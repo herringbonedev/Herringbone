@@ -30,7 +30,7 @@ jobs:
 
     - name: Run container for smoke test
       run: |
-        docker run -d --name test_receiver receiver:beta-1.0.0-${{ github.run_number }}
+        docker run -d --name test_receiver -e RECEIVER_TYPE=UDP receiver:beta-1.0.0-${{ github.run_number }}
         sleep 5
         docker logs test_receiver  # Optional: View logs
         docker ps -a               # Show container status
