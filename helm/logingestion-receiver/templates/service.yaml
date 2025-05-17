@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: herringbone-receiver-service
+  namespace {{ Values.namespace | default "herringbone" }}
+spec:
+  type: NodePort
+  externalTrafficPolicy: Local
+  selector:
+    app: herringbone-receiver
+  ports:
+    - name: tcp
+      protocol: TCP
+      port: 7002
+      targetPort: 7002
+      nodePort: 
+    - name: udp
+      protocol: UDP
+      port: 7002
+      targetPort: 7002
+      nodePort: {{ Values.NodePort | default 30002 }}
