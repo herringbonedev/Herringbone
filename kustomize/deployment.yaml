@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: herringbone-receiver
+  namespace: herringbone
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: herringbone-receiver
+  template:
+    metadata:
+      labels:
+        app: herringbone-receiver
+    spec:
+      containers:
+        - name: receiver
+          image: quay.io/herringbone/receiver  # tag injected by Kustomize
+          ports:
+            - containerPort: 7002
+              name: tcp-port
+              protocol: TCP
+            - containerPort: 7002
+              name: udp-port
+              protocol: UDP
