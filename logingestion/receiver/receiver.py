@@ -2,7 +2,7 @@ import inet, web
 import os
 
 TYPE = os.environ.get("RECEIVER_TYPE")
-print("Starting receiver..."+ TYPE)
+print("Starting herringbone receiver..."+ TYPE)
 
 if TYPE == "UDP":
     inet.start_udp_receiver()
