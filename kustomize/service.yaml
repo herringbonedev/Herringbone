@@ -4,7 +4,7 @@ metadata:
   name: herringbone-receiver-service
   namespace: herringbone
 spec:
-  type: LoadBalancer
+  type: NodePort
   externalTrafficPolicy: Local
   selector:
     app: herringbone-receiver
@@ -13,7 +13,9 @@ spec:
       protocol: TCP
       port: 7002
       targetPort: 7002
+      nodePort: 30002
     - name: udp
       protocol: UDP
       port: 7002
       targetPort: 7002
+      nodePort: 30002
