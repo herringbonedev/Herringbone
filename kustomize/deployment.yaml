@@ -23,3 +23,7 @@ spec:
             - containerPort: 7002
               name: udp-port
               protocol: UDP
+              protocol: UDP
+        env:
+          - name: RECEIVER_TYPE
+            value: UDP
