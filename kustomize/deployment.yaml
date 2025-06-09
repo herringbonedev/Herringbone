@@ -24,6 +24,6 @@ spec:
               name: udp-port
               protocol: UDP
               protocol: UDP
-        env:
-          - name: RECEIVER_TYPE
-            value: UDP
+          env:
+            - name: RECEIVER_TYPE
+              value: "UDP"
