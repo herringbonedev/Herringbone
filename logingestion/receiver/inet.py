@@ -8,10 +8,9 @@ def start_udp_receiver():
     print("Started on container port 7002")
 
     while( True):
-        print("Receiving...")
         data, addr = udp_receiver.recvfrom(1024)
         data = data.decode('utf-8')
-        print(f"[{addr}] {data}")
+        print(f"[Source Address: {addr}] {data}")
 
 def start_tcp_receiver():
     print("Receiver type set to TCP...")
@@ -20,7 +19,6 @@ def start_tcp_receiver():
     print("Started on container port 7002")
 
     while(True):
-        print("Receiving...")
         data, addr = tcp_receiver.accept()
         data = data.recv(1024).decode('utf-8')
-        print(f"[{addr}] {data}")
+        print(f"[Source Address: {addr}] {data}")
