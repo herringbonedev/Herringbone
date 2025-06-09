@@ -38,10 +38,8 @@ jobs:
 
     - name: Push image to DockerHub (only if tests pass)
       run: |
-        docker tag receiver:beta-1.0.0-${{ github.run_number }} quay.io/herringbone/receiver:beta-1.0.0-${{ github.run_number }}
-        docker push quay.io/herringbone/receiver:beta-1.0.0-${{ github.run_number }}
-        docker tag receiver:latest quay.io/herringbone/receiver:beta-1.0.0-${{ github.run_number }}
-        docker push docker tag receiver:latest
+        docker tag receiver:beta-1.0.0-${{ github.run_number }} quay.io/herringbone/receiver:latest
+        docker push quay.io/herringbone/receiver:latest
 
     - name: Cleanup
       if: always()
