@@ -40,6 +40,8 @@ jobs:
       run: |
         docker tag receiver:beta-1.0.0-${{ github.run_number }} quay.io/herringbone/receiver:beta-1.0.0-${{ github.run_number }}
         docker push quay.io/herringbone/receiver:beta-1.0.0-${{ github.run_number }}
+        docker tag receiver:latest quay.io/herringbone/receiver:beta-1.0.0-${{ github.run_number }}
+        docker push docker tag receiver:latest
 
     - name: Cleanup
       if: always()
