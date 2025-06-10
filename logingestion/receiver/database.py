@@ -11,7 +11,7 @@ class MongoDatabaseHandler:
 
     def __init__(self):
         self.MONGO_HOST = os.environ.get('MONGO_HOST', None)
-        self.DB_NAME = 'herringbone_db'
+        self.DB_NAME = os.environ.get("DB_NAME")
         self.COLLECTION_NAME = os.environ.get('COLLECTION_NAME')
         self.MONGO_USER = os.environ.get('MONGO_USER')
         self.MONGO_PASS = os.environ.get('MONGO_PASS')
