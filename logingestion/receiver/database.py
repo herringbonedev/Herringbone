@@ -15,7 +15,7 @@ class MongoDatabaseHandler:
         self.COLLECTION_NAME = os.environ.get('COLLECTION_NAME')
         self.MONGO_USER = os.environ.get('MONGO_USER')
         self.MONGO_PASS = os.environ.get('MONGO_PASS')
-        self.AUTH_URI = f"mongodb://{self.MONGO_USER}:{self.MONGO_PASS}@{self.MONGO_HOST}"
+        self.AUTH_URI = f"mongodb://{self.MONGO_USER}:{self.MONGO_PASS}@{self.MONGO_HOST}/{self.DB_NAME}"
 
         if self.MONGO_HOST is not None:
             self.client = MongoClient(self.MONGO_HOST)
