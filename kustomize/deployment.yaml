@@ -7,11 +7,11 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: herringbone-receiver
+      app: herringbone-receiver-udp
   template:
     metadata:
       labels:
-        app: herringbone-receiver
+        app: herringbone-receiver-udp
     spec:
       containers:
         - name: receiver
@@ -36,11 +36,11 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: herringbone-receiver
+      app: herringbone-receiver-http
   template:
     metadata:
       labels:
-        app: herringbone-receiver
+        app: herringbone-receiver-http
     spec:
       containers:
         - name: receiver
