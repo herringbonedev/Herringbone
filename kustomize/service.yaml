@@ -35,9 +35,9 @@ spec:
       protocol: TCP
       port: 7002
       targetPort: 7002
-      nodePort: 30002
+      nodePort: 30003
     - name: tcp
       protocol: TCP
       port: 7002
       targetPort: 7002
-      nodePort: 30002
+      nodePort: 30003
