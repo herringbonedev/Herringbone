@@ -6,7 +6,7 @@ def start_udp_receiver():
     try:
         print("Connecting to database...")
         mongo = MongoDatabaseHandler()
-    except Excetion as e:
+    except Exception as e:
         print(f"Mongo connection failed. {e}")
 
     print("Receiver type set to UDP...")
@@ -21,7 +21,7 @@ def start_udp_receiver():
 
         try:
             mongo.insert_log({"source_address": addr, "log": data})
-        except exception as e:
+        except Exception as e:
             print(f"Mongo insert operation failed. {e}")
 
 def start_tcp_receiver():
