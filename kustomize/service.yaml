@@ -9,11 +9,6 @@ spec:
   selector:
     app: herringbone-receiver-udp
   ports:
-    - name: tcp
-      protocol: TCP
-      port: 7002
-      targetPort: 7002
-      nodePort: 30002
     - name: udp
       protocol: UDP
       port: 7002
@@ -31,11 +26,6 @@ spec:
   selector:
     app: herringbone-receiver-http
   ports:
-    - name: tcp
-      protocol: TCP
-      port: 7002
-      targetPort: 7002
-      nodePort: 30003
     - name: tcp
       protocol: TCP
       port: 7002
