@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: herringbone-receiver-service
+  name: herringbone-receiver-udp-service
   namespace: herringbone
 spec:
   type: NodePort
   externalTrafficPolicy: Local
   selector:
-    app: herringbone-receiver
+    app: herringbone-receiver-udp
   ports:
     - name: tcp
       protocol: TCP
@@ -16,6 +16,28 @@ spec:
       nodePort: 30002
     - name: udp
       protocol: UDP
+      port: 7002
+      targetPort: 7002
+      nodePort: 30002
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: herringbone-receiver-http-service
+  namespace: herringbone
+spec:
+  type: NodePort
+  externalTrafficPolicy: Local
+  selector:
+    app: herringbone-receiver-http
+  ports:
+    - name: tcp
+      protocol: TCP
+      port: 7002
+      targetPort: 7002
+      nodePort: 30002
+    - name: tcp
+      protocol: TCP
       port: 7002
       targetPort: 7002
       nodePort: 30002
