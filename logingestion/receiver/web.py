@@ -6,7 +6,11 @@ app = Flask(__name__)
 def receiver():
     data = request.args.get('data')
     if data:
-        print(f"Received data: {data}")
+        if request.headers.getlist("X-Forwarded-For"):
+            addr = request.headers.getlist("X-Forwarded-For")[0].split(',')[0]
+        else:
+            addr = request.remote_addr
+        print(f"[Source Address: {addr}] {data}")
         return "Data received", 200
     else:
         return "No data received", 400
