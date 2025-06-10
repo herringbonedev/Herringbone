@@ -15,12 +15,7 @@ class MongoDatabaseHandler:
         self.COLLECTION_NAME = os.environ.get('COLLECTION_NAME')
         self.MONGO_USER = os.environ.get('MONGO_USER')
         self.MONGO_PASS = os.environ.get('MONGO_PASS')
-
-        uri_parts = self.MONGO_HOST.split("://")
-        if len(uri_parts) != 2:
-            raise Exception("Invalid MONGO_HOST format. Expecting mongodb://hostname:port")
-        
-        self.AUTH_URI = f"{uri_parts[0]}://{self.MONGO_USER}:{self.MONGO_PASS}@{uri_parts[1]}"
+        self.AUTH_URI = f"mongodb://{self.MONGO_USER}:{self.MONGO_PASS}@{self.MONGO_HOST}"
 
         if self.MONGO_HOST is not None:
             self.client = MongoClient(self.MONGO_HOST)
