@@ -5,7 +5,7 @@ from database import MongoDatabaseHandler
 def start_udp_receiver():
     print("Connecting to database...")
     mongo = MongoDatabaseHandler()
-
+    
     print("Receiver type set to UDP...")
     udp_receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_receiver.bind(('0.0.0.0', 7002))

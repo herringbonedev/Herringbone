@@ -7,12 +7,12 @@ class MongoNotSet(Exception):
     """If the MONGO_HOST is not set in the container environment variables"""
     pass
 
-class mongo_database():
+class MongoDatabaseHandler:
 
-    def __init__(self, collection_name):
+    def __init__(self):
         self.MONGO_HOST = os.environ.get('MONGO_HOST', None)
         self.DB_NAME = 'herringbone_db'
-        self.COLLECTION_NAME = collection_name
+        self.COLLECTION_NAME = os.environ.get('COLLECTION_NAME')
         self.MONGO_USER = os.environ.get('MONGO_USER')
         self.MONGO_PASS = os.environ.get('MONGO_PASS')
 
