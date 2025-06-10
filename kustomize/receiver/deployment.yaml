@@ -18,9 +18,6 @@ spec:
           image: quay.io/herringbone/receiver
           ports:
             - containerPort: 7002
-              name: tcp-port
-              protocol: TCP
-            - containerPort: 7002
               name: udp-port
               protocol: UDP
           env:
@@ -66,9 +63,6 @@ spec:
           ports:
             - containerPort: 7002
               name: tcp-port
-              protocol: TCP
-            - containerPort: 7002
-              name: udp-port
               protocol: TCP
           env:
             - name: RECEIVER_TYPE
