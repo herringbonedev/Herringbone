@@ -23,9 +23,9 @@ spec:
             - containerPort: 7002
               name: udp-port
               protocol: UDP
-      env:
-        - name: RECEIVER_TYPE
-          value: "UDP"
+          env:
+          - name: RECEIVER_TYPE
+            value: "UDP"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -52,6 +52,6 @@ spec:
             - containerPort: 7002
               name: udp-port
               protocol: TCP
-      env:
-        - name: RECEIVER_TYPE
-          value: "HTTP"
+          env:
+          - name: RECEIVER_TYPE
+            value: "HTTP"
