@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: herringbone-receiver
+  name: herringbone-receiver-udp
   namespace: herringbone
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: herringbone-receiver
@@ -26,3 +26,32 @@ spec:
       env:
         - name: RECEIVER_TYPE
           value: UDP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: herringbone-receiver-http
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: herringbone-receiver
+  template:
+    metadata:
+      labels:
+        app: herringbone-receiver
+    spec:
+      containers:
+        - name: receiver
+          image: quay.io/herringbone/receiver  # tag injected by Kustomize
+          ports:
+            - containerPort: 7002
+              name: tcp-port
+              protocol: TCP
+            - containerPort: 7002
+              name: udp-port
+              protocol: TCP
+      env:
+        - name: RECEIVER_TYPE
+          value: HTTP
