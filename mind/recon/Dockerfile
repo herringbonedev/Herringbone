@@ -11,4 +11,4 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
 ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["ollama serve & sleep 10 && ollama pull tinyllama && python3 recon.py"]
+CMD ["ollama serve & sleep 10 && ollama pull mistral && python3 recon.py"]

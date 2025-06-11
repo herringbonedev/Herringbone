@@ -15,12 +15,11 @@ You are a log analysis AI. Given a raw log message, respond with only a JSON obj
 "malicious": a score from 0 (benign) to 10 (very malicious)
 
 Example output:
-{
-  "log_type": "Windows 10",
-  "origin": "United States",
-  "description": "Login event",
-  "malicious": "10"
-}
+
+"log_type": "Windows 10",
+"origin": "United States",
+"description": "Login event",
+"malicious": "10"
 
 Now analyze this log: {record}
 """
@@ -34,12 +33,12 @@ def recon():
     prompt = PROMPT_TEMPLATE.format(record=record)
 
     response = requests.post(OLLAMA_URL, json={
-        "model": "tinyllama",
+        "model": "mistral",
         "prompt": prompt,
         "stream": False
     })
 
-    return response.json().get("response", "")
+    return response.json().get('response', 'No response from model')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8002)
