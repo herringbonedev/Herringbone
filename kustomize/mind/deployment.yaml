@@ -14,7 +14,7 @@ spec:
         app: herringbone-mind-recon
     spec:
       containers:
-        - name: receiver
+        - name: mind-recon
           image: quay.io/herringbone/mind_recon
           ports:
             - containerPort: 8002
