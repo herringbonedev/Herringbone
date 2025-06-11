@@ -38,4 +38,5 @@ def recon():
     return response.json().get("response", "")
 
 if __name__ == '__main__':
+    print("Starting Mind Recon API")
     app.run(host='0.0.0.0', port=8002)
