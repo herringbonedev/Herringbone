@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: herringbone-mind-recon-service
+  namespace: herringbone
+spec:
+  type: NodePort
+  externalTrafficPolicy: Local
+  selector:
+    app: herringbone-mind-recon
+  ports:
+    - name: tcp
+      protocol: TCP
+      port: 8002
+      targetPort: 8002
+      nodePort: 30012

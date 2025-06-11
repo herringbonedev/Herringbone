@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: herringbone-mind-recon
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: herringbone-mind-recon
+  template:
+    metadata:
+      labels:
+        app: herringbone-mind-recon
+    spec:
+      containers:
+        - name: receiver
+          image: quay.io/herringbone/mind_recon
+          ports:
+            - containerPort: 8002
+              name: tcp-port
+              protocol: TCP
