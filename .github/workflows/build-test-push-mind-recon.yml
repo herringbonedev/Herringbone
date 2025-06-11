@@ -6,7 +6,7 @@ on:
     branches:
       - beta-1.0           # Or test branch if preferred
     paths:
-      - '/mind/recon/**'
+      - 'mind/recon/**'
 
 jobs:
   build-test-push:
