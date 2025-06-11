@@ -7,24 +7,22 @@ app = Flask(__name__)
 OLLAMA_URL = 'http://localhost:11434/api/generate'
 
 PROMPT_TEMPLATE = """
-You are a cybersecurity recon analyst. Given the log below, answer this question in a concise and technical manner using the following format:
+You are a log analysis AI. Given a raw log message, respond with only a JSON object containing:
 
-You need to 
+"log_type": the OS or app name,
+"origin": country if possible,
+"description": a short event summary,
+"malicious": a score from 0 (benign) to 10 (very malicious)
 
-"log_type":"Your evaluation of what operating system, application or whatever kind of source this log came from",
-"origin":"The country of origin that this log came from",
-"description":"a description of what this log is",
-"malicious":"Your evaluation if it is malicious or not from a scale of 1 (least malicious) to 100 (most malicious)"
+Example output:
+{
+  "log_type": "Windows 10",
+  "origin": "United States",
+  "description": "Login event",
+  "malicious": "10"
+}
 
-
-here is an example of a perfect answer:
-
-"log_type":"Windows 10",
-"origin":"United States",
-"description":"Login event",
-"malicious":"10"
-
-Heres the log to evaluate: {record}
+Now analyze this log: {record}
 """
 
 @app.route('/recon', methods=['POST'])
