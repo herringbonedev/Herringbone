@@ -30,7 +30,7 @@ def recon():
     prompt = PROMPT_TEMPLATE.format(record=record)
 
     response = requests.post(OLLAMA_URL, json={
-        "model": "llama3",
+        "model": "tinyllama",
         "prompt": prompt,
         "stream": False
     })
