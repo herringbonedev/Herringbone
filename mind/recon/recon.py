@@ -7,21 +7,33 @@ app = Flask(__name__)
 OLLAMA_URL = 'http://localhost:11434/api/generate'
 
 PROMPT_TEMPLATE = """
-You are a log analysis AI. Given a raw log message, respond with only a JSON object containing:
+You are a cybersecurity threat analysis AI trained to extract structured intelligence from raw logs. Given a log message, respond with only a JSON object using STIX 2.1-compatible fields, MITRE ATT&CK mappings, and typed indicators of compromise.
 
-"log_type": the OS or app name,
-"origin": country if possible,
-"description": a short event summary,
-"malicious": a score from 0 (benign) to 10 (very malicious)
+Return only the following fields when available:
 
-Example output:
+- "log_type": High-level source category (e.g., "Windows Event Log", "Linux Syslog", "Apache Access Log")
+- "operating_system": The specific OS (e.g., "Windows 10", "Ubuntu 22.04")
+- "origin": Country of origin based on source IP or hostname, if determinable
+- "description": Short summary of the log event
+- "malicious": Score from 0 (benign) to 10 (highly malicious)
+- "event_type": Classification like "authentication", "network", "file_access", "execution", "registry_change", etc.
+- "attack_tactic": Mapped MITRE ATT&CK tactic (e.g., "Execution", "Persistence")
+- "attack_technique": MITRE ATT&CK technique name and ID (e.g., "Command and Scripting Interpreter (T1059)")
+- "ioc": Object grouping the extracted indicators of compromise, broken down by type:
+  - "IPv4Address": List of IP addresses
+  - "domain": List of FQDNs or domains
+  - "url": List of URLs
+  - "username": List of usernames or account names
+  - "filepath": List of local file paths
+  - "process": List of process names or commands
+  - "registry_key": List of registry keys accessed or modified
+  - "hash": List of file hashes (MD5, SHA1, SHA256)
 
-"log_type": "Windows 10",
-"origin": "United States",
-"description": "Login event",
-"malicious": "10"
+- "confidence": Integer from 0–100 representing the model’s certainty in its output
 
-Now analyze this log: {record}
+Respond with a valid JSON object only — no additional explanations, comments, or null fields.
+
+input log: {record}
 """
 
 @app.route('/recon', methods=['POST'])
