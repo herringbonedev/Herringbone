@@ -1,4 +1,4 @@
-name: Build, Test, and Push Docker Image
+name: Build, Test, and Push Docker Image (Receiver)
 
 on:
   workflow_dispatch:  # Trigger manually from GitHub UI
