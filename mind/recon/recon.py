@@ -33,7 +33,7 @@ def recon():
     prompt = PROMPT_TEMPLATE.format(record=record)
 
     response = requests.post(OLLAMA_URL, json={
-        "model": "mistral",
+        "model": "gemma:2b",
         "prompt": prompt,
         "stream": False
     })
