@@ -1,0 +1,50 @@
+name: Build, Test, and Push Docker Image
+
+on:
+  workflow_dispatch:  # Trigger manually from GitHub UI
+  push:
+    branches:
+      - beta-1.0           # Or test branch if preferred
+    paths:
+      - /mind/recon
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to DockerHub
+      uses: docker/login-action@v3
+      with:
+        registry: quay.io
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build Docker image
+      run: |-
+        docker build -t mind_recon:beta-1.0.0-${{ github.run_number }} ./mind/recon
+
+    - name: Run container for smoke test
+      run: |
+        docker run -d --name test_mind_recon mind_recon:beta-1.0.0-${{ github.run_number }}
+        sleep 5
+        docker logs test_mind_recon  # Optional: View logs
+        docker ps -a               # Show container status
+        docker inspect test_mind_recon --format='{{.State.Running}}' | grep true
+
+    - name: Push image to DockerHub (only if tests pass)
+      run: |
+        docker tag mind_recon:beta-1.0.0-${{ github.run_number }} quay.io/herringbone/mind_recon:latest
+        docker push quay.io/herringbone/mind_recon:latest
+
+    - name: Cleanup
+      if: always()
+      run: |
+        docker stop test_mind_recon || true
+        docker rm test_mind_recon || true
