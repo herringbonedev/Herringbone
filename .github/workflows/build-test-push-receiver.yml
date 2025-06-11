@@ -6,7 +6,7 @@ on:
     branches:
       - beta-1.0           # Or test branch if preferred
     paths:
-      - /logingestion/receiver
+      - 'logingestion/receiver/**'
 
 jobs:
   build-test-push:
