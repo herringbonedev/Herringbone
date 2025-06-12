@@ -35,6 +35,11 @@ class MongoDatabaseHandler:
         
     def insert_log(self, log_object):
         try:
+            log_object.update({
+                "recon": False,
+                "recon_data": None,
+                "last_update": datetime.utcnow()
+            })
             result = self.collection.insert_one(log_object)
             print(f"[✓] Inserted log with _id: {result.inserted_id}")
         except Exception as e:
