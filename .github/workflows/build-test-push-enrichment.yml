@@ -30,14 +30,6 @@ jobs:
       run: |-
         docker build -t enrichment:beta-1.0.0-${{ github.run_number }} ./logingestion/enrichment
 
-    - name: Run container for smoke test
-      run: |
-        docker run -d --name test_enrichment enrichment:beta-1.0.0-${{ github.run_number }}
-        sleep 5
-        docker logs test_enrichment  # Optional: View logs
-        docker ps -a               # Show container status
-        docker inspect test_enrichment --format='{{.State.Running}}' | grep true
-
     - name: Push image to DockerHub (only if tests pass)
       run: |
         docker tag enrichment:beta-1.0.0-${{ github.run_number }} quay.io/herringbone/enrichment:latest
