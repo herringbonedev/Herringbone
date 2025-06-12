@@ -44,13 +44,10 @@ except Exception as e:
 
 while True:
 
-    doc = collection.find_one_and_update(
-        {
-                "recon": False,
-                "recon_data": None,
-        },
-        return_document=ReturnDocument.AFTER
-    )
+    doc = collection.find_one({
+        "recon": False,
+        "recon_data": None,
+    })
 
     if not doc:
         time.sleep(1)
