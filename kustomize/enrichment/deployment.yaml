@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: herringbone-enrichment
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: herringbone-enrichment
+  template:
+    metadata:
+      labels:
+        app: herringbone-enrichment
+    spec:
+      containers:
+        - name: enrichment
+          image: quay.io/herringbone/enrichment
+          env:
+            - name: MONGO_HOST
+              value: mongodb.mongodb.svc.cluster.local:27017
+            - name: DB_NAME
+              value: herringbone
+            - name: COLLECTION_NAME
+              value: http_logs
+            - name: MIND_RECON_SVC
+              value: http://herringbone-mind-recon-service.herringbone.svc.cluster.local:8002/recon
+            - name: MONGO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: username
+            - name: MONGO_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: password

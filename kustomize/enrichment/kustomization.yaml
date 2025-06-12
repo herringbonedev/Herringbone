@@ -1,0 +1,8 @@
+namespace: herringbone
+
+resources:
+  - deployment.yaml
+
+images:
+  - name: quay.io/herringbone/enrichment
+    newTag: latest  # Image Updater will modify this
