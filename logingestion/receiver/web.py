@@ -1,6 +1,14 @@
 from flask import Flask, request
+from database import MongoDatabaseHandler
+
 
 app = Flask(__name__)
+
+try:
+    print("Connecting to database...")
+    mongo = MongoDatabaseHandler()
+except Exception as e:
+    print(f"Mongo connection failed. {e}")
 
 @app.route('/receiver')
 def receiver():
@@ -11,6 +19,12 @@ def receiver():
         else:
             addr = request.remote_addr
         print(f"[Source Address: {addr}] {data}")
+
+        try:
+            mongo.insert_log({"source_address": addr, "raw_log": data})
+        except Exception as e:
+            print(f"Mongo insert operation failed. {e}")
+
         return "Data received", 200
     else:
         return "No data received", 400

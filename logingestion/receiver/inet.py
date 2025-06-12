@@ -20,7 +20,7 @@ def start_udp_receiver():
         print(f"[Source Address: {addr}] {data}")
 
         try:
-            mongo.insert_log({"source_address": addr, "log": data})
+            mongo.insert_log({"source_address": addr, "raw_log": data})
         except Exception as e:
             print(f"Mongo insert operation failed. {e}")
 
