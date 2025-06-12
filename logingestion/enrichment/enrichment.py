@@ -9,7 +9,7 @@ def perform_recon(raw_log):
     payload = {"record": raw_log}
 
     try:
-        response = requests.post(url, json=payload, timeout=10)
+        response = requests.post(url, json=payload, timeout=1000)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
