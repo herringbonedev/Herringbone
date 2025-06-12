@@ -22,7 +22,7 @@ spec:
             - name: DB_NAME
               value: herringbone
             - name: COLLECTION_NAME
-              value: http_logs
+              value: logs
             - name: MIND_RECON_SVC
               value: http://herringbone-mind-recon-service.herringbone.svc.cluster.local:8002/recon
             - name: MONGO_USER
