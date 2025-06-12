@@ -20,3 +20,10 @@ spec:
             - containerPort: 8002
               name: tcp-port
               protocol: TCP
+      nodeSelector:
+        mind: "true"
+      tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "mind"
+          effect: "NoSchedule"
