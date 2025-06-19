@@ -8,7 +8,10 @@ EXPOSE 8002/tcp
 WORKDIR /app
 COPY . .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt || true
 
-ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["ollama serve & sleep 10 && ollama pull gemma:2b && python3 recon.py"]
+RUN ollama pull gemma:2b
+
+RUN ollama create securitylog -f Modelfile
+
+CMD ["sh", "-c", "ollama serve & sleep 10 && python3 recon.py"]
