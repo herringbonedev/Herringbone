@@ -10,7 +10,6 @@ Your sole job is to take one **raw log line** from any OS or application and ret
 | log_type | string | High-level source category, e.g. “Windows Event Log”, “Linux Syslog”, “Apache Access Log”. |
 | origin | string | Country of the *source* IP (“United States”, “Germany”). Use built-in GeoIP knowledge; if none, return “Unknown”. |
 | description | string | One-sentence, human-readable summary of what happened. Start with a capital letter, no trailing period. |
-| malicious | integer (0-10) | Risk score (0 = benign, 10 = confirmed malicious). See **Scoring Rules**. |
 | event_type | string | One of: authentication, network, process, privilege_escalation, persistence, file, registry, configuration, reconnaissance, other. |
 
 > **JSON MUST be single-line, UTF-8, no spaces except inside string values, double-quoted keys, and ordered exactly as above.**  
