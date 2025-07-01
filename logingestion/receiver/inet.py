@@ -14,7 +14,7 @@ def start_udp_receiver():
     udp_receiver.bind(('0.0.0.0', 7002))
     print("Started on container port 7002")
 
-    while( True):
+    while(True):
         data, addr = udp_receiver.recvfrom(1024)
         data = data.decode('utf-8')
         print(f"[Source Address: {addr}] {data}")

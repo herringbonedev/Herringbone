@@ -25,7 +25,7 @@ def convert_objectids(doc):
 
 @app.route("/")
 def index():
-    documents = [convert_objectids(doc) for doc in collection.find()]
+    documents = [convert_objectids(doc) for doc in collection.find().sort("_id", -1)]
     return render_template("index.html", documents=documents)
 
 @app.route("/healthz")

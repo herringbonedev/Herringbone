@@ -1,28 +1,84 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>MongoDB Logs Viewer</title>
     <style>
-        body { font-family: Arial; padding: 2em; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ccc; padding: 8px; vertical-align: top; }
-        th { background-color: #f2f2f2; }
-        pre { margin: 0; white-space: pre-wrap; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            padding: 2em;
+        }
+        h1 {
+            color: #ffffff;
+        }
+        input[type="text"] {
+            padding: 10px;
+            width: 100%;
+            margin-bottom: 1em;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            border: 1px solid #444;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #1e1e1e;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #333;
+            vertical-align: top;
+        }
+        th {
+            background-color: #333;
+            color: #f0f0f0;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+        }
     </style>
+    <script>
+        function filterLogs() {
+            const search = document.getElementById("search").value.toLowerCase();
+            const rows = document.querySelectorAll("tbody tr");
+            rows.forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(search) ? "" : "none";
+            });
+        }
+    </script>
 </head>
 <body>
     <h1>MongoDB Logs ({{ documents|length }})</h1>
+    <input type="text" id="search" placeholder="Search logs..." onkeyup="filterLogs()">
     <table>
-        <tr>
-            <th>#</th>
-            <th>Document</th>
-        </tr>
-        {% for doc in documents %}
-        <tr>
-            <td>{{ loop.index }}</td>
-            <td><pre>{{ doc | tojson(indent=2) }}</pre></td>
-        </tr>
-        {% endfor %}
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Description</th>
+                <th>Source Address</th>
+                <th>Full JSON</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for doc in documents %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ doc.recon_data.description if doc.recon_data and 'description' in doc.recon_data else '—' }}</td>
+                <td>
+                    {% if doc.source_address %}
+                        {{ doc.source_address[0] }}:{{ doc.source_address[1] }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td><pre>{{ doc | tojson(indent=2) }}</pre></td>
+            </tr>
+            {% endfor %}
+        </tbody>
     </table>
 </body>
 </html>

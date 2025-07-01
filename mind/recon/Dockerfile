@@ -1,17 +1,27 @@
 FROM ollama/ollama:latest
 
-RUN apt-get update && \
-    apt-get install -y python3 python3-pip curl
+# Install dependencies
+RUN apt-get update && apt-get install -y python3 python3-pip curl
+RUN apt-get update && apt-get install -y tree
 
-EXPOSE 8002/tcp
-
+# Set working directory
 WORKDIR /app
+
+# Copy app source and model files
 COPY . .
 
+# Install Python dependencies (if any)
 RUN pip install --no-cache-dir -r requirements.txt || true
 
-RUN ollama pull gemma:2b
+# Expose necessary ports
+EXPOSE 8002
+EXPOSE 11434
 
-RUN ollama create securitylog -f Modelfile
-
-CMD ["sh", "-c", "ollama serve & sleep 10 && python3 recon.py"]
+# Start Ollama, copy model files, and run the app
+ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["ollama serve & sleep 10 && \
+mkdir -p /root/.ollama/models/manifests/registry.ollama.ai/library/herringbone-mind-recon && \
+mkdir -p /root/.ollama/models/blobs && \
+cp -r /app/herringbone-mind-recon/manifests/registry.ollama.ai/library/herringbone-mind-recon /root/.ollama/models/manifests/registry.ollama.ai/library && \
+cp -r /app/herringbone-mind-recon/blobs /root/.ollama/models && \
+python3 recon.py"]

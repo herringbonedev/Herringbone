@@ -69,6 +69,10 @@ while True:
     except Exception as e:
         collection.update_one(
             {"_id": doc["_id"]},
-            {"$set": {"recon": False}}
+            {"$set": 
+                {"recon": True, 
+                 "recon_data": {"description": "Failed to enrich log"}, 
+                 "last_processed": datetime.utcnow()}
+            }
         )
         print(f"[✗] Failed to enrich log {doc['_id']}: {e}")

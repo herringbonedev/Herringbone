@@ -2,6 +2,7 @@ from pymongo import MongoClient
 from datetime import datetime
 import os
 import json
+import codecs
 
 class MongoNotSet(Exception):
     """If the MONGO_HOST is not set in the container environment variables"""
@@ -32,8 +33,19 @@ class MongoDatabaseHandler:
 
         except Exception as e:
             raise Exception(f"Failed to connect to MongoDB: {e}")
-        
+
+    def clean_codec(self,data):
+        """Clean the codec data by decoding it from unicode escape sequences.
+        """
+
+        decoded = data.encode('utf-8').decode('unicode_escape')
+        decoded = codecs.decode(decoded.encode('utf-8'), 'unicode_escape')
+        return decoded.strip()
+
     def insert_log(self, log_object):
+
+        log_object["raw_log"] = self.clean_codec(log_object["raw_log"])
+        
         try:
             log_object.update({
                 "recon": False,
