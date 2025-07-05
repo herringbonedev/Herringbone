@@ -1,12 +1,18 @@
-from flask import Flask, render_template
+import eventlet
+eventlet.monkey_patch()
+
+from flask import Flask, render_template, jsonify
+from flask_socketio import SocketIO
 from pymongo import MongoClient
 from bson import ObjectId
 import os
+import threading
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Get env vars
-MONGO_HOST = os.environ.get('MONGO_HOST', None)
+MONGO_HOST = os.environ.get('MONGO_HOST')
 DB_NAME = os.environ.get("DB_NAME")
 COLLECTION_NAME = os.environ.get('COLLECTION_NAME')
 MONGO_USER = os.environ.get('MONGO_USER')
@@ -32,5 +38,13 @@ def index():
 def healthz():
     return "OK", 200
 
+@app.route("/api/logs")
+def api_logs():
+    documents = [convert_objectids(doc) for doc in collection.find().sort("_id", -1)]
+    return jsonify(documents)
+
+def emit_new_log(log):
+    socketio.emit('new_log', convert_objectids(log), broadcast=True)
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=7002)
+    socketio.run(app, host="0.0.0.0", port=7002)

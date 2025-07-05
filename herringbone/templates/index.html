@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MongoDB Logs Viewer</title>
+    <title>Herringbone - Log Ingestion</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -49,10 +49,44 @@
                 row.style.display = row.textContent.toLowerCase().includes(search) ? "" : "none";
             });
         }
+
+        function renderLogs(logs) {
+            const table = document.querySelector("tbody");
+            table.innerHTML = ""; // Clear existing rows
+
+            logs.forEach((data, index) => {
+                const desc = data.recon_data?.description || '—';
+                const addr = data.source_address ? data.source_address[0] + ':' + data.source_address[1] : '—';
+
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${desc}</td>
+                    <td>${addr}</td>
+                    <td><pre>${JSON.stringify(data, null, 2)}</pre></td>
+                `;
+                table.appendChild(row);
+            });
+        }
+
+        async function fetchLogs() {
+            try {
+                const res = await fetch("/api/logs");
+                const logs = await res.json();
+                renderLogs(logs);
+            } catch (err) {
+                console.error("Error fetching logs:", err);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            fetchLogs(); // initial fetch
+            setInterval(fetchLogs, 5000); // poll every 5 seconds
+        });
     </script>
 </head>
 <body>
-    <h1>MongoDB Logs ({{ documents|length }})</h1>
+    <h1>Herringbone - Log Ingestion</h1>
     <input type="text" id="search" placeholder="Search logs..." onkeyup="filterLogs()">
     <table>
         <thead>
@@ -64,20 +98,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for doc in documents %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ doc.recon_data.description if doc.recon_data and 'description' in doc.recon_data else '—' }}</td>
-                <td>
-                    {% if doc.source_address %}
-                        {{ doc.source_address[0] }}:{{ doc.source_address[1] }}
-                    {% else %}
-                        —
-                    {% endif %}
-                </td>
-                <td><pre>{{ doc | tojson(indent=2) }}</pre></td>
-            </tr>
-            {% endfor %}
+            <!-- Rows populated dynamically by JS -->
         </tbody>
     </table>
 </body>

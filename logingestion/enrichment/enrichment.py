@@ -10,6 +10,7 @@ def perform_recon(raw_log):
 
     try:
         response = requests.post(url, json=payload, timeout=1000)
+        print(response.text)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
@@ -69,10 +70,6 @@ while True:
     except Exception as e:
         collection.update_one(
             {"_id": doc["_id"]},
-            {"$set": 
-                {"recon": True, 
-                 "recon_data": {"description": "Failed to enrich log"}, 
-                 "last_processed": datetime.utcnow()}
-            }
+            {"$set": {"recon": False}}
         )
         print(f"[✗] Failed to enrich log {doc['_id']}: {e}")

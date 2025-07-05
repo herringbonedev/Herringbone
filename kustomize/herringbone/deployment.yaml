@@ -14,7 +14,7 @@ spec:
         app: herringbone-app
     spec:
       containers:
-        - name: receiver
+        - name: herringbone-app
           image: quay.io/herringbone/herringbone-app
           ports:
             - containerPort: 7002

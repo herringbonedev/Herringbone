@@ -18,6 +18,7 @@ def prompt_template(raw_log):
 def recon():
     data = request.get_json()
     raw_log = data.get('record', '')
+    print(f"[*] Recon request received for log: {raw_log}")
 
     response = requests.post(OLLAMA_URL, json={
         "model": "herringbone-mind-recon",

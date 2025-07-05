@@ -8,7 +8,10 @@ RUN apt-get update && apt-get install -y tree
 WORKDIR /app
 
 # Copy app source and model files
-COPY . .
+COPY ./recon.py /app/recon.py
+COPY ./prompt.text /app/prompt.text
+COPY ./requirements.txt /app/requirements.txt
+COPY ./herringbone-mind-recon /app/herringbone-mind-recon
 
 # Install Python dependencies (if any)
 RUN pip install --no-cache-dir -r requirements.txt || true

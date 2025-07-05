@@ -15,3 +15,5 @@ If you are even slightly unsure of your answer for any of the given fields in th
 You are not allowed to add or alter the keys in the JSON given.
 
 Don't use any value if you don't know a field. Just simply leave it blank
+
+Do not return anything except the JSON. Only respond with the JSON. Just return JSON.
