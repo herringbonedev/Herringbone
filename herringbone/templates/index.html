@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Herringbone - Log Ingestion</title>
+    <title>MongoDB Logs Viewer</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -42,52 +42,78 @@
         }
     </style>
     <script>
-        function filterLogs() {
-            const search = document.getElementById("search").value.toLowerCase();
-            const rows = document.querySelectorAll("tbody tr");
-            rows.forEach(row => {
-                row.style.display = row.textContent.toLowerCase().includes(search) ? "" : "none";
-            });
+        let logsCache = [];
+
+        function getValueByPath(obj, path) {
+            return path.split('.').reduce((o, p) => o?.[p], obj);
         }
 
-        function renderLogs(logs) {
-            const table = document.querySelector("tbody");
-            table.innerHTML = ""; // Clear existing rows
+        function filterLogs() {
+            const textQuery = document.getElementById("search").value.toLowerCase();
+            const jsonQueryStr = document.getElementById("jsonSearch").value.trim();
+            let jsonQuery = {};
 
-            logs.forEach((data, index) => {
+            try {
+                if (jsonQueryStr) {
+                    jsonQuery = JSON.parse(jsonQueryStr);
+                }
+            } catch (e) {
+                console.warn("Invalid JSON query");
+                return;
+            }
+
+            const table = document.querySelector("tbody");
+            table.innerHTML = "";
+
+            logsCache.forEach((data, index) => {
                 const desc = data.recon_data?.description || '—';
                 const addr = data.source_address ? data.source_address[0] + ':' + data.source_address[1] : '—';
+                const jsonStr = JSON.stringify(data, null, 2).toLowerCase();
 
-                const row = document.createElement("tr");
-                row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${desc}</td>
-                    <td>${addr}</td>
-                    <td><pre>${JSON.stringify(data, null, 2)}</pre></td>
-                `;
-                table.appendChild(row);
+                let textMatch = jsonStr.includes(textQuery);
+                let jsonMatch = true;
+
+                for (const [key, val] of Object.entries(jsonQuery)) {
+                    const actual = getValueByPath(data, key);
+                    if (!actual || !actual.toString().toLowerCase().includes(val.toString().toLowerCase())) {
+                        jsonMatch = false;
+                        break;
+                    }
+                }
+
+                if (textMatch && jsonMatch) {
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${desc}</td>
+                        <td>${addr}</td>
+                        <td><pre>${JSON.stringify(data, null, 2)}</pre></td>
+                    `;
+                    table.appendChild(row);
+                }
             });
         }
 
         async function fetchLogs() {
             try {
                 const res = await fetch("/api/logs");
-                const logs = await res.json();
-                renderLogs(logs);
+                logsCache = await res.json();
+                filterLogs(); // re-apply current filters on update
             } catch (err) {
                 console.error("Error fetching logs:", err);
             }
         }
 
         document.addEventListener("DOMContentLoaded", () => {
-            fetchLogs(); // initial fetch
+            fetchLogs();
             setInterval(fetchLogs, 5000); // poll every 5 seconds
         });
     </script>
 </head>
 <body>
-    <h1>Herringbone - Log Ingestion</h1>
+    <h1>MongoDB Logs</h1>
     <input type="text" id="search" placeholder="Search logs..." onkeyup="filterLogs()">
+    <input type="text" id="jsonSearch" placeholder='JSON filter (e.g. {"recon_data.description":"System"})' onkeyup="filterLogs()">
     <table>
         <thead>
             <tr>
@@ -98,7 +124,7 @@
             </tr>
         </thead>
         <tbody>
-            <!-- Rows populated dynamically by JS -->
+            <!-- Dynamic rows inserted here -->
         </tbody>
     </table>
 </body>
