@@ -1,4 +1,0 @@
-resources:
-  - clusterissuer.yaml
-  - certificate.yaml
-  - argocd-ingress.yaml
