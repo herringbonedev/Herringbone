@@ -1,4 +1,4 @@
-name: Build, Test, and Push Docker Image (Receiver)
+name: (Receiver) Build, Test, and Push Docker Image
 
 on:
   workflow_dispatch:  # Trigger manually from GitHub UI
@@ -48,3 +48,23 @@ jobs:
       run: |
         docker stop test_receiver || true
         docker rm test_receiver || true
+
+          - name: Checkout repo
+        uses: actions/checkout@v3
+
+    - name: Install yq
+      run: |
+        sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+        sudo chmod +x /usr/bin/yq
+
+    - name: Update restart timestamp to trigger rollout
+      run: |
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        yq eval ".spec.template.metadata.annotations.\"herringbone.io/restartedAt\" = \"${TIMESTAMP}\"" -i kustomize/receiver/restart-patch.yaml
+
+    - name: Commit & push rollout trigger
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git commit -am "Trigger rollout with timestamp ${TIMESTAMP}" || echo "No changes to commit"
+        git push

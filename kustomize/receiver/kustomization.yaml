@@ -7,6 +7,9 @@ resources:
   - deployment.yaml
   - service.yaml
 
+patchesStrategicMerge:
+  - restart-patch.yaml
+
 images:
   - name: quay.io/herringbone/receiver
     newTag: latest  # Image Updater will modify this
