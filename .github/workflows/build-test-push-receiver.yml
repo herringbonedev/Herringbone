@@ -49,9 +49,6 @@ jobs:
         docker stop test_receiver || true
         docker rm test_receiver || true
 
-          - name: Checkout repo
-        uses: actions/checkout@v3
-
     - name: Install yq
       run: |
         sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
