@@ -44,6 +44,7 @@ class MongoDatabaseHandler:
 
     def insert_log(self, log_object):
 
+        log_object["raw_log"] = log_object["raw_log"].replace("\"", "'")
         log_object["raw_log"] = self.clean_codec(log_object["raw_log"])
         
         try:

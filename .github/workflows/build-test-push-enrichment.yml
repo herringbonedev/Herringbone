@@ -4,7 +4,7 @@ on:
   workflow_dispatch:  # Trigger manually from GitHub UI
   push:
     branches:
-      - beta-1.0           # Or test branch if preferred
+      - beta-1.1           # Or test branch if preferred
     paths:
       - 'logingestion/enrichment/**'
 
@@ -28,11 +28,11 @@ jobs:
 
     - name: Build Docker image
       run: |-
-        docker build -t enrichment:beta-1.0.0-${{ github.run_number }} ./logingestion/enrichment
+        docker build -t enrichment:beta-1.1.0-${{ github.run_number }} ./logingestion/enrichment
 
     - name: Push image to DockerHub (only if tests pass)
       run: |
-        docker tag enrichment:beta-1.0.0-${{ github.run_number }} quay.io/herringbone/enrichment:latest
+        docker tag enrichment:beta-1.1.0-${{ github.run_number }} quay.io/herringbone/enrichment:latest
         docker push quay.io/herringbone/enrichment:latest
 
     - name: Cleanup

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:  # Trigger manually from GitHub UI
   push:
     branches:
-      - beta-1.0           # Or test branch if preferred
+      - beta-1.1           # Or test branch if preferred
     paths:
       - 'logingestion/receiver/**'
 
@@ -28,11 +28,11 @@ jobs:
 
     - name: Build Docker image
       run: |
-        docker build -t receiver:beta-1.0.0-${{ github.run_number }} ./logingestion/receiver
+        docker build -t receiver:beta-1.1.0-${{ github.run_number }} ./logingestion/receiver
 
     - name: Run container for smoke test
       run: |
-        docker run -d --name test_receiver -e RECEIVER_TYPE=UDP receiver:beta-1.0.0-${{ github.run_number }}
+        docker run -d --name test_receiver -e RECEIVER_TYPE=UDP receiver:beta-1.1.0-${{ github.run_number }}
         sleep 5
         docker logs test_receiver  # Optional: View logs
         docker ps -a               # Show container status
@@ -40,7 +40,7 @@ jobs:
 
     - name: Push image to DockerHub (only if tests pass)
       run: |
-        docker tag receiver:beta-1.0.0-${{ github.run_number }} quay.io/herringbone/receiver:latest
+        docker tag receiver:beta-1.1.0-${{ github.run_number }} quay.io/herringbone/receiver:latest
         docker push quay.io/herringbone/receiver:latest
 
     - name: Cleanup

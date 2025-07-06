@@ -1,5 +1,9 @@
 FROM ollama/ollama:latest
 
+ENV OLLAMA_NUM_PARALLEL=4
+ENV OLLAMA_MAX_BATCH_SIZE=16
+ENV OLLAMA_KEEP_ALIVE=1
+
 # Install dependencies
 RUN apt-get update && apt-get install -y python3 python3-pip curl
 RUN apt-get update && apt-get install -y tree

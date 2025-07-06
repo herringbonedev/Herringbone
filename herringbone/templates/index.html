@@ -1,131 +1,283 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>MongoDB Logs Viewer</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #121212;
-            color: #e0e0e0;
-            padding: 2em;
-        }
-        h1 {
-            color: #ffffff;
-        }
-        input[type="text"] {
-            padding: 10px;
-            width: 100%;
-            margin-bottom: 1em;
-            background-color: #1e1e1e;
-            color: #e0e0e0;
-            border: 1px solid #444;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: #1e1e1e;
-        }
-        th, td {
-            padding: 10px;
-            border: 1px solid #333;
-            vertical-align: top;
-        }
-        th {
-            background-color: #333;
-            color: #f0f0f0;
-        }
-        pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            margin: 0;
-        }
-    </style>
-    <script>
-        let logsCache = [];
+  <meta charset="UTF-8" />
+  <title>Herringbone Logs Viewer</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: #e0e0e0;
+      padding: 2em;
+    }
 
-        function getValueByPath(obj, path) {
-            return path.split('.').reduce((o, p) => o?.[p], obj);
-        }
+    h1 {
+      color: #ffffff;
+    }
 
-        function filterLogs() {
-            const textQuery = document.getElementById("search").value.toLowerCase();
-            const jsonQueryStr = document.getElementById("jsonSearch").value.trim();
-            let jsonQuery = {};
+    input[type="text"] {
+      padding: 10px;
+      width: 100%;
+      margin-bottom: 1em;
+      background-color: #1e1e1e;
+      color: #e0e0e0;
+      border: 1px solid #444;
+    }
 
-            try {
-                if (jsonQueryStr) {
-                    jsonQuery = JSON.parse(jsonQueryStr);
-                }
-            } catch (e) {
-                console.warn("Invalid JSON query");
-                return;
-            }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: #1e1e1e;
+    }
 
-            const table = document.querySelector("tbody");
-            table.innerHTML = "";
+    th, td {
+      padding: 10px;
+      border: 1px solid #333;
+      vertical-align: top;
+    }
 
-            logsCache.forEach((data, index) => {
-                const desc = data.recon_data?.description || '—';
-                const addr = data.source_address ? data.source_address[0] + ':' + data.source_address[1] : '—';
-                const jsonStr = JSON.stringify(data, null, 2).toLowerCase();
+    th {
+      background-color: #333;
+      color: #f0f0f0;
+    }
 
-                let textMatch = jsonStr.includes(textQuery);
-                let jsonMatch = true;
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
 
-                for (const [key, val] of Object.entries(jsonQuery)) {
-                    const actual = getValueByPath(data, key);
-                    if (!actual || !actual.toString().toLowerCase().includes(val.toString().toLowerCase())) {
-                        jsonMatch = false;
-                        break;
-                    }
-                }
+    .filter-row {
+      margin-bottom: 10px;
+    }
 
-                if (textMatch && jsonMatch) {
-                    const row = document.createElement("tr");
-                    row.innerHTML = `
-                        <td>${index + 1}</td>
-                        <td>${desc}</td>
-                        <td>${addr}</td>
-                        <td><pre>${JSON.stringify(data, null, 2)}</pre></td>
-                    `;
-                    table.appendChild(row);
-                }
-            });
-        }
+    select {
+      padding: 5px;
+      margin-right: 5px;
+      background-color: #1e1e1e;
+      color: #e0e0e0;
+      border: 1px solid #444;
+    }
 
-        async function fetchLogs() {
-            try {
-                const res = await fetch("/api/logs");
-                logsCache = await res.json();
-                filterLogs(); // re-apply current filters on update
-            } catch (err) {
-                console.error("Error fetching logs:", err);
-            }
-        }
+    select.valueSelect {
+      min-width: 200px;
+      height: auto;
+      min-height: 80px;
+    }
 
-        document.addEventListener("DOMContentLoaded", () => {
-            fetchLogs();
-            setInterval(fetchLogs, 5000); // poll every 5 seconds
-        });
-    </script>
+    button {
+      background-color: #333;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    #filters {
+      margin-bottom: 1em;
+    }
+  </style>
 </head>
 <body>
-    <h1>MongoDB Logs</h1>
-    <input type="text" id="search" placeholder="Search logs..." onkeyup="filterLogs()">
-    <input type="text" id="jsonSearch" placeholder='JSON filter (e.g. {"recon_data.description":"System"})' onkeyup="filterLogs()">
-    <table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Description</th>
-                <th>Source Address</th>
-                <th>Full JSON</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Dynamic rows inserted here -->
-        </tbody>
-    </table>
+  <h1>Herringbone Logs Viewer</h1>
+
+  <input type="text" id="search" placeholder="Search logs..." onkeyup="filterLogs()">
+
+  <div id="filters"></div>
+  <button onclick="addFilter()">+ Add Filter</button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Description</th>
+        <th>Source Address</th>
+        <th>Full JSON</th>
+      </tr>
+    </thead>
+    <tbody id="logTableBody"></tbody>
+  </table>
+
+  <script>
+    const logsCache = [];
+    const socket = io();
+
+    document.addEventListener("DOMContentLoaded", () => {
+      fetch("/api/logs")
+        .then(res => res.json())
+        .then(data => {
+          logsCache.push(...data);
+          renderTable();
+        });
+
+      socket.on('new_log', function (data) {
+        logsCache.unshift(data);
+        renderTable();
+      });
+    });
+
+    function flattenKeys(obj, prefix = '', keys = new Set()) {
+      for (const k in obj) {
+        const path = prefix ? `${prefix}.${k}` : k;
+        if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
+          flattenKeys(obj[k], path, keys);
+        } else {
+          keys.add(path);
+        }
+      }
+      return keys;
+    }
+
+    function getValueByPath(obj, path) {
+      return path.split('.').reduce((o, k) => (o && k in o) ? o[k] : undefined, obj);
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("logTableBody");
+      tbody.innerHTML = "";
+
+      const textSearch = document.getElementById("search").value.toLowerCase();
+
+      logsCache.forEach((doc, index) => {
+        const fullText = JSON.stringify(doc).toLowerCase();
+        const textMatch = fullText.includes(textSearch);
+
+        // Multi-filter logic
+        const filterRows = document.querySelectorAll(".filter-row");
+        let filterMatch = true;
+
+        filterRows.forEach(row => {
+          const key = row.querySelector(".keySelect").value;
+          const values = Array.from(row.querySelector(".valueSelect").selectedOptions).map(o => o.value.toLowerCase());
+
+          if (!key || values.length === 0) return;
+
+          const actual = getValueByPath(doc, key);
+          if (Array.isArray(actual)) {
+            if (!actual.some(v => values.includes(v.toString().toLowerCase()))) {
+              filterMatch = false;
+            }
+          } else {
+            if (!values.includes((actual || '').toString().toLowerCase())) {
+              filterMatch = false;
+            }
+          }
+        });
+
+        if (textMatch && filterMatch) {
+          const tr = document.createElement("tr");
+          const desc = doc.recon_data?.description || '—';
+          const addr = doc.source_address ? `${doc.source_address[0]}:${doc.source_address[1]}` : '—';
+
+          tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${desc}</td>
+            <td>${addr}</td>
+            <td><pre>${JSON.stringify(doc, null, 2)}</pre></td>
+          `;
+          tbody.appendChild(tr);
+        }
+      });
+
+      updateDropdownOptions(); // Refresh options without breaking selection
+    }
+
+    function addFilter() {
+      const id = Date.now();
+      const container = document.getElementById("filters");
+
+      const div = document.createElement("div");
+      div.className = "filter-row";
+      div.dataset.id = id;
+
+      div.innerHTML = `
+        <select class="keySelect"></select>
+        <select class="valueSelect" multiple size="4"></select>
+        <button onclick="removeFilter(${id})">✖</button>
+      `;
+
+      container.appendChild(div);
+      const keySelect = div.querySelector(".keySelect");
+      const valueSelect = div.querySelector(".valueSelect");
+
+      populateKeyDropdown(keySelect, valueSelect);
+    }
+
+    function removeFilter(id) {
+      document.querySelector(`.filter-row[data-id="${id}"]`)?.remove();
+      renderTable();
+    }
+
+    function populateKeyDropdown(keySelect, valueSelect) {
+      const allKeys = new Set();
+      logsCache.forEach(log => flattenKeys(log).forEach(k => allKeys.add(k)));
+
+      keySelect.innerHTML = '<option value="">-- Select Key --</option>';
+      Array.from(allKeys).sort().forEach(k => {
+        const opt = document.createElement("option");
+        opt.value = k;
+        opt.textContent = k;
+        keySelect.appendChild(opt);
+      });
+
+      keySelect.addEventListener("change", () => {
+        updateValueDropdown(keySelect, valueSelect);
+        valueSelect.addEventListener("change", renderTable); // NEW: trigger re-render on value change
+        renderTable();
+      });
+    }
+
+    function updateValueDropdown(keySelect, valueSelect) {
+      const selectedKey = keySelect.value;
+      const selectedValues = Array.from(valueSelect.selectedOptions).map(o => o.value);
+
+      valueSelect.innerHTML = "";
+
+      if (!selectedKey) return;
+
+      const valueSet = new Set();
+      logsCache.forEach(log => {
+        const val = getValueByPath(log, selectedKey);
+        if (val !== undefined && val !== null) valueSet.add(val.toString());
+      });
+
+      Array.from(valueSet).sort().forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v;
+        opt.textContent = v;
+        valueSelect.appendChild(opt);
+      });
+
+      // Re-apply previous selection
+      Array.from(valueSelect.options).forEach(opt => {
+        if (selectedValues.includes(opt.value)) opt.selected = true;
+      });
+    }
+
+    function updateDropdownOptions() {
+      document.querySelectorAll(".filter-row").forEach(row => {
+        const keySelect = row.querySelector(".keySelect");
+        const valueSelect = row.querySelector(".valueSelect");
+
+        const selectedKey = keySelect.value;
+        const selectedValues = Array.from(valueSelect.selectedOptions).map(o => o.value);
+
+        populateKeyDropdown(keySelect, valueSelect);
+        keySelect.value = selectedKey;
+
+        if (selectedKey) {
+          updateValueDropdown(keySelect, valueSelect);
+          Array.from(valueSelect.options).forEach(opt => {
+            if (selectedValues.includes(opt.value)) opt.selected = true;
+          });
+        }
+      });
+    }
+
+    function filterLogs() {
+      renderTable();
+    }
+  </script>
 </body>
 </html>

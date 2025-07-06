@@ -22,9 +22,11 @@ def recon():
 
     response = requests.post(OLLAMA_URL, json={
         "model": "herringbone-mind-recon",
-        "prompt": prompt_template(raw_log),
+        "prompt": raw_log,
         "stream": False
     })
+
+    print(f"[*] Response from model: {response.text}")
 
     return response.json().get('response', 'No response from model')
 
