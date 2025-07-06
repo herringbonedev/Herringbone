@@ -59,9 +59,13 @@ jobs:
         TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         yq eval ".spec.template.metadata.annotations.\"herringbone.io/restartedAt\" = \"${TIMESTAMP}\"" -i kustomize/receiver/restart-patch.yaml
 
-    - name: Commit & push rollout trigger
+    - name: Push changes
+      env:
+        TOKEN: ${{ secrets.WORKFLOW_BOT_TOKEN }}
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git commit -am "Trigger rollout with timestamp ${TIMESTAMP}" || echo "No changes to commit"
-        git push
+        git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}
+        git commit -am "Trigger rollout with timestamp $(date)" || echo "No changes to commit"
+        git push origin HEAD:${GITHUB_REF#refs/heads/}
+
