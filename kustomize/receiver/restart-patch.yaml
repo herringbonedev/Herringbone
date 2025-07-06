@@ -1,0 +1,9 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: your-deployment-name
+spec:
+  template:
+    metadata:
+      annotations:
+        herringbone.io/restartedAt: "{{restarted_at}}"
