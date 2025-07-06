@@ -48,24 +48,3 @@ jobs:
       run: |
         docker stop test_receiver || true
         docker rm test_receiver || true
-
-    - name: Install yq
-      run: |
-        sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
-        sudo chmod +x /usr/bin/yq
-
-    - name: Update restart timestamp to trigger rollout
-      run: |
-        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        yq eval ".spec.template.metadata.annotations.\"herringbone.io/restartedAt\" = \"${TIMESTAMP}\"" -i kustomize/receiver/restart-patch.yaml
-
-    - name: Push changes
-      env:
-        TOKEN: ${{ secrets.WORKFLOW_BOT_TOKEN }}
-      run: |
-        git config user.name "unixv"
-        git config user.email "unixv@users.noreply.github.com"
-        git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}
-        git commit -am "Trigger rollout with timestamp $(date)" || echo "No changes to commit"
-        git push origin HEAD:${GITHUB_REF#refs/heads/}
-
