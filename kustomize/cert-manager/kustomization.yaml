@@ -1,5 +1,4 @@
 resources:
-  - cert-manager-app.yaml
   - clusterissuer.yaml
   - certificate.yaml
   - argocd-ingress.yaml
