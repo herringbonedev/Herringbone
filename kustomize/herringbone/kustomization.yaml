@@ -6,6 +6,8 @@ namespace: herringbone
 resources:
   - deployment.yaml
   - service.yaml
+  - ingress.yaml
+  - app-herringbone-dev-tls.yaml
 
 images:
   - name: quay.io/herringbone/herringbone-app
