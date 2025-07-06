@@ -1,7 +1,7 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: app-herringbone-dev
+  name: app-herringbone-dev-tls
   namespace: herringbone
 spec:
   secretName: app-herringbone-dev-tls
