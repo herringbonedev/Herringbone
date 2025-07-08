@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: herringbone-app
+  name: herringbone-ui
   namespace: herringbone
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: herringbone-app
+      app: herringbone-ui
   template:
     metadata:
       labels:
-        app: herringbone-app
+        app: herringbone-ui
     spec:
       containers:
-        - name: herringbone-app
+        - name: herringbone-ui
           image: quay.io/herringbone/herringbone-app
           ports:
             - containerPort: 7002
