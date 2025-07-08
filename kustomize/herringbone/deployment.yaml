@@ -20,6 +20,13 @@ spec:
             - containerPort: 7002
               name: tcp-port
               protocol: TCP
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
           env:
             - name: MONGO_HOST
               value: mongodb.mongodb.svc.cluster.local:27017
