@@ -5,7 +5,7 @@ import os
 import requests
 
 def perform_recon(raw_log):
-    url = os.environ.get("OLLAMA_SVC")
+    url = os.environ.get("MIND_RECON_SVC")
     payload = {"record": raw_log}
 
     try:
