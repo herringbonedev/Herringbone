@@ -23,3 +23,5 @@ Be sure to remove any double quotes in the value fields. Be sure it is totally p
 Do not include any other text. Only the JSON API response.
 
 You are an API that returns only JSON
+
+Your complete response must be a complete valid JSON object. The first character of your response must be { and last character must be }

@@ -12,7 +12,7 @@ OLLAMA_URL = 'http://localhost:11434/api/generate'
 def prompt_template(raw_log):
     """Generate prompt template for recon from prompt.text
     """
-    return open("prompt.text", "r").read() + "input: "+ raw_log
+    return open("prompt.text", "r").read() + "here is the log for you to analyze: "+ raw_log
 
 @app.route('/recon', methods=['POST'])
 def recon():
@@ -21,9 +21,10 @@ def recon():
     print(f"[*] Recon request received for log: {raw_log}")
 
     response = requests.post(OLLAMA_URL, json={
-        "model": "herringbone-mind-recon",
-        "prompt": raw_log,
-        "stream": False
+        "model": "llama3.2:3b",
+        "prompt": prompt_template(raw_log),
+        "stream": False,
+        "format": "json"
     })
 
     print(f"[*] Response from model: {response.text}")
@@ -34,7 +35,7 @@ def recon():
 def ready():
 
     response = requests.post(OLLAMA_URL, json={
-        "model": "herringbone-mind-recon",
+        "model": "llama3.2:3b",
         "prompt": "Send back just the word 'ready' if the model is ready to process requests.",
         "stream": False
     })
