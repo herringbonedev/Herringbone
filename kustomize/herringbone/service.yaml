@@ -4,11 +4,12 @@ metadata:
   name: herringbone-app-service
   namespace: herringbone
 spec:
-  ports:
-  - name: tcp
-    port: 7002
-    protocol: TCP
-    targetPort: 7002
+  type: LoadBalancer
+  externalTrafficPolicy: Local
   selector:
     app: herringbone-app
-  type: ClusterIP
+  ports:
+    - name: tcp
+      protocol: tcp
+      port: 7002
+      targetPort: 7002
