@@ -19,3 +19,11 @@ class KubernetesAppAdmin():
             return [service.metadata.name for service in services.items]
         except client.rest.ApiException as e:
             raise RuntimeError(f"Failed to list services: {e}")
+    
+    def get_deployments(self):
+        try:
+            apps_v1 = client.AppsV1Api()
+            deployments = apps_v1.list_namespaced_deployment(self.namespace)
+            return [deployment.metadata.name for deployment in deployments.items]
+        except client.rest.ApiException as e:
+            raise RuntimeError(f"Failed to list deployments: {e}")
