@@ -4,9 +4,11 @@ kind: Kustomization
 namespace: herringbone
 
 resources:
-  - deployment.yaml
-  - service.yaml
+  - apps-deployment.yaml
+  - apps-service.yaml
+  - apps-serviceaccount.yaml
+  - apps-clusterrolebinding.yaml
 
 images:
-  - name: quay.io/herringbone/herringbone-app
+  - name: quay.io/herringbone/herringbone-apps
     newTag: latest  # Image Updater will modify this
