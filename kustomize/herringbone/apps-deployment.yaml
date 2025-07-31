@@ -13,6 +13,7 @@ spec:
       labels:
         app: herringbone-apps
     spec:
+      serviceAccountName: herringbone-apps-serviceaccount
       containers:
         - name: herringbone-apps
           image: quay.io/herringbone/herringbone-apps
