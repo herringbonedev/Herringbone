@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: herringbone-receiver-http-service
+  namespace: herringbone
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app: herringbone-receiver-http
+  ports:
+    - name: tcp
+      protocol: TCP
+      port: 7002
+      targetPort: 7002

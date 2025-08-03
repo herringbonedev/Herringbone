@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: herringbone-receiver-http
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: herringbone-receiver-http
+  template:
+    metadata:
+      labels:
+        app: herringbone-receiver-http
+    spec:
+      containers:
+        - name: receiver
+          image: quay.io/herringbone/receiver
+          ports:
+            - containerPort: 7002
+              name: tcp-port
+              protocol: TCP
+          env:
+            - name: RECEIVER_TYPE
+              value: HTTP
+            - name: MONGO_HOST
+              value: mongodb.mongodb.svc.cluster.local:27017
+            - name: DB_NAME
+              value: herringbone
+            - name: COLLECTION_NAME
+              value: logs
+            - name: MONGO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: username
+            - name: MONGO_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: password
