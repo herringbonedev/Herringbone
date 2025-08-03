@@ -4,10 +4,10 @@ kind: Kustomization
 namespace: herringbone
 
 resources:
-  - apps-deployment.yaml
-  - apps-service.yaml
-  - apps-serviceaccount.yaml
-  - apps-clusterrolebinding.yaml
+  - deployment.yaml
+  - service.yaml
+  - serviceaccount.yaml
+  - clusterrolebinding.yaml
 
 images:
   - name: quay.io/herringbone/herringbone-apps
