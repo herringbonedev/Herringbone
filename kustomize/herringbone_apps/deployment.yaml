@@ -47,7 +47,7 @@ spec:
                   key: password
           livenessProbe:
             httpGet:
-              path: /herringbone/apps/healthz
+              path: /herringbone/apps/livez
               port: 7002
             initialDelaySeconds: 5
             periodSeconds: 10
