@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: herringbone-receiver-udp
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: herringbone-receiver-udp
+  template:
+    metadata:
+      labels:
+        app: herringbone-receiver-udp
+    spec:
+      containers:
+        - name: receiver
+          image: quay.io/herringbone/receiver
+          ports:
+            - containerPort: 7002
+              name: udp-port
+              protocol: UDP
+          env:
+            - name: RECEIVER_TYPE
+              value: UDP
+            - name: MONGO_HOST
+              value: mongodb.mongodb.svc.cluster.local:27017
+            - name: DB_NAME
+              value: herringbone
+            - name: COLLECTION_NAME
+              value: logs
+            - name: MONGO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: username
+            - name: MONGO_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: password
