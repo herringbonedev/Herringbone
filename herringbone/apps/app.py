@@ -12,7 +12,9 @@ image_comp = {
 
 @app.route('/herringbone/apps/status', methods=['GET'])
 def apps_status():
-    """Get the status of Herringbone apps"""
+    """Get the status of Herringbone apps
+    """
+
     k8s_admin = kube_functions.KubernetesAppAdmin()
     deployments = k8s_admin.get_deployments()
 
@@ -23,10 +25,31 @@ def apps_status():
 
     return jsonify(status)
 
-@app.route('/herringbone/apps/ready')
-def apps_ready():
+#
+# Herringbone requires Liveness and Readiness probes for all services.
+#
+# The routes below contain the logic for healthz and readyz
+#
 
-    return jsonify({"ready":True, "description":"herringbone/apps API is ready."})
+@app.route('/herringbone/apps/livez', methods=['GET'])
+def liveness_probe():
+    """Checks if the API is up and running.
+    """
+
+    return 'OK', 200
+
+@app.route('/herringbone/apps/readyz', methods=['GET'])
+def readiness_check():
+    """Readiness check to see if the service is able to serve data
+    from the Kubernetes API.
+    """
+    
+    k8s_admin = kube_functions.KubernetesAppAdmin()
+    if k8s_admin.readyz():
+        return jsonify({"ready": True}), 200
+    else:
+        return jsonify({"ready": False}), 503
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=7002)

@@ -25,3 +25,13 @@ class KubernetesAppAdmin():
 
         except client.rest.ApiException as e:
             raise RuntimeError(f"Failed to list deployments: {e}")
+        
+    def readyz(self):
+        """Readiness function for /herringbone/apps/readyz
+        """
+        try:
+            self.v1.list_namespaced_pod(namespace=self.namespace, limit=1)
+            return True
+        except client.rest.ApiException as e:
+            print(f"Kubernetes API access failed: {e}")
+            return False
