@@ -1,4 +1,4 @@
-name: (enrichment) Build, Test, and Push Docker Image
+name: (Enrichment) Build, Test, and Push Docker Image
 
 permissions:
   contents: write
@@ -30,8 +30,10 @@ jobs:
 
     - name: Install MongoDB CLI
       run: |
+        wget -qO - https://pgp.mongodb.com/server-7.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
+        echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
         sudo apt-get update
-        sudo apt-get install -y mongodb-clients
+        sudo apt-get install -y mongodb-org-shell
 
     # Configure runner with code and docker
     - name: Checkout code
@@ -59,7 +61,7 @@ jobs:
           -e MONGO_INITDB_ROOT_PASSWORD=herringbonepw123 \
           -e MONGO_INITDB_DATABASE=herringbone \
           mongo:7
-
+          
     - name: Insert test log into MongoDB
       run: |
         mongo mongodb://herringbone:herringbonepw123@localhost:27017/herringbone --authenticationDatabase admin --eval '
@@ -67,10 +69,11 @@ jobs:
             timestamp: new Date(),
             raw_log: "Test log message",
             source: "github-actions",
-            "recon": False,
-            "recon_data": None
+            recon: false,
+            recon_data: null
           });
         '
+
 
     # Build, test, and push the Docker image
     - name: Build Docker image
