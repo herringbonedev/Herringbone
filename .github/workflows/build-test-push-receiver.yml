@@ -14,6 +14,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Install yq
+      run: |
+        sudo wget https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 -O /usr/bin/yq
+        sudo chmod +x /usr/bin/yq
+
     - name: Checkout code
       uses: actions/checkout@v3
 
@@ -50,6 +55,28 @@ jobs:
       run: |
         docker tag receiver:beta-1.1.0-${{ github.run_number }} quay.io/herringbone/receiver:latest
         docker push quay.io/herringbone/receiver:latest
+
+    - name: Get image digest
+      id: digest
+      run: |
+        IMAGE_REF="quay.io/herringbone/receiver:latest"
+        DIGEST=$(docker buildx imagetools inspect $IMAGE_REF --format '{{json .}}' | jq -r '.digest')
+        echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+
+      
+    - name: Update kustomization.yaml with new image digest
+      run: |
+        yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/receiver_udp/kustomization.yaml
+        yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/receiver_http/kustomization.yaml
+
+    - name: Commit and push kustomization.yaml update
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add kustomize/receiver_http/kustomization.yaml
+        git add kustomize/receiver_udp/kustomization.yaml
+        git commit -m "Update receiver image digest to ${{ steps.digest.outputs.digest }}"
+        git push
 
     - name: Cleanup
       if: always()
