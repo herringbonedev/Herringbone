@@ -33,7 +33,7 @@ jobs:
 
     - name: Run container for smoke test
       run: |
-        docker run -d -p 7002:7002 --name test_receiver -e RECEIVER_TYPE=UDP receiver:beta-1.1.0-${{ github.run_number }}
+        docker run -d -p 7002:7002/udp --name test_receiver -e RECEIVER_TYPE=UDP receiver:beta-1.1.0-${{ github.run_number }}
         sleep 5
         docker logs test_receiver  # Optional: View logs
         docker ps -a               # Show container status
@@ -42,7 +42,7 @@ jobs:
     - name: UDP Receiver Test
       run: |
         echo "Testing UDP receiver..."
-        echo "Test message" | nc -u -w1 localhost 7002
+        echo "Test message" | nc -u -w 0 localhost 7002
         sleep 5
         docker logs test_receiver | grep "Test message" || (echo "UDP receiver test failed" && exit 1)
 
