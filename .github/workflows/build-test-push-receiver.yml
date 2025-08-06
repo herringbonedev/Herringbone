@@ -2,7 +2,7 @@ name: (Receiver) Build, Test, and Push Docker Image
 
 permissions:
   contents: write
-  
+
 on:
   workflow_dispatch:
   push:
@@ -21,6 +21,11 @@ jobs:
       run: |
         sudo wget https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 -O /usr/bin/yq
         sudo chmod +x /usr/bin/yq
+
+    - name: Install skopeo
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y skopeo
 
     - name: Checkout code
       uses: actions/checkout@v3
@@ -62,11 +67,10 @@ jobs:
     - name: Get image digest
       id: digest
       run: |
-        IMAGE_REF="quay.io/herringbone/receiver:latest"
-        DIGEST=$(docker buildx imagetools inspect $IMAGE_REF --format '{{json .}}' | jq -r '.digest')
+        DIGEST=$(skopeo inspect docker://quay.io/herringbone/receiver:latest | jq -r '.Digest')
+        echo "digest=$DIGEST"
         echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
-      
     - name: Update kustomization.yaml with new image digest
       run: |
         yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/receiver_udp/kustomization.yaml
