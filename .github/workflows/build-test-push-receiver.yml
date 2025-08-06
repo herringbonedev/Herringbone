@@ -1,5 +1,8 @@
 name: (Receiver) Build, Test, and Push Docker Image
 
+permissions:
+  contents: write
+  
 on:
   workflow_dispatch:
   push:
