@@ -7,4 +7,4 @@ resources:
 images:
   - name: quay.io/herringbone/receiver
     newTag: latest # Image Updater will modify this
-    digest: "sha256:b38896ff8fa06bb2dbd38c1b6de9c83efc1065db34376feebb6cafae10080085"
+    digest: "sha256:87be097d2e4f505a573f0276e0aa23bffb7f184e6c3f061f1aeb89e827b48ef3"
