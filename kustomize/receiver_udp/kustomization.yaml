@@ -1,12 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
 namespace: herringbone
-
 resources:
   - deployment.yaml
   - service.yaml
-
 images:
   - name: quay.io/herringbone/receiver
-    newTag: latest  # Image Updater will modify this
+    newTag: latest # Image Updater will modify this
+    digest: sha256:7f527330ab4eb4d75b7b426ff1690c517facc01d43624b0f87a76da57aa14b42
