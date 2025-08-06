@@ -42,7 +42,7 @@ jobs:
     - name: UDP Receiver Test
       run: |
         echo "Testing UDP receiver..."
-        echo "Test message" | nc -u -w1 localhost 9999
+        echo "Test message" | nc -u -w1 localhost 7002
         sleep 5
         docker logs test_receiver | grep "Test message" || (echo "UDP receiver test failed" && exit 1)
 
