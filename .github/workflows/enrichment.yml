@@ -1,0 +1,133 @@
+name: (enrichment) Build, Test, and Push Docker Image
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'logingestion/enrichment/**'
+      - '.github/workflows/enrichment.yml'
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+
+    # Install dependencies
+    steps:
+    - name: Install yq
+      run: |
+        sudo wget https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 -O /usr/bin/yq
+        sudo chmod +x /usr/bin/yq
+
+    - name: Install skopeo
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y skopeo
+
+    - name: Install MongoDB CLI
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mongodb-clients
+
+    # Configure runner with code and docker
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to DockerHub
+      uses: docker/login-action@v3
+      with:
+        registry: quay.io
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # Setup test mongo network and database
+    - name: Start local MongoDB container
+      run: |
+        docker network create herringbone-net
+        docker run -d \
+          --name mongo \
+          --network herringbone-net \
+          -p 27017:27017 \
+          -e MONGO_INITDB_ROOT_USERNAME=herringbone \
+          -e MONGO_INITDB_ROOT_PASSWORD=herringbonepw123 \
+          -e MONGO_INITDB_DATABASE=herringbone \
+          mongo:7
+
+    - name: Insert test log into MongoDB
+      run: |
+        mongo mongodb://herringbone:herringbonepw123@localhost:27017/herringbone --authenticationDatabase admin --eval '
+          db.logs.insertOne({
+            timestamp: new Date(),
+            raw_log: "Test log message",
+            source: "github-actions",
+            "recon": False,
+            "recon_data": None
+          });
+        '
+
+    # Build, test, and push the Docker image
+    - name: Build Docker image
+      run: |
+        docker build -t enrichment:beta-1.1.0-${{ github.run_number }} ./logingestion/enrichment
+
+    - name: Run container for smoke test
+      run: |
+        docker run -d \
+        --name test_enrichment \
+        --network herringbone-net \
+        -e MONGO_HOST=mongo:27017 \
+        -e DB_NAME=herringbone \
+        -e MONGO_USER=herringbone \
+        -e MONGO_PASSWORD=herringbonepw123 \
+        -e ENRICHMENT_SVC=test.service \
+        enrichment:beta-1.1.0-${{ github.run_number }} \
+        sleep 5
+        docker logs test_enrichment  # Optional: View logs
+        docker ps -a               # Show container status
+        docker inspect test_enrichment --format='{{.State.Running}}' | grep true
+
+    - name: Enrichment test
+      run: |
+        sleep 10; \
+        docker logs test_enrichment | grep "Enriched log" || (echo "Enrichment test failed" && exit 1)
+
+    - name: Push image to DockerHub (only if tests pass)
+      run: |
+        docker tag enrichment:beta-1.1.0-${{ github.run_number }} quay.io/herringbone/enrichment:latest
+        docker push quay.io/herringbone/enrichment:latest
+
+    # Update kustomization.yaml with the new image digest
+    - name: Get image digest
+      id: digest
+      run: |
+        DIGEST=$(skopeo inspect docker://quay.io/herringbone/enrichment:latest | jq -r '.Digest')
+        echo "digest=$DIGEST"
+        echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+
+    - name: Update kustomization.yaml with new image digest
+      run: |
+        yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/enrichment_udp/kustomization.yaml
+        yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/enrichment_http/kustomization.yaml
+
+    - name: Commit and push kustomization.yaml update
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add kustomize/enrichment_http/kustomization.yaml
+        git add kustomize/enrichment_udp/kustomization.yaml
+        git commit -m "Update enrichment image digest to ${{ steps.digest.outputs.digest }}"
+        git push
+
+    # Cleanup
+    - name: Cleanup
+      if: always()
+      run: |
+        docker stop test_enrichment || true
+        docker rm test_enrichment || true
