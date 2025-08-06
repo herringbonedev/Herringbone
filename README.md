@@ -1,6 +1,19 @@
 # Herringbone
 Bite sized security tool components for you to stack however you want!
 
+### Tips before you get started
+
+Beta leans on ArgoCD to deploy Hrringbone services through Kustomization manifests. It also leans
+on Helm charts for critical infrastructure components. It's a good idea to just deploy everything
+through Argo.
+
+### ArgoCD
+
+Beta is leveraging ArgoCD as the application deployment and scalability engine. You will need to have
+an ArgoCD instance available on the target cluster to deploy Herringbone beta.
+
+For setup instructions, see: https://argo-cd.readthedocs.io
+
 ### MongoDB
 
 For this beta version of the Herringbone SOC a MongoDB instance must be provided. To keep
@@ -20,12 +33,15 @@ data:
   username: YWRtaW4=        # base64 for 'admin'
   password: Y2hhbmdlbWU=    # base64 for 'changeme'
 ```
-### ArgoCD
 
-Beta is leveraging ArgoCD as the application deployment and scalability engine. You will need to have
-an ArgoCD instance available on the target cluster to deploy Herringbone beta.
+To install mongodb via helm, see: https://artifacthub.io/packages/helm/bitnami/mongodb
 
-For setup instructions, see: https://argo-cd.readthedocs.io
+### LoadBalancer
+
+Ensure you have a LoadBalancer service option setup for your cluster. If deploying without a cloud provider; consider
+using metallb.
+
+For setup instructions, see: https://metallb.universe.tf/installation/
 
 ## Application deployments
 
@@ -35,10 +51,28 @@ For example, if your goal is simply to collect logs via an HTTP endpoint and vie
 
 You can always deploy additional applications later. All components are built to be plug-and-play. Just add the application in ArgoCD, deploy from its respective kustomize directory, and it will integrate automatically with the rest of the system.
 
-### Mind
+## Deploy a Herringbone service on Argo
 
-### Receivers
+1. Create a new application on ArgoCD
+2. Use the main branch of this git repository
+3. Ensure the namespace is the same namespace where the `mongo-secret` exists.
+4. The `PATH` is where you can select which Herringbone component you wish to deploy.
+5. Create the app and sync.
+6. Enjoy your new Herringbone service!
 
-### Enrichment
+## AI Requirements
 
-### Herringbone UI
+If you want to use the Herringbone's **Mind** services you will need a dedicated node.
+
+Taint the node `spec.taints`
+```yaml
+  taints:
+  - effect: NoSchedule
+    key: dedicated
+    value: mind
+```
+
+Label the node `metadata.labels`
+```yaml
+mind: "true"
+```
