@@ -67,7 +67,7 @@ jobs:
 
     - name: Insert test log into MongoDB
       run: |
-        mongo mongodb://herringbone:herringbonepw123@localhost:27017/herringbone --authenticationDatabase admin --eval '
+        mongosh mongodb://herringbone:herringbonepw123@localhost:27017/herringbone --authenticationDatabase admin --eval '
           db.logs.insertOne({
             timestamp: new Date(),
             raw_log: "Test log message",
