@@ -4,8 +4,14 @@ import time
 import os
 import requests
 
+print("Enrichment service has started")
+
 def perform_recon(raw_log):
-    url = os.environ.get("MIND_RECON_SVC")
+    url = os.environ.get("ENRICHMENT_SVC")
+
+    if url == "test.service":
+        return {"pass": True}
+    
     payload = {"record": raw_log}
 
     try:

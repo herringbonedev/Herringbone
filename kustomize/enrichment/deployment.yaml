@@ -23,7 +23,7 @@ spec:
               value: herringbone
             - name: COLLECTION_NAME
               value: logs
-            - name: MIND_RECON_SVC
+            - name: ENRICHMENT_SVC
               value: http://herringbone-mind-recon-service.herringbone.svc.cluster.local:8002/recon
             - name: MONGO_USER
               valueFrom:
