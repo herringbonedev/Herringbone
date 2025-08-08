@@ -121,15 +121,13 @@ jobs:
 
     - name: Update kustomization.yaml with new image digest
       run: |
-        yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/enrichment_udp/kustomization.yaml
-        yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/enrichment_http/kustomization.yaml
+        yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/enrichment/kustomization.yaml
 
     - name: Commit and push kustomization.yaml update
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
-        git add kustomize/enrichment_http/kustomization.yaml
-        git add kustomize/enrichment_udp/kustomization.yaml
+        git add kustomize/enrichment/kustomization.yaml
         git commit -m "Update enrichment image digest to ${{ steps.digest.outputs.digest }}"
         git push
 
