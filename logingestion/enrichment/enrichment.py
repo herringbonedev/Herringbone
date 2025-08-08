@@ -52,8 +52,6 @@ except Exception as e:
 
 while True:
 
-    print(AUTH_URI)
-
     doc = collection.find_one({
         "recon": False,
         "recon_data": None,
