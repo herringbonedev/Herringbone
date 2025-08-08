@@ -52,8 +52,8 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    # Setup test mongo network and database
-    - name: Start local MongoDB container
+    # Setup test mongo network and database, and insert test log
+    - name: Start local MongoDB container and insert test log
       run: |
         docker network create herringbone-net
         docker run -d \
@@ -65,16 +65,18 @@ jobs:
           -e MONGO_INITDB_DATABASE=herringbone \
           mongo:7
 
-    - name: Insert test log into MongoDB
-      run: |
-        mongosh mongodb://herringbone:herringbonepw123@localhost:27017/herringbone --authenticationDatabase admin --eval '
+        # Wait for MongoDB to fully start
+        sleep 5
+
+        # Insert test log
+        docker exec mongo mongosh "mongodb://herringbone:herringbonepw123@localhost:27017/herringbone?authSource=admin" --eval '
           db.logs.insertOne({
             timestamp: new Date(),
             raw_log: "Test log message",
             source: "github-actions",
             recon: false,
             recon_data: null
-          });
+          })
         '
 
     # Build, test, and push the Docker image
