@@ -96,7 +96,7 @@ jobs:
         -e COLLECTION_NAME=logs \
         -e ENRICHMENT_SVC=test.service \
         enrichment:beta-1.1.0-${{ github.run_number }} \
-        sleep 5
+        sleep 30
         docker logs test_enrichment  # Optional: View logs
         docker ps -a               # Show container status
         docker inspect test_enrichment --format='{{.State.Running}}' | grep true
