@@ -104,6 +104,7 @@ jobs:
       run: |
         sleep 10; \
         # docker logs test_enrichment | grep "Enriched log" || (echo "Enrichment test failed" && exit 1)
+        docker logs test_enrichment
 
     - name: Push image to DockerHub (only if tests pass)
       run: |
