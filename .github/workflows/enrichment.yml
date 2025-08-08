@@ -95,17 +95,11 @@ jobs:
         -e MONGO_PASSWORD=herringbonepw123 \
         -e COLLECTION_NAME=logs \
         -e ENRICHMENT_SVC=test.service \
-        enrichment:beta-1.1.0-${{ github.run_number }} \
+        enrichment:beta-1.1.0-${{ github.run_number }};
         sleep 30
         docker logs test_enrichment  # Optional: View logs
         docker ps -a               # Show container status
         docker inspect test_enrichment --format='{{.State.Running}}' | grep true
-
-    - name: Enrichment test
-      run: |
-        sleep 10; \
-        # docker logs test_enrichment | grep "Enriched log" || (echo "Enrichment test failed" && exit 1)
-        docker logs test_enrichment
 
     - name: Push image to DockerHub (only if tests pass)
       run: |
