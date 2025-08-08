@@ -10,6 +10,7 @@ def perform_recon(raw_log):
     url = os.environ.get("ENRICHMENT_SVC")
 
     if url == "test.service":
+        print("[Test Service]")
         return {"pass": True}
     
     payload = {"record": raw_log}
@@ -50,6 +51,8 @@ except Exception as e:
     raise Exception(f"Failed to connect to MongoDB: {e}")
 
 while True:
+
+    print(AUTH_URI)
 
     doc = collection.find_one({
         "recon": False,
