@@ -5,6 +5,8 @@ import os
 import requests
 
 print("Enrichment service has started")
+if os.environ.get("ENRICHMENT_SVC") == "test.service":
+    print("[Test Service] Started in test mode")
 
 def perform_recon(raw_log):
     url = os.environ.get("ENRICHMENT_SVC")
@@ -52,10 +54,14 @@ except Exception as e:
 
 while True:
 
-    doc = collection.find_one({
-        "recon": False,
-        "recon_data": None,
-    })
+    if os.environ.get("ENRICHMENT_SVC") == "test.service":
+        print("[Test Mode] Finding test log")
+        doc = collection.find_one()
+    else:
+        doc = collection.find_one({
+            "recon": False,
+            "recon_data": None,
+        })
 
     if not doc:
         time.sleep(1)
