@@ -52,10 +52,9 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    # Setup test mongo network and database, and insert test log
-    - name: Start local MongoDB container and insert test log
+    - name: Start MongoDB and create app user
       run: |
-        docker network create herringbone-net
+        docker network create herringbone-net || true
         docker run -d \
           --name mongo \
           --network herringbone-net \
@@ -65,18 +64,38 @@ jobs:
           -e MONGO_INITDB_DATABASE=herringbone \
           mongo:7
 
-        # Wait for MongoDB to fully start
-        sleep 5
+        # Wait for mongod to be ready
+        for i in {1..20}; do
+          if docker exec mongo mongosh --quiet --eval "db.runCommand({ ping: 1 })" >/dev/null 2>&1; then
+            break
+          fi
+          sleep 1
+        done
 
-        # Insert test log
-        docker exec mongo mongosh "mongodb://herringbone:herringbonepw123@localhost:27017/herringbone?authSource=admin" --eval '
+        # Create app user in the herringbone DB (no authSource needed for app connections)
+        docker exec mongo mongosh --quiet "mongodb://herringbone:herringbonepw123@localhost:27017/admin" --eval '
+          use herringbone;
+          try {
+            db.createUser({
+              user: "hbapp",
+              pwd: "hbapp_pw123",
+              roles: [{ role: "readWrite", db: "herringbone" }]
+            });
+            print("Created hbapp user");
+          } catch (e) {
+            print("User may already exist:", e);
+          }
+        '
+
+        # (Optional) seed a test doc
+        docker exec mongo mongosh --quiet "mongodb://hbapp:hbapp_pw123@localhost:27017/herringbone" --eval '
           db.logs.insertOne({
             timestamp: new Date(),
             raw_log: "Test log message",
             source: "github-actions",
             recon: false,
             recon_data: null
-          })
+          });
         '
 
     # Build, test, and push the Docker image
