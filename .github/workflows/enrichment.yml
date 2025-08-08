@@ -89,13 +89,14 @@ jobs:
         docker run -d \
         --name test_enrichment \
         --network herringbone-net \
-        -e MONGO_HOST=localhost:27017 \
+        -e MONGO_HOST=mongo:27017 \
         -e DB_NAME=herringbone \
         -e MONGO_USER=herringbone \
         -e MONGO_PASSWORD=herringbonepw123 \
         -e ENRICHMENT_SVC=test.service \
         enrichment:beta-1.1.0-${{ github.run_number }} \
         sleep 5
+        docker exec test_enrichment env \
         docker logs test_enrichment  # Optional: View logs
         docker ps -a               # Show container status
         docker inspect test_enrichment --format='{{.State.Running}}' | grep true

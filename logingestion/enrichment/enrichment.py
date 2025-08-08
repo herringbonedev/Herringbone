@@ -10,6 +10,7 @@ def perform_recon(raw_log):
     url = os.environ.get("ENRICHMENT_SVC")
 
     if url == "test.service":
+        print("[Test Service]")
         return {"pass": True}
     
     payload = {"record": raw_log}
