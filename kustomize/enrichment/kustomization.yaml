@@ -6,4 +6,4 @@ resources:
 images:
   - name: quay.io/herringbone/enrichment
     newTag: latest # Image Updater will modify this
-    digest: sha256:ae861e4c9d4fe4393adea6cb189045f85dbd2d8ffcf5a9772c04784f55b95c8b
+    digest: sha256:02c41a684dd5f7d5e25f9c0a1c25b27cf1d1e3c869737287ba8889037a01cff7
