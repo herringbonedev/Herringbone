@@ -70,7 +70,7 @@ jobs:
 
         # Insert test log
         docker exec mongo mongosh "mongodb://herringbone:herringbonepw123@localhost:27017/herringbone?authSource=admin" --eval '
-          db.logs.insertOne({
+          db.getSiblingDB("herringbone").logs.insertOne({
             timestamp: new Date(),
             raw_log: "Test log message",
             source: "github-actions",
