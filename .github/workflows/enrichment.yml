@@ -93,6 +93,7 @@ jobs:
         -e DB_NAME=herringbone \
         -e MONGO_USER=herringbone \
         -e MONGO_PASSWORD=herringbonepw123 \
+        -e COLLECTION_NAME=logs \
         -e ENRICHMENT_SVC=test.service \
         enrichment:beta-1.1.0-${{ github.run_number }} \
         sleep 5
