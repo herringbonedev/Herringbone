@@ -33,6 +33,7 @@ COLLECTION_NAME = os.environ.get('COLLECTION_NAME')
 MONGO_USER = os.environ.get('MONGO_USER')
 MONGO_PASS = os.environ.get('MONGO_PASS')
 AUTH_URI = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_HOST}/{DB_NAME}"
+print(AUTH_URI)
 
 if MONGO_HOST is not None:
     client = MongoClient(MONGO_HOST)
