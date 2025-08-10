@@ -78,7 +78,7 @@ while True:
 
     try:
         enrichment_result = perform_recon(doc["raw_log"])
-        if not os.environ.get("ENRICHMENT_SVC") == "test.svc":
+        if os.environ.get("ENRICHMENT_SVC") != "test.svc":
             collection.update_one(
                 {"_id": doc["_id"]},
                 {
@@ -91,7 +91,7 @@ while True:
             )
             print(f"[✓] Enriched log {doc['_id']}")
     except Exception as e:
-        if not os.environ.get("ENRICHMENT_SVC") == "test.svc":
+        if os.environ.get("ENRICHMENT_SVC") != "test.svc":
             collection.update_one(
                 {"_id": doc["_id"]},
                 {"$set": {"recon": False}}
