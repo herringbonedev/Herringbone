@@ -79,6 +79,7 @@ while True:
     try:
         enrichment_result = perform_recon(doc["raw_log"])
         if os.environ.get("ENRICHMENT_SVC") != "test.svc":
+            print("[→] Inserting log into MongoDB")
             collection.update_one(
                 {"_id": doc["_id"]},
                 {
@@ -92,6 +93,7 @@ while True:
             print(f"[✓] Enriched log {doc['_id']}")
     except Exception as e:
         if os.environ.get("ENRICHMENT_SVC") != "test.svc":
+            print("[→] Inserting log into MongoDB")
             collection.update_one(
                 {"_id": doc["_id"]},
                 {"$set": {"recon": False}}
