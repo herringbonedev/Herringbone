@@ -78,20 +78,22 @@ while True:
 
     try:
         enrichment_result = perform_recon(doc["raw_log"])
-        collection.update_one(
-            {"_id": doc["_id"]},
-            {
-                "$set": {
-                    "recon": True,
-                    "recon_data": enrichment_result,
-                    "last_processed": datetime.utcnow()
+        if not os.environ.get("ENRICHMENT_SVC") == "test.svc":
+            collection.update_one(
+                {"_id": doc["_id"]},
+                {
+                    "$set": {
+                        "recon": True,
+                        "recon_data": enrichment_result,
+                        "last_processed": datetime.utcnow()
+                    }
                 }
-            }
-        )
-        print(f"[✓] Enriched log {doc['_id']}")
+            )
+            print(f"[✓] Enriched log {doc['_id']}")
     except Exception as e:
-        collection.update_one(
-            {"_id": doc["_id"]},
-            {"$set": {"recon": False}}
-        )
+        if not os.environ.get("ENRICHMENT_SVC") == "test.svc":
+            collection.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"recon": False}}
+            )
         print(f"[✗] Failed to enrich log {doc['_id']}: {e}")
