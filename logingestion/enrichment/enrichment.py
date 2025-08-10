@@ -4,6 +4,10 @@ import time
 import os
 import requests
 
+class MongoNotSet(Exception):
+    """If the MONGO_HOST is not set in the container environment variables"""
+    pass
+
 print("Enrichment service has started")
 if os.environ.get("ENRICHMENT_SVC") == "test.service":
     print("[Test Service] Started in test mode")
@@ -25,38 +29,43 @@ def perform_recon(raw_log):
     except requests.RequestException as e:
         raise RuntimeError(f"Enrichment service failed: {e}")
 
-class MongoNotSet(Exception):
-    """If the MONGO_HOST is not set in the container environment variables"""
-    pass
-
 MONGO_HOST = os.environ.get('MONGO_HOST', None)
-DB_NAME = os.environ.get("DB_NAME")
-COLLECTION_NAME = os.environ.get('COLLECTION_NAME')
-MONGO_USER = os.environ.get('MONGO_USER')
-MONGO_PASS = os.environ.get('MONGO_PASS')
-AUTH_URI = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_HOST}/{DB_NAME}"
+DB_NAME = os.environ.get("DB_NAME", None)
+COLLECTION_NAME = os.environ.get('COLLECTION_NAME', None)
+MONGO_USER = os.environ.get('MONGO_USER', None)
+MONGO_PASS = os.environ.get('MONGO_PASS', None)
 
 if MONGO_HOST is not None:
     client = MongoClient(MONGO_HOST)
     db = client[DB_NAME]
     collection = db[COLLECTION_NAME]
+    AUTH_URI = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_HOST}/{DB_NAME}"
+
+    try:
+        client = MongoClient(AUTH_URI)
+        db = client[DB_NAME]
+        collection = db[COLLECTION_NAME]
+
+    except Exception as e:
+        raise Exception(f"Failed to connect to MongoDB: {e}")
+    
+elif os.environ.get("ENRICHMENT_SVC") == "test.service":
+    print("[Test Mode] Ignoring MongoDB connection.")
 
 else:
     raise MongoNotSet("MONGO_HOST is not set in the container environment variables.")
 
-try:
-    client = MongoClient(AUTH_URI)
-    db = client[DB_NAME]
-    collection = db[COLLECTION_NAME]
-
-except Exception as e:
-    raise Exception(f"Failed to connect to MongoDB: {e}")
-
 while True:
 
     if os.environ.get("ENRICHMENT_SVC") == "test.service":
-        print("[Test Mode] Finding test log")
-        doc = collection.find_one()
+        print("[Test Mode] Using test log")
+        doc = {
+        "timestamp": "00:00:00",
+        "raw_log": "Test log message",
+        "source": "github-actions",
+        "recon": False,
+        "recon_data": None
+      }
     else:
         doc = collection.find_one({
             "recon": False,
