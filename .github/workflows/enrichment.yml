@@ -70,7 +70,6 @@ jobs:
 
     - name: Push image to DockerHub (only if tests pass)
       run: |
-        docker tag quay.io/herringbone/enrichment:latest-${GITHUB_SHA::8}-${{ github.run_number }}
         docker push quay.io/herringbone/enrichment:latest-${GITHUB_SHA::8}-${{ github.run_number }}
 
     - name: Get image digest
