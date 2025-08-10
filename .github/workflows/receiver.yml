@@ -46,11 +46,11 @@ jobs:
     # Build, test, and push the Docker image
     - name: Build Docker image
       run: |
-        docker build -t receiver:beta-1.1.0-${{ github.run_number }} ./logingestion/receiver
+        docker build -t quay.io/herringbone/receiver:latest-${GITHUB_SHA::8}-${{ github.run_number }} ./logingestion/receiver
 
     - name: Run container for smoke test
       run: |
-        docker run -d -p 7002:7002/udp --name test_receiver -e RECEIVER_TYPE=UDP receiver:beta-1.1.0-${{ github.run_number }}
+        docker run -d -p 7002:7002/udp --name test_receiver -e RECEIVER_TYPE=UDP quay.io/herringbone/receiver:latest-${GITHUB_SHA::8}-${{ github.run_number }}
         sleep 5
         docker logs test_receiver  # Optional: View logs
         docker ps -a               # Show container status
@@ -65,23 +65,25 @@ jobs:
 
     - name: Push image to DockerHub (only if tests pass)
       run: |
-        docker tag receiver:beta-1.1.0-${{ github.run_number }} quay.io/herringbone/receiver:latest
-        docker push quay.io/herringbone/receiver:latest
+        docker push quay.io/herringbone/receiver:latest-${GITHUB_SHA::8}-${{ github.run_number }}
 
     # Update kustomization.yaml with the new image digest
     - name: Get image digest
       id: digest
       run: |
-        DIGEST=$(skopeo inspect docker://quay.io/herringbone/receiver:latest | jq -r '.Digest')
+        DIGEST=$(skopeo inspect docker://quay.io/herringbone/receiver:latest-${GITHUB_SHA::8}-${{ github.run_number }} | jq -r '.Digest')
         echo "digest=$DIGEST"
         echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
     - name: Update kustomization.yaml with new image digest
       run: |
+        yq e '.images[0].newTag = "latest-${GITHUB_SHA::8}-${{ github.run_number }}"' -i kustomize/receiver_udp/kustomization.yaml
+        yq e '.images[0].newTag = "latest-${GITHUB_SHA::8}-${{ github.run_number }}"' -i kustomize/receiver_http/kustomization.yaml
         yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/receiver_udp/kustomization.yaml
         yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/receiver_http/kustomization.yaml
 
     - name: Commit and push kustomization.yaml update
+      if: github.ref == 'refs/heads/main'
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
