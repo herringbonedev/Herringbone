@@ -55,14 +55,14 @@ jobs:
     # Build, test, and push the Docker image
     - name: Build Docker image
       run: |
-        docker build -t enrichment:beta-1.1.0-${{ github.run_number }} ./logingestion/enrichment
+        docker build -t quay.io/herringbone/enrichment:latest-${GITHUB_SHA::8}-${{ github.run_number }} ./logingestion/enrichment
 
     - name: Run container for smoke test
       run: |
         docker run -d \
         --name test_enrichment \
         -e ENRICHMENT_SVC=test.service \
-        enrichment:beta-1.1.0-${{ github.run_number }};
+        quay.io/herringbone/enrichment:latest-${GITHUB_SHA::8}-${{ github.run_number }};
         sleep 20
         docker logs test_enrichment  # Optional: View logs
         docker ps -a               # Show container status
@@ -70,22 +70,23 @@ jobs:
 
     - name: Push image to DockerHub (only if tests pass)
       run: |
-        docker tag enrichment:beta-1.1.0-${{ github.run_number }} quay.io/herringbone/enrichment:latest
-        docker push quay.io/herringbone/enrichment:latest
+        docker tag quay.io/herringbone/enrichment:latest-${GITHUB_SHA::8}-${{ github.run_number }}
+        docker push quay.io/herringbone/enrichment:latest-${GITHUB_SHA::8}-${{ github.run_number }}
 
-    # Update kustomization.yaml with the new image digest
     - name: Get image digest
       id: digest
       run: |
-        DIGEST=$(skopeo inspect docker://quay.io/herringbone/enrichment:latest | jq -r '.Digest')
+        DIGEST=$(skopeo inspect docker://quay.io/herringbone/enrichment:latest-${GITHUB_SHA::8}-${{ github.run_number }} | jq -r '.Digest')
         echo "digest=$DIGEST"
         echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
     - name: Update kustomization.yaml with new image digest
       run: |
         yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/enrichment/kustomization.yaml
+        yq e '.images[0].newTag = "latest-${GITHUB_SHA::8}-${{ github.run_number }}"' -i kustomize/enrichment/kustomization.yaml
 
     - name: Commit and push kustomization.yaml update
+      if: github.ref == 'refs/heads/main'
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
