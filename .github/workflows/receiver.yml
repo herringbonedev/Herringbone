@@ -87,6 +87,7 @@ jobs:
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
+        git pull --rebase
         git add kustomize/receiver_http/kustomization.yaml
         git add kustomize/receiver_udp/kustomization.yaml
         git commit -m "Update receiver image digest to ${{ steps.digest.outputs.digest }}"
