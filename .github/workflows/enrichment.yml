@@ -63,7 +63,7 @@ jobs:
         --name test_enrichment \
         -e ENRICHMENT_SVC=test.service \
         quay.io/herringbone/enrichment:latest-${GITHUB_SHA::8}-${{ github.run_number }};
-        sleep 20
+        sleep 1
         docker logs test_enrichment  # Optional: View logs
         docker ps -a               # Show container status
         docker inspect test_enrichment --format='{{.State.Running}}' | grep true
