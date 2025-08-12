@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/receiver
-    newTag: latest-${GITHUB_SHA::8}-8 # Image Updater will modify this
-    digest: "sha256:314f41fd4b4afe79edcf60c514cd1fab6e1b143d3f6160410c780b2fdcc79bb5"
+    newTag: $TAG # Image Updater will modify this
+    digest: "sha256:c46e2ea078c677fc283d10797a31d53d29998f9c33ffccd70728e1fe58926436"
