@@ -8,7 +8,6 @@ on:
   push:
     branches:
       - main
-      - fixup-pipeline
     paths:
       - 'logingestion/enrichment/**'
       - '.github/workflows/enrichment.yml'
@@ -89,6 +88,7 @@ jobs:
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
+        git pull --rebase
         git add kustomize/enrichment/kustomization.yaml
         git commit -m "Update enrichment image digest to ${{ steps.digest.outputs.digest }}"
         git push
