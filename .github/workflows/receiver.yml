@@ -77,10 +77,10 @@ jobs:
     - name: Update kustomization.yaml with new image digest
       run: |
         TAG="latest-${GITHUB_SHA::8}-${GITHUB_RUN_NUMBER}"
-        yq e '.images[0].newTag = "$TAG"' -i kustomize/receiver_udp/kustomization.yaml
-        yq e '.images[0].newTag = "$TAG"' -i kustomize/receiver_http/kustomization.yaml
-        yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/receiver_udp/kustomization.yaml
-        yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/receiver_http/kustomization.yaml
+        yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/receiver_udp/kustomization.yaml
+        yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/receiver_http/kustomization.yaml
+        yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_udp/kustomization.yaml
+        yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_http/kustomization.yaml
 
     - name: Commit and push kustomization.yaml update
       if: github.ref == 'refs/heads/main'
