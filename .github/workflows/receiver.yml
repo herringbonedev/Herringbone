@@ -76,8 +76,8 @@ jobs:
 
     - name: Update kustomization.yaml with new image digest
       run: |
-        yq e '.images[0].newTag = "latest-${GITHUB_SHA::8}-${{ github.run_number }}"' -i kustomize/receiver_udp/kustomization.yaml
-        yq e '.images[0].newTag = "latest-${GITHUB_SHA::8}-${{ github.run_number }}"' -i kustomize/receiver_http/kustomization.yaml
+        yq e '.images[0].newTag = "latest-${{GITHUB_SHA::8}}-${{ github.run_number }}"' -i kustomize/receiver_udp/kustomization.yaml
+        yq e '.images[0].newTag = "latest-${{GITHUB_SHA::8}}-${{ github.run_number }}"' -i kustomize/receiver_http/kustomization.yaml
         yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/receiver_udp/kustomization.yaml
         yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/receiver_http/kustomization.yaml
 

@@ -81,7 +81,7 @@ jobs:
     - name: Update kustomization.yaml with new image digest
       run: |
         yq e '.images[0].digest = "${{ steps.digest.outputs.digest }}"' -i kustomize/enrichment/kustomization.yaml
-        yq e '.images[0].newTag = "latest-${GITHUB_SHA::8}-${{ github.run_number }}"' -i kustomize/enrichment/kustomization.yaml
+        yq e '.images[0].newTag = "latest-${{GITHUB_SHA::8}}-${{ github.run_number }}"' -i kustomize/enrichment/kustomization.yaml
 
     - name: Commit and push kustomization.yaml update
       if: github.ref == 'refs/heads/main'
