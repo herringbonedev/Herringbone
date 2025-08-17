@@ -35,3 +35,45 @@ spec:
                 secretKeyRef:
                   name: mongo-secret
                   key: password
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  python - <<'PY'
+                  import os, sys
+                  from pymongo import MongoClient
+                  try:
+                      host = os.environ.get("MONGO_HOST")
+                      user = os.environ.get("MONGO_USER")
+                      pw   = os.environ.get("MONGO_PASS")
+                      uri = f"mongodb://{user}:{pw}@{host}/admin" if user and pw else f"mongodb://{host}/admin"
+                      MongoClient(uri, serverSelectionTimeoutMS=2000).admin.command("ping")
+                      sys.exit(0)
+                  except Exception:
+                      sys.exit(1)
+                  PY
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  python - <<'PY'
+                  import os, sys
+                  from pymongo import MongoClient
+                  try:
+                      host = os.environ.get("MONGO_HOST")
+                      user = os.environ.get("MONGO_USER")
+                      pw   = os.environ.get("MONGO_PASS")
+                      uri = f"mongodb://{user}:{pw}@{host}/admin" if user and pw else f"mongodb://{host}/admin"
+                      MongoClient(uri, serverSelectionTimeoutMS=2000).admin.command("ping")
+                      sys.exit(0)
+                  except Exception:
+                      sys.exit(1)
+                  PY
