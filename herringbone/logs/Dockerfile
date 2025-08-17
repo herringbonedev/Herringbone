@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.text
 
 COPY . .
 
-# Flask listens on 9002
-EXPOSE 9002
+# Flask listens on 7002
+EXPOSE 7002
 
 CMD ["python", "app.py"]
