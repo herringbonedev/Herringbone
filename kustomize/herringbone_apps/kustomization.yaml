@@ -1,14 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
 namespace: herringbone
-
 resources:
   - deployment.yaml
   - service.yaml
   - serviceaccount.yaml
   - clusterrolebinding.yaml
-
 images:
   - name: quay.io/herringbone/herringbone-apps
-    newTag: latest  # Image Updater will modify this
+    newTag: latest-36b4debc-1 # Image Updater will modify this
+    digest: sha256:f155e571f22393927f62f23621372eaed37be48de8fba1d0b9cec8f98fa1c39e
