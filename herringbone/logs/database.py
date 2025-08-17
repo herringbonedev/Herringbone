@@ -17,6 +17,7 @@ class MongoDatabaseHandler:
         self.MONGO_USER = os.environ.get('MONGO_USER')
         self.MONGO_PASS = os.environ.get('MONGO_PASS')
         self.AUTH_URI = f"mongodb://{self.MONGO_USER}:{self.MONGO_PASS}@{self.MONGO_HOST}/{self.DB_NAME}"
+        self.ready = False
 
         if self.MONGO_HOST is not None:
             self.client = MongoClient(self.MONGO_HOST)
@@ -30,6 +31,7 @@ class MongoDatabaseHandler:
             self.client = MongoClient(self.AUTH_URI)
             self.db = self.client[self.DB_NAME]
             self.collection = self.db[self.COLLECTION_NAME]
+            self.ready = True
 
         except Exception as e:
             raise Exception(f"Failed to connect to MongoDB: {e}")
