@@ -44,3 +44,15 @@ spec:
                 secretKeyRef:
                   name: mongo-secret
                   key: password
+          livenessProbe:
+            httpGet:
+              path: /herringbone/logs/livez
+              port: 7002
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /herringbone/logs/readyz
+              port: 7002
+            initialDelaySeconds: 10
+            periodSeconds: 10

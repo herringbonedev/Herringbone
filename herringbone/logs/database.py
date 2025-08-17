@@ -41,3 +41,4 @@ class MongoDatabaseHandler:
             return list(documents)
         except Exception as e:
             raise Exception(f"Failed to retrieve latest documents: {e}")
+    
