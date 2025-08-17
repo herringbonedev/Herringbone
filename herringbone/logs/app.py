@@ -41,7 +41,7 @@ def readiness_check():
     """
 
     mongo_handler = MongoDatabaseHandler()
-    if mongo_handler.ready():
+    if mongo_handler.ready:
         return jsonify({"ready": True}), 200
     else:
         return jsonify({"ready": False}), 503
