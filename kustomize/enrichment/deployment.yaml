@@ -39,7 +39,7 @@ spec:
             exec:
               command:
                 - python
-                - /app/container_probes.py
+                - /herringbone/enrichment/container_probes.py
                 - livez
             initialDelaySeconds: 10
             periodSeconds: 10
@@ -49,7 +49,7 @@ spec:
             exec:
               command:
                 - python
-                - /app/container_probes.py
+                - /herringbone/enrichment/container_probes.py
                 - readyz
             initialDelaySeconds: 5
             periodSeconds: 10
