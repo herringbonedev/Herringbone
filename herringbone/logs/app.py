@@ -24,7 +24,7 @@ def get_docs():
 #
 # Herringbone requires Liveness and Readiness probes for all services.
 #
-# The routes below contain the logic for healthz and readyz
+# The routes below contain the logic for livez and readyz
 #
 
 @app.route('/herringbone/logs/livez', methods=['GET'])
