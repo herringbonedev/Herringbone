@@ -17,7 +17,7 @@ spec:
         - name: detectionengine-ruleset
           image: quay.io/herringbone/detectionengine-ruleset
           ports:
-            - containerPort: 9002
+            - containerPort: 7002
               name: tcp-port
               protocol: TCP
           resources:
