@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from bson.json_util import dumps
 from database import MongoDatabaseHandler
 
 
@@ -13,11 +14,29 @@ def insert_rule():
     try:
         print("Connecting to database...")
         mongo = MongoDatabaseHandler()
-        mongo.insert_log({"rule":rule})
+        mongo.insert_rule({"rule":rule})
+        del mongo
     except Exception as e:
         print(f"Mongo connection failed. {e}")
+        del mongo
         return jsonify({"inserted": False})
 
+    return jsonify({"inserted": True})
+
+@app.route("/detectionengine/ruleset/get_rules", methods=["GET"])
+def insert_rule():
+    
+    print(f"[GET RULES] Getting all the rules.")
+
+    try:
+        print("Connecting to database...")
+        mongo = MongoDatabaseHandler()
+        docs = mongo.get_rules()
+        del mongo
+        return dumps(docs), 200
+    except Exception as e:
+        del mongo
+        return jsonify({"error": str(e)}), 500
     return jsonify({"inserted": True})
 
 #
