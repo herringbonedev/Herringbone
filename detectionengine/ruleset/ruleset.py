@@ -1,10 +1,10 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from database import MongoDatabaseHandler
 
 
 app = Flask(__name__)
 
-@app.route("/insert_rule", methods=["GET"])
+@app.route("/detectionengine/insert_rule", methods=["GET"])
 def insert_rule():
 
     rule = request.args.get('rule')
@@ -16,6 +16,22 @@ def insert_rule():
         mongo.insert_log({"rule":rule})
     except Exception as e:
         print(f"Mongo connection failed. {e}")
+        return jsonify({"inserted": False})
+
+    return jsonify({"inserted": True})
+
+#
+# Herringbone requires Liveness and Readiness probes for all services.
+#
+# The routes below contain the logic for livez and readyz
+#
+
+@app.route('/detectionengine/ruleset/livez', methods=['GET'])
+def liveness_probe():
+    """Checks if the API is up and running.
+    """
+
+    return 'OK', 200
 
 if __name__ == "__main__":
 
