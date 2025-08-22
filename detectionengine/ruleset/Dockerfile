@@ -4,7 +4,6 @@ LABEL Project="Herringbone"
 
 USER root
 
-EXPOSE 7002/udp
 EXPOSE 7002/tcp 
 
 WORKDIR /herringbone/ruleset

@@ -17,3 +17,6 @@ def insert_rule():
     except Exception as e:
         print(f"Mongo connection failed. {e}")
 
+if __name__ == "__main__":
+
+    app.run(host="0.0.0.0", port=7002)
