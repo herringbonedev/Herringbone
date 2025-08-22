@@ -2,26 +2,49 @@ from flask import Flask, request, jsonify
 from bson.json_util import dumps
 from database import MongoDatabaseHandler
 
-
 app = Flask(__name__)
 
-@app.route("/detectionengine/ruleset/insert_rule", methods=["GET"])
+EXPECTED_SCHEMA = {
+    "name": str,
+    "key": str,
+    "value": str,
+}
+
+def validate_json(data):
+
+    errors = {}
+    for key, expected_type in EXPECTED_SCHEMA.items():
+        if key not in data:
+            errors[key] = "Missing key"
+        elif not isinstance(data[key], expected_type):
+            errors[key] = f"Expected {expected_type.__name__}, got {type(data[key]).__name__}"
+    return errors
+
+@app.route("/detectionengine/ruleset/insert_rule", methods=["POST"])
 def insert_rule():
 
-    rule = request.args.get('rule')
-    print(f"[RULE INSERT] Attempting to insert {rule}")
+    if not request.is_json:
+        return jsonify({"error": "Invalid request, JSON required"}), 400
+    
+    data = request.get_json()
+    errors = validate_json(data)
+
+    if errors:
+        return jsonify({"error": "Invalid JSON structure", "details": errors}), 400
+    
+    print(f"[RULE INSERT] Attempting to insert {data}")
 
     try:
         print("Connecting to database...")
         mongo = MongoDatabaseHandler()
-        mongo.insert_rule({"rule":rule})
+        mongo.insert_rule(data)
         del mongo
     except Exception as e:
         print(f"Mongo connection failed. {e}")
         del mongo
-        return jsonify({"inserted": False})
+        return jsonify({"inserted": False}), 500
 
-    return jsonify({"inserted": True})
+    return jsonify({"inserted": True}), 200
 
 @app.route("/detectionengine/ruleset/get_rules", methods=["GET"])
 def get_rules():
