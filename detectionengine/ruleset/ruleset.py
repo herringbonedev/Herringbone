@@ -24,8 +24,8 @@ def insert_rule():
     return jsonify({"inserted": True})
 
 @app.route("/detectionengine/ruleset/get_rules", methods=["GET"])
-def insert_rule():
-    
+def get_rules():
+
     print(f"[GET RULES] Getting all the rules.")
 
     try:
