@@ -52,6 +52,18 @@ def liveness_probe():
 
     return 'OK', 200
 
+@app.route('/detectionengine/ruleset/readyz', methods=['GET'])
+def readiness_check():
+    """Readiness check to see if the service is able to serve data
+    from the MongoDB collection Herringbone.
+    """
+
+    mongo = MongoDatabaseHandler()
+    if mongo.ready:
+        return jsonify({"ready": True}), 200
+    else:
+        return jsonify({"ready": False}), 503
+
 if __name__ == "__main__":
 
     app.run(host="0.0.0.0", port=7002)
