@@ -4,7 +4,7 @@ from database import MongoDatabaseHandler
 
 app = Flask(__name__)
 
-@app.route("/detectionengine/insert_rule", methods=["GET"])
+@app.route("/detectionengine/ruleset/insert_rule", methods=["GET"])
 def insert_rule():
 
     rule = request.args.get('rule')
