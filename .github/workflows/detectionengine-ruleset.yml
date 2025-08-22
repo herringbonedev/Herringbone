@@ -1,4 +1,4 @@
-name: (Ruleset) Build, Test, and Push Docker Image
+name: (Ruleset) Build
 
 permissions:
   contents: write

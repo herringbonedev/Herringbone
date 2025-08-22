@@ -1,4 +1,4 @@
-name: (Receiver) Build, Test, and Push Docker Image
+name: (Receiver) Build
 
 permissions:
   contents: write

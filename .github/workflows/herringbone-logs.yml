@@ -1,4 +1,4 @@
-name: (Herringbone Logs API) Build, Test, and Push Docker Image
+name: (Herringbone Logs API) Build
 
 permissions:
   contents: write
