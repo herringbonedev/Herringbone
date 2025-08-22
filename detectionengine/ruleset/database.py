@@ -42,13 +42,21 @@ class MongoDatabaseHandler:
         decoded = codecs.decode(decoded.encode('utf-8'), 'unicode_escape')
         return decoded.strip()
 
-    def insert_log(self, log_object):
+    def insert_rule(self, log_object):
         
         try:
             result = self.collection.insert_one(log_object)
             print(f"[✓] Inserted rule with _id: {result.inserted_id}")
         except Exception as e:
             print(f"[✗] Error inserting rule: {e}")
+
+    def get_rules(self):
+        """Retrieve n most recent documents sorted by _id descending"""
+        try:
+            documents = self.collection.find().sort("_id", -1)
+            return list(documents)
+        except Exception as e:
+            raise Exception(f"Failed to retrieve latest documents: {e}")
 
     def close(self):
         self.client.close()
