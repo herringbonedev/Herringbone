@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - detection-engine
+      - main
     paths:
       - 'detectionengine/ruleset/**'
       - '.github/workflows/detectionengine-ruleset.yml'
