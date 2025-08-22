@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: detectionengine-ruleset
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: detectionengine-ruleset
+  template:
+    metadata:
+      labels:
+        app: detectionengine-ruleset
+    spec:
+      containers:
+        - name: detectionengine-ruleset
+          image: quay.io/herringbone/detectionengine-ruleset
+          ports:
+            - containerPort: 9002
+              name: tcp-port
+              protocol: TCP
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "150m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          env:
+            - name: MONGO_HOST
+              value: mongodb.mongodb.svc.cluster.local:27017
+            - name: DB_NAME
+              value: herringbone
+            - name: COLLECTION_NAME
+              value: rules
+            - name: MONGO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: username
+            - name: MONGO_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: password
