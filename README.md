@@ -3,13 +3,9 @@
 A cloud-native engine for log management, detection rules, and security intelligence.
 
 [![DetectionEngine Ruleset](https://github.com/herringbonedev/Herringbone/actions/workflows/detectionengine-ruleset.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/detectionengine-ruleset.yml)
-
 [![Enrichment](https://github.com/herringbonedev/Herringbone/actions/workflows/enrichment.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/enrichment.yml)
-
 [![Herringbone Apps](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-apps.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-apps.yml)
-
 [![Herringbone Logs](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-logs.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-logs.yml)
-
 [![Receiver](https://github.com/herringbonedev/Herringbone/actions/workflows/receiver.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/receiver.yml)
 
 ### Summary
