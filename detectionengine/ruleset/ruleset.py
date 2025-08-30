@@ -5,9 +5,10 @@ from database import MongoDatabaseHandler
 app = Flask(__name__)
 
 EXPECTED_SCHEMA = {
+    "type":"mind",
     "name": str,
-    "key": str,
-    "value": str,
+    "prompt": str,
+    "data": dict
 }
 
 def validate_json(data):
