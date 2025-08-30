@@ -10,7 +10,7 @@ class MongoNotSet(Exception):
     pass
 
 class MongoDatabaseHandler:
-
+    
     def __init__(self):
         self.MONGO_HOST = os.environ.get('MONGO_HOST', None)
         self.DB_NAME = os.environ.get("DB_NAME")
@@ -51,7 +51,7 @@ class MongoDatabaseHandler:
             result = self.collection.insert_one(log_object)
             print(f"[✓] Inserted rule with _id: {result.inserted_id}")
         except Exception as e:
-            print(f"[✗] Error inserting rule: {e}")
+            raise Exception(f"[✗] Error inserting rule: {e}")
 
     def delete_rule(self, rule_id):
 
@@ -59,7 +59,7 @@ class MongoDatabaseHandler:
             result = self.collection.delete_one({"_id": ObjectId(rule_id)})
             print(f"[✓] Deleted rule with _id: {rule_id}")
         except Exception as e:
-            print(f"[✗] Error deleting rule {rule_id}: {e}")
+            raise Exception(f"[✗] Error deleting rule {rule_id}: {e}")
 
     def get_rules(self):
         """Retrieve n most recent documents sorted by _id descending"""
