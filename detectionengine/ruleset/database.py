@@ -52,6 +52,14 @@ class MongoDatabaseHandler:
         except Exception as e:
             print(f"[✗] Error inserting rule: {e}")
 
+    def delete_rule(self, rule_id):
+
+        try:
+            result = self.collection.delete_one({"_id": ObjectId(rule_id)})
+            print(f"[✓] Deleted rule with _id: {rule_id}")
+        except Exception as e:
+            print(f"[✗] Error deleting rule {rule_id}: {e}")
+
     def get_rules(self):
         """Retrieve n most recent documents sorted by _id descending"""
         try:
