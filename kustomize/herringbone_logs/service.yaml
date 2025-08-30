@@ -11,5 +11,5 @@ spec:
   ports:
     - name: tcp
       protocol: TCP
-      port: 9002
-      targetPort: 9002
+      port: 7002
+      targetPort: 7002
