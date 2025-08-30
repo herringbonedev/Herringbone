@@ -5,7 +5,7 @@ from database import MongoDatabaseHandler
 app = Flask(__name__)
 
 EXPECTED_SCHEMA = {
-    "type":"mind",
+    "type": str,
     "name": str,
     "prompt": str,
     "data": dict
