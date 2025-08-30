@@ -62,6 +62,26 @@ def get_rules():
         return jsonify({"error": str(e)}), 500
     return jsonify({"inserted": True})
 
+@app.route("/detectionengine/ruleset/delete_rule", methods=["GET"])
+def delete_rule():
+
+    rule_id = request.args.get('id', None)
+
+    if not rule_id:
+        return jsonify({"deleted": False}), 500
+
+    try:
+        print("Connecting to database...")
+        mongo = MongoDatabaseHandler()
+        mongo.delete_rule(rule_id)
+        del mongo
+    except Exception as e:
+        print(f"Mongo connection failed. {e}")
+        del mongo
+        return jsonify({"deleted": False}), 500
+
+    return jsonify({"deleted": True}), 200
+
 #
 # Herringbone requires Liveness and Readiness probes for all services.
 #
