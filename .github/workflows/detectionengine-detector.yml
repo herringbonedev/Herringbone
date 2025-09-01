@@ -1,8 +1,5 @@
 name: (Detector) Build
 
-permissions:
-  contents: write
-
 on:
   workflow_dispatch:
   push:
@@ -12,89 +9,134 @@ on:
       - 'detectionengine/detector/**'
       - '.github/workflows/detectionengine-detector.yml'
 
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
+concurrency:
+  group: detector-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test-push:
     runs-on: ubuntu-latest
 
-    # Install dependencies
     steps:
-    - name: Install yq
-      run: |
-        sudo wget https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 -O /usr/bin/yq
-        sudo chmod +x /usr/bin/yq
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Install skopeo
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y skopeo
+      - name: Install tools (yq, skopeo, jq, gh)
+        run: |
+          set -euo pipefail
+          sudo wget https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+          sudo apt-get update
+          sudo apt-get install -y skopeo jq
+          type -p gh >/dev/null || (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
+            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+            sudo apt-get update && sudo apt-get install gh -y)
 
-    # Configure runner with code and docker
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Log in to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Log in to DockerHub
-      uses: docker/login-action@v3
-      with:
-        registry: quay.io
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build Docker image
+        env:
+          SHORT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA=${SHORT_SHA::8}
+          docker build -t quay.io/herringbone/detectionengine-detector:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} ./detectionengine/detector
 
-    # Build, test, and push the Docker image
-    - name: Build Docker image
-      run: |
-        docker build -t quay.io/herringbone/detectionengine-detector:latest-${GITHUB_SHA::8}-${{ github.run_number }} ./detectionengine/detector
+      - name: Smoke test container
+        env:
+          SHORT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA=${SHORT_SHA::8}
+          docker run -d --name test_detectionengine_detector \
+            quay.io/herringbone/detectionengine-detector:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
+          sleep 1
+          docker logs test_detectionengine_detector || true
+          test "$(docker inspect test_detectionengine_detector --format='{{.State.Running}}')" = "true"
 
-    - name: Run container for smoke test
-      run: |
-        docker run -d \
-        --name test_detectionengine_detector \
-        quay.io/herringbone/detectionengine-detector:latest-${GITHUB_SHA::8}-${{ github.run_number }};
-        sleep 1
-        docker logs test_detectionengine_detector  # Optional: View logs
-        docker ps -a               # Show container status
-        docker inspect test_detectionengine_detector --format='{{.State.Running}}' | grep true
+      - name: Push image
+        env:
+          SHORT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA=${SHORT_SHA::8}
+          docker push quay.io/herringbone/detectionengine-detector:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
 
-    - name: Push image to DockerHub (only if tests pass)
-      run: |
-        docker push quay.io/herringbone/detectionengine-detector:latest-${GITHUB_SHA::8}-${{ github.run_number }}
+      - name: Get image digest
+        id: digest
+        env:
+          SHORT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA=${SHORT_SHA::8}
+          DIGEST=$(skopeo inspect docker://quay.io/herringbone/detectionengine-detector:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} | jq -r '.Digest')
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
-    - name: Get image digest
-      id: digest
-      run: |
-        DIGEST=$(skopeo inspect docker://quay.io/herringbone/detectionengine-detector:latest-${GITHUB_SHA::8}-${{ github.run_number }} | jq -r '.Digest')
-        echo "digest=$DIGEST"
-        echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+      - name: Update kustomization.yaml with new tag & digest
+        run: |
+          set -euo pipefail
+          SHORT_SHA=${GITHUB_SHA::8}
+          TAG="latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+          yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/detectionengine_detector/kustomization.yaml
+          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/detectionengine_detector/kustomization.yaml
 
-    - name: Update kustomization.yaml with new image digest
-      run: |
-        TAG="latest-${GITHUB_SHA::8}-${GITHUB_RUN_NUMBER}"
-        yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/detectionengine_detector/kustomization.yaml
-        yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/detectionengine_detector/kustomization.yaml
+      - name: Detect changes
+        id: bump
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
-    - name: Create/update PR
-      if: steps.bump.outputs.changed == 'true'
-      uses: peter-evans/create-pull-request@v6
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}     # cannot bypass protections (good!)
-        branch: auto/update/detector-digest    # bot branch
-        delete-branch: true
-        commit-message: "chore(detector): bump image to ${{ steps.digest.outputs.digest }}"
-        title: "chore(detector): bump detector image"
-        body: |
-          Automated update to kustomization for detector image.
-          - Tag & digest updated by CI
-          - This PR respects branch protection (no direct pushes to `main`)
-        labels: |
-          automations
-          chore
-        signoff: true
-        committer: "herringbone-bot <actions@users.noreply.github.com>"
-        author: "herringbone-bot <actions@users.noreply.github.com>"
+      # Create a bot branch with the change and open a PR via GitHub CLI (first-party)
+      - name: Create/update PR with gh
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BOT_BRANCH="auto/update/detector-digest"
+          git config user.name "Herringbone Bot"
+          git config user.email "bot@herringbone.dev"
 
-    - name: Cleanup
-      if: always()
-      run: |
-        docker rm -f test_detectionengine_detector || true
+          # Create/refresh bot branch from current main
+          git checkout -B "$BOT_BRANCH"
+          git add kustomize/detectionengine_detector/kustomization.yaml
+          git commit -m "chore(detector): bump image to ${{ steps.digest.outputs.digest }}" --signoff || true
+          git push -u origin "$BOT_BRANCH" --force
+
+          # Create PR if none exists; otherwise, it's fine (idempotent)
+          if ! gh pr list --head "$BOT_BRANCH" --base main --state open --json number --jq 'length' | grep -q '^0$'; then
+            echo "PR already open for $BOT_BRANCH"
+          else
+            gh pr create \
+              --base main \
+              --head "$BOT_BRANCH" \
+              --title "chore(detector): bump detector image" \
+              --body "Automated update to kustomization for detector image.\n- Tag & digest updated by CI\n- This PR respects branch protection."
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f test_detectionengine_detector || true
