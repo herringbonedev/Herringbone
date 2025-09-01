@@ -21,7 +21,7 @@ No component in Herringbone building block is tightly coupled to another, allowi
 During its beta phase, Herringbone relies on a small set of critical infrastructure components. These dependencies are planned to be reduced or fully removed in future releases:
 
 - MongoDB
-- Kubernetes (built on vanilla Kubernetes, with support for distributions such as OpenShift, GKE, and others)
+- Kubernetes (built on vanilla Kubernetes, making it portable across major distributions, including OpenShift, GKE, AKS, and EKS.)
 - ArgoCD
 - NGINX Ingress
 - LoadBalancer Service (e.g., MetalLB for on-premises environments)
