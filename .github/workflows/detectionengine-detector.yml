@@ -74,19 +74,27 @@ jobs:
         yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/detectionengine_detector/kustomization.yaml
         yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/detectionengine_detector/kustomization.yaml
 
-    - name: Commit and push kustomization.yaml update
-      if: github.ref == 'refs/heads/main'
-      run: |
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git pull
-        git add kustomize/detectionengine_detector/kustomization.yaml
-        git commit -m "Update detectionengine_detector image digest to ${{ steps.digest.outputs.digest }}"
-        git push
+    - name: Create/update PR
+      if: steps.bump.outputs.changed == 'true'
+      uses: peter-evans/create-pull-request@v6
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}     # cannot bypass protections (good!)
+        branch: auto/update/detector-digest    # bot branch
+        delete-branch: true
+        commit-message: "chore(detector): bump image to ${{ steps.digest.outputs.digest }}"
+        title: "chore(detector): bump detector image"
+        body: |
+          Automated update to kustomization for detector image.
+          - Tag & digest updated by CI
+          - This PR respects branch protection (no direct pushes to `main`)
+        labels: |
+          automations
+          chore
+        signoff: true
+        committer: "herringbone-bot <actions@users.noreply.github.com>"
+        author: "herringbone-bot <actions@users.noreply.github.com>"
 
-    # Cleanup
     - name: Cleanup
       if: always()
       run: |
-        docker stop test_detectionengine_detector || true
-        docker rm test_detectionengine_detector || true
+        docker rm -f test_detectionengine_detector || true
