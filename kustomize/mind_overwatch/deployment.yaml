@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: herringbone-mind-overwatch
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: herringbone-mind-overwatch
+  template:
+    metadata:
+      labels:
+        app: herringbone-mind-overwatch
+    spec:
+      containers:
+        - name: mind-overwatch
+          image: quay.io/herringbone/mind_overwatch
+          ports:
+            - containerPort: 8002
+              name: tcp-port
+              protocol: TCP
+      nodeSelector:
+        mind: "true"
+      tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "mind"
+          effect: "NoSchedule"
