@@ -28,19 +28,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install tools (yq, skopeo, jq, gh)
+      - name: Install tools (yq, skopeo, jq)
         run: |
           set -euo pipefail
           sudo wget https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 -O /usr/bin/yq
           sudo chmod +x /usr/bin/yq
           sudo apt-get update
           sudo apt-get install -y skopeo jq
-          type -p gh >/dev/null || (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
-            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
-            sudo apt-get update && sudo apt-get install gh -y)
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -108,33 +102,35 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Create a bot branch with the change and open a PR via GitHub CLI (first-party)
-      - name: Create/update PR with gh
+      # Create/Update PR using peter-evans (gracefully no-ops if no diff)
+      - name: Create PR (only if changes exist)
         if: steps.bump.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: cpr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(detector): bump image to ${{ steps.digest.outputs.digest }}"
+          title: "chore(detector): bump detector image"
+          body: |
+            Automated update to kustomization for detector image.
+            - Tag & digest updated by CI
+            - This PR respects branch protection.
+          branch: auto/update/detector-digest
+          delete-branch: true
+          signoff: true
+          labels: |
+            automation
+            digest
+
+      - name: Log PR result
+        if: steps.bump.outputs.changed == 'true'
         run: |
-          set -euo pipefail
-          BOT_BRANCH="auto/update/detector-digest"
-          git config user.name "Herringbone Bot"
-          git config user.email "bot@herringbone.dev"
+          echo "operation=${{ steps.cpr.outputs.pull-request-operation }}"
+          echo "pr=${{ steps.cpr.outputs.pull-request-number || 'none' }}"
 
-          # Create/refresh bot branch from current main
-          git checkout -B "$BOT_BRANCH"
-          git add kustomize/detectionengine_detector/kustomization.yaml
-          git commit -m "chore(detector): bump image to ${{ steps.digest.outputs.digest }}" --signoff || true
-          git push -u origin "$BOT_BRANCH" --force
-
-          # Create PR if none exists; otherwise, it's fine (idempotent)
-          if ! gh pr list --head "$BOT_BRANCH" --base main --state open --json number --jq 'length' | grep -q '^0$'; then
-            echo "PR already open for $BOT_BRANCH"
-          else
-            gh pr create \
-              --base main \
-              --head "$BOT_BRANCH" \
-              --title "chore(detector): bump detector image" \
-              --body "Automated update to kustomization for detector image.\n- Tag & digest updated by CI\n- This PR respects branch protection."
-          fi
+      - name: No changes
+        if: steps.bump.outputs.changed != 'true'
+        run: echo "No changes; skipping PR."
 
       - name: Cleanup
         if: always()
