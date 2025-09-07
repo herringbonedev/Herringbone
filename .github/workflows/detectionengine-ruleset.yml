@@ -74,19 +74,45 @@ jobs:
         yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/detectionengine_ruleset/kustomization.yaml
         yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/detectionengine_ruleset/kustomization.yaml
 
-    - name: Commit and push kustomization.yaml update
-      if: github.ref == 'refs/heads/main'
+    - name: Detect changes
+      id: bump
       run: |
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git pull
-        git add kustomize/detectionengine_ruleset/kustomization.yaml
-        git commit -m "Update detectionengine_ruleset image digest to ${{ steps.digest.outputs.digest }}"
-        git push
+        set -euo pipefail
+        if git diff --quiet; then
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+        fi
 
-    # Cleanup
+    # Create a bot branch with the change and open a PR via GitHub CLI (first-party)
+    - name: Create/update PR with gh
+      if: steps.bump.outputs.changed == 'true'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -euo pipefail
+        BOT_BRANCH="auto/update/detector-digest"
+        git config user.name "Herringbone Bot"
+        git config user.email "bot@herringbone.dev"
+
+        # Create/refresh bot branch from current main
+        git checkout -B "$BOT_BRANCH"
+        git add kustomize/detectionengine_detector/kustomization.yaml
+        git commit -m "chore(detector): bump image to ${{ steps.digest.outputs.digest }}" --signoff || true
+        git push -u origin "$BOT_BRANCH" --force
+
+        # Create PR if none exists; otherwise, it's fine (idempotent)
+        if ! gh pr list --head "$BOT_BRANCH" --base main --state open --json number --jq 'length' | grep -q '^0$'; then
+          echo "PR already open for $BOT_BRANCH"
+        else
+          gh pr create \
+            --base main \
+            --head "$BOT_BRANCH" \
+            --title "chore(detector): bump detector image" \
+            --body "Automated update to kustomization for detector image.\n- Tag & digest updated by CI\n- This PR respects branch protection."
+        fi
+
     - name: Cleanup
       if: always()
       run: |
-        docker stop test_detectionengine_ruleset || true
-        docker rm test_detectionengine_ruleset || true
+        docker rm -f test_detectionengine_detector || true

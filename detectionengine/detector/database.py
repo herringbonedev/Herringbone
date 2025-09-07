@@ -56,7 +56,7 @@ class MongoDatabaseHandler:
     def get_rules(self):
         """Retrieve n most recent documents sorted by _id descending"""
         try:
-            documents = self.collection.find().sort("_id", -1)
+            documents = self.collection.find().sort("_id", -1).limit(1000)
             return list(documents)
         except Exception as e:
             raise Exception(f"Failed to retrieve latest documents: {e}")
