@@ -7,6 +7,8 @@ A cloud-native engine for log management, detection rules, and security intellig
 [![Herringbone Apps](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-apps.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-apps.yml)
 [![Herringbone Logs](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-logs.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-logs.yml)
 [![Receiver](https://github.com/herringbonedev/Herringbone/actions/workflows/receiver.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/receiver.yml)
+[![Herringbone Logs](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-recon.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-recon.yml)
+[![Receiver](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-overwatch.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-overwatch.yml)
 
 ## Summary
 
