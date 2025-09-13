@@ -31,11 +31,13 @@ while True:
             raise Exception("No logs found to run detection.")
         
         else:
+            # Print out the data to be sent to overwatch
+            to_analyze = {"log":latest_not_detected, "rules": rules}
+
             # Send the log over with the rules to overwatch for analysis
             response = requests.post(os.environ.get("OVERWATCH_HOST"), 
                                      headers =  {"Content-Type": "application/json"},
-                                     data={"log":latest_not_detected,
-                                           "rules": rules})
+                                     data=to_analyze)
             print(response.content)
 
     except Exception as e:
