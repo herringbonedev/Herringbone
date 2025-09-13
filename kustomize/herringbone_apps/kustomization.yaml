@@ -8,5 +8,5 @@ resources:
   - clusterrolebinding.yaml
 images:
   - name: quay.io/herringbone/herringbone-apps
-    newTag: latest-2a3269a2-3 # Image Updater will modify this
-    digest: sha256:c80dcc6aea34f7b0bca85058ca120f309e6315a1095a9547f296f8966b27ba97
+    newTag: latest-c48187c2-4 # Image Updater will modify this
+    digest: sha256:e7a389b491fd9a5656601c8b7e4e58a0ccf58bf52ed7c46cc25784df274aafde
