@@ -12,12 +12,12 @@ OLLAMA_URL = 'http://localhost:11434/api/generate'
 def prompt_template(raw_log, rules):
     """Generate prompt template for recon from prompt.text
     """
-    return open("prompt.text", "r").read() + "here is the log for you to analyze: "+ raw_log +" and here are the rules"+ rules
+    return open("prompt.text", "r").read() + " here is the log for you to analyze: "+ raw_log +" and here are the rules"+ rules
 
 @app.route('/overwatch', methods=['POST'])
 def overwatch():
     raw_log = request.get_json()["log"]
-    rules = requests.get_json()["rules"]
+    rules = request.get_json()["rules"]
     print(f"[*] Overwatch request received for log: {raw_log}")
 
     response = requests.post(OLLAMA_URL, json={
