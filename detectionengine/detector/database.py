@@ -8,7 +8,7 @@ import codecs
 class MongoNotSet(Exception):
     """If the MONGO_HOST is not set in the container environment variables.
     """
-    
+
     pass
 
 class MongoDatabaseHandler:
@@ -68,7 +68,7 @@ class MongoDatabaseHandler:
     def get_latest_not_detected(self):
         """Retrieve the latest document that has not been marked detected.
         """
-
+        
         return self.collection.find_one({"detected": False})
 
     def close(self):
