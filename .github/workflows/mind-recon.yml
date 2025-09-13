@@ -1,4 +1,4 @@
-name: (Receiver) Build
+name: (Mind Recon) Build
 
 on:
   workflow_dispatch:
@@ -51,31 +51,13 @@ jobs:
           SHORT_SHA=${SHORT_SHA::8}
           docker build -t quay.io/herringbone/mind_recon:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} ./mind/recon
 
-      - name: Run container for smoke test
-        env:
-          SHORT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          SHORT_SHA=${SHORT_SHA::8}
-          docker run -d -p 7002:7002/udp --name test_receiver -e RECEIVER_TYPE=UDP quay.io/herringbone/receiver:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
-          sleep 5
-          docker logs test_receiver || true
-          docker inspect test_receiver --format='{{.State.Running}}' | grep true
-
-      - name: UDP Receiver Test
-        run: |
-          echo "Testing UDP receiver..."
-          echo "Test message" | nc -u -w 0 localhost 7002
-          sleep 5
-          docker logs test_receiver | grep "Test message" || (echo "UDP receiver test failed" && exit 1)
-
       - name: Push image (only if tests pass)
         env:
           SHORT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
-          docker push quay.io/herringbone/receiver:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
+          docker push quay.io/herringbone/mind_recon:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
 
       # Update kustomization.yaml with the new image tag & digest
       - name: Get image digest
@@ -85,7 +67,7 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
-          DIGEST=$(skopeo inspect docker://quay.io/herringbone/receiver:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} | jq -r '.Digest')
+          DIGEST=$(skopeo inspect docker://quay.io/herringbone/mind_recon:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} | jq -r '.Digest')
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Update kustomization.yaml with new image tag & digest
@@ -93,10 +75,8 @@ jobs:
           set -euo pipefail
           SHORT_SHA=${GITHUB_SHA::8}
           TAG="latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
-          yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/receiver_udp/kustomization.yaml
-          yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/receiver_http/kustomization.yaml
-          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_udp/kustomization.yaml
-          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_http/kustomization.yaml
+          yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/mind_recon/kustomization.yaml
+          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/mind_recon/kustomization.yaml
 
       - name: Detect changes
         id: bump
@@ -115,13 +95,13 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(receiver): bump image to ${{ steps.digest.outputs.digest }}"
-          title: "chore(receiver): bump receiver image"
+          commit-message: "chore(mind recon): bump image to ${{ steps.digest.outputs.digest }}"
+          title: "chore(mind recon): bump mind recon image"
           body: |
-            Automated update to kustomization for receiver image.
+            Automated update to kustomization for mind recon image.
             - Tag & digest updated by CI
             - This PR respects branch protection.
-          branch: auto/update/receiver
+          branch: auto/update/mind_recon
           delete-branch: true
           signoff: true
           labels: |
@@ -136,9 +116,3 @@ jobs:
       - name: No changes
         if: steps.bump.outputs.changed != 'true'
         run: echo "No changes; skipping PR."
-
-      # Cleanup
-      - name: Cleanup
-        if: always()
-        run: |
-          docker rm -f test_receiver || true
