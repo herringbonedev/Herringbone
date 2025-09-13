@@ -17,7 +17,7 @@ while True:
         latest_not_detected = logs_mongo.get_latest_not_detected()
         
         if not latest_not_detected:
-            raise("No logs found to run detection.")
+            raise Exception("No logs found to run detection.")
         
         else:
             # Send the log over with the rules to overwatch for analysis
