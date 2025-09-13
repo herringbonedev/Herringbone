@@ -22,9 +22,9 @@ while True:
         else:
             # Send the log over with the rules to overwatch for analysis
             response = requests.post(os.environ.get("OVERWATCH_HOST"), 
-                                     headers =  {"Content-Type": "application/json",
-                                                 "Accept": "application/json"},
-                                     data=latest_not_detected)
+                                     headers =  {"Content-Type": "application/json"},
+                                     data={"log":latest_not_detected,
+                                           "rules": rules})
             print(response.content)
 
     except Exception as e:
