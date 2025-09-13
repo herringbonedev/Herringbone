@@ -7,8 +7,9 @@ A cloud-native engine for log management, detection rules, and security intellig
 [![Herringbone Apps](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-apps.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-apps.yml)
 [![Herringbone Logs](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-logs.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-logs.yml)
 [![Receiver](https://github.com/herringbonedev/Herringbone/actions/workflows/receiver.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/receiver.yml)
-[![Herringbone Logs](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-recon.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-recon.yml)
-[![Receiver](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-overwatch.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-overwatch.yml)
+[![Mind Recon](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-recon.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-recon.yml)
+[![Mind Overwatch](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-overwatch.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-overwatch.yml)
+[![DetectionEngine Detetor](https://github.com/herringbonedev/Herringbone/actions/workflows/detectionengine-detector.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/detectionengine.detector.yml)
 
 ## Summary
 
