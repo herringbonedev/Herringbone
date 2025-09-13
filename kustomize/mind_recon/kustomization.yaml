@@ -1,12 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
 namespace: herringbone
-
 resources:
   - deployment.yaml
   - service.yaml
-
 images:
   - name: quay.io/herringbone/mind_recon
-    newTag: latest  # Image Updater will modify this
+    newTag: latest-62a38a74-4 # Image Updater will modify this
+    digest: sha256:070d4b4bccaa4c74eb19558f82e795828f11824ccc250e51c98338f55acff080
