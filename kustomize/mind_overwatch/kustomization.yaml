@@ -1,12 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
 namespace: herringbone
-
 resources:
   - deployment.yaml
   - service.yaml
-
 images:
   - name: quay.io/herringbone/mind_overwatch
-    newTag: latest  # Image Updater will modify this
+    newTag: latest-62a38a74-3 # Image Updater will modify this
+    digest: sha256:69ba8ccd3d4be492ec390fc94e977df9aeb1ed2fb1711370b9ff906c7cf101ac
