@@ -33,6 +33,7 @@ while True:
         else:
             # Print out the data to be sent to overwatch
             to_analyze = {"log":latest_not_detected, "rules": rules}
+            print(to_analyze)
 
             # Send the log over with the rules to overwatch for analysis
             response = requests.post(os.environ.get("OVERWATCH_HOST"), 
