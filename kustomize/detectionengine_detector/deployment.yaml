@@ -32,8 +32,12 @@ spec:
               value: mongodb.mongodb.svc.cluster.local:27017
             - name: DB_NAME
               value: herringbone
-            - name: COLLECTION_NAME
+            - name: RULES_COLLECTION_NAME
               value: rules
+            - name: EVENTS_COLLECTION_NAME
+              value: logs
+            - name: DETECTIONS_COLLECTION_NAME
+              value: detections
             - name: MONGO_USER
               valueFrom:
                 secretKeyRef:

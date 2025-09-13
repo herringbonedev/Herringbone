@@ -6,15 +6,17 @@ import json
 import codecs
 
 class MongoNotSet(Exception):
-    """If the MONGO_HOST is not set in the container environment variables"""
+    """If the MONGO_HOST is not set in the container environment variables.
+    """
+    
     pass
 
 class MongoDatabaseHandler:
     
-    def __init__(self):
+    def __init__(self, collection):
         self.MONGO_HOST = os.environ.get('MONGO_HOST', None)
         self.DB_NAME = os.environ.get("DB_NAME")
-        self.COLLECTION_NAME = os.environ.get('COLLECTION_NAME')
+        self.COLLECTION_NAME = collection
         self.MONGO_USER = os.environ.get('MONGO_USER')
         self.MONGO_PASS = os.environ.get('MONGO_PASS')
         self.AUTH_URI = f"mongodb://{self.MONGO_USER}:{self.MONGO_PASS}@{self.MONGO_HOST}/{self.DB_NAME}"
@@ -54,12 +56,20 @@ class MongoDatabaseHandler:
             raise Exception(f"[✗] Error inserting rule: {e}")
 
     def get_rules(self):
-        """Retrieve n most recent documents sorted by _id descending"""
+        """Retrieve n most recent documents sorted by _id descending.
+        """
+
         try:
             documents = self.collection.find().sort("_id", -1).limit(1000)
             return list(documents)
         except Exception as e:
             raise Exception(f"Failed to retrieve latest documents: {e}")
+        
+    def get_latest_not_detected(self):
+        """Retrieve the latest document that has not been marked detected.
+        """
+
+        return self.collection.find_one({"detected": False})
 
     def close(self):
         self.client.close()

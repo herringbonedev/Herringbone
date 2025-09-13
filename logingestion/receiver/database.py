@@ -50,6 +50,7 @@ class MongoDatabaseHandler:
         try:
             log_object.update({
                 "recon": False,
+                "detected": False,
                 "recon_data": None,
                 "last_update": datetime.utcnow()
             })
