@@ -34,7 +34,7 @@ spec:
               value: herringbone
             - name: RULES_COLLECTION_NAME
               value: rules
-            - name: EVENTS_COLLECTION_NAME
+            - name: LOGS_COLLECTION_NAME
               value: logs
             - name: DETECTIONS_COLLECTION_NAME
               value: detections
