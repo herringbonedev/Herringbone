@@ -2,6 +2,17 @@ from database import MongoDatabaseHandler
 import requests
 import time, os
 
+# Start message
+print(f"""[Detector] started with the following parameters.
+
+Overwatch endpoint: {os.environ.get("OVERWATCH_HOST")}
+MongoDB Host: {os.environ.get("MONGO_HOST")}
+MongoDB Database: {os.environ.get("DB_NAME")}
+Rules collection: {os.environ.get("RULES_COLLECTION_NAME")}
+Logs collection: {os.environ.get("LOGS_COLLECTION_NAME")}
+Detections collection: {os.environ.get("DETECTIONS_COLLECTION_NAME")}
+""")
+
 while True:
 
     try:
