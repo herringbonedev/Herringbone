@@ -11,10 +11,12 @@ while True:
         
         # Pull out most recent non-detected object
         print("[Detector] Trying to find undetected logs.")
-        
+
         logs_mongo = MongoDatabaseHandler(collection = os.environ.get("LOGS_COLLECTION_NAME"))
         latest_not_detected = logs_mongo.get_latest_not_detected()
-        print(latest_not_detected)
+        
+        if not latest_not_detected:
+            raise("No logs found to run detection.")
 
     except Exception as e:
         print(e)
