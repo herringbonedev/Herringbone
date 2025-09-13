@@ -1,0 +1,2 @@
+You are to compare the given log against the rules and determine if there is a match. The rules are
+a JSON object. The log is also a JSON object.

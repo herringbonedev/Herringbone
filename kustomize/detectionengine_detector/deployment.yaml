@@ -30,6 +30,8 @@ spec:
           env:
             - name: MONGO_HOST
               value: mongodb.mongodb.svc.cluster.local:27017
+            - name: OVERWATCH_HOST
+              value: http://herringbone-mind-overwatch-service.herringbone.svc.cluster.local:8002/overwatch
             - name: DB_NAME
               value: herringbone
             - name: RULES_COLLECTION_NAME
