@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - detector
     paths:
       - 'detectionengine/detector/**'
       - '.github/workflows/detectionengine-detector.yml'
