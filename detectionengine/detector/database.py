@@ -1,7 +1,7 @@
 from pymongo import MongoClient
 from datetime import datetime
 from bson.objectid import ObjectId
-from bson.json_util import dumps, loads
+
 import os
 import json
 import codecs
@@ -62,7 +62,7 @@ class MongoDatabaseHandler:
 
         try:
             documents = self.collection.find().sort("_id", -1).limit(1000)
-            return list(loads(dumps(documents)))
+            return list(documents)
         except Exception as e:
             raise Exception(f"Failed to retrieve latest documents: {e}")
         
@@ -70,7 +70,7 @@ class MongoDatabaseHandler:
         """Retrieve the latest document that has not been marked detected.
         """
         
-        return loads(dumps(self.collection.find_one({"detected": False})))
+        return self.collection.find_one({"detected": False})
 
     def close(self):
         self.client.close()

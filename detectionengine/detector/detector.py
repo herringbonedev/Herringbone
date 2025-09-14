@@ -39,7 +39,7 @@ while True:
             # Send the log over with the rules to overwatch for analysis
             response = requests.post(os.environ.get("OVERWATCH_HOST"), 
                                      headers =  {"Content-Type": "application/json"},
-                                     data=to_analyze)
+                                     data={"logs":"andrew logged in", "rules":["andrew logging in"]})
             print(response.content)
 
     except Exception as e:
