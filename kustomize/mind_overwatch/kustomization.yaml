@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/mind_overwatch
-    newTag: latest-92de5f2e-6 # Image Updater will modify this
-    digest: sha256:8e2cd7697d196343eabffa07e88b96b1745c8ed9d3e414b5436abebdc3a2cf43
+    newTag: latest-7a497acc-7 # Image Updater will modify this
+    digest: sha256:8829d1413e7fc28fde95798b8806b90b88fd6ba827f23a7f85c963c3a0bed0f2
