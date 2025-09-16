@@ -38,7 +38,7 @@ while True:
 
             # Send the log over with the rules to overwatch for analysis
             response = requests.post(os.environ.get("OVERWATCH_HOST"), 
-                                     json={"logs":"andrew logged in", "rules":["andrew logging in"]},
+                                     json=to_analyze,
                                      timeout=1000)
             print(response.content)
 
