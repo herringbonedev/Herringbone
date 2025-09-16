@@ -17,7 +17,7 @@ def prompt_template(raw_log, rules):
 @app.route('/overwatch', methods=['POST'])
 def overwatch():
     data = request.get_json()
-    raw_log = data["logs"]
+    raw_log = data["log"]
     rules = data["rules"]
     print(f"[*] Overwatch request received for log: {raw_log}")
     print(rules)
