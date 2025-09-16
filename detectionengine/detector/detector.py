@@ -22,7 +22,7 @@ while True:
         rules_mongo = MongoDatabaseHandler(collection=os.environ.get("RULES_COLLECTION_NAME"))
         rules = rules_mongo.get_rules()
         for rule in rules:
-            if "_id" in r:
+            if "_id" in rule:
                 del rule["_id"]
         
         # Pull out most recent non-detected object
