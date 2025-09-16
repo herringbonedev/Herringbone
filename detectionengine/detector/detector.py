@@ -21,7 +21,9 @@ while True:
         print("[Detector] Loading rules.")
         rules_mongo = MongoDatabaseHandler(collection=os.environ.get("RULES_COLLECTION_NAME"))
         rules = rules_mongo.get_rules()
-        del rules["_id"]
+        for rule in rules:
+            if "_id" in r:
+                del rule["_id"]
         
         # Pull out most recent non-detected object
         print("[Detector] Trying to find undetected logs.")
