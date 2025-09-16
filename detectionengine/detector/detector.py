@@ -1,6 +1,7 @@
 from database import MongoDatabaseHandler
 import requests
 import time, os
+import json
 
 # Start message
 print(f"""[Detector] started with the following parameters.
@@ -20,12 +21,14 @@ while True:
         print("[Detector] Loading rules.")
         rules_mongo = MongoDatabaseHandler(collection=os.environ.get("RULES_COLLECTION_NAME"))
         rules = rules_mongo.get_rules()
+        del rules["_id"]
         
         # Pull out most recent non-detected object
         print("[Detector] Trying to find undetected logs.")
 
         logs_mongo = MongoDatabaseHandler(collection=os.environ.get("LOGS_COLLECTION_NAME"))
         latest_not_detected = logs_mongo.get_latest_not_detected()
+        log_id = latest_not_detected["_id"]
         del latest_not_detected["_id"]
         del latest_not_detected["last_update"]
         del latest_not_detected["last_processed"]
@@ -42,7 +45,10 @@ while True:
             response = requests.post(os.environ.get("OVERWATCH_HOST"), 
                                      json=to_analyze,
                                      timeout=1000)
-            print(response.content)
+            analysis = json.loads(response.content.decode("utf-8"))
+
+            if analysis["match"]:
+                logs_mongo.update_detection_status(log_id)
 
     except Exception as e:
         print(e)
