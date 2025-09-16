@@ -16,9 +16,10 @@ def prompt_template(raw_log, rules):
 
 @app.route('/overwatch', methods=['POST'])
 def overwatch():
-    raw_log = request.get_json()["log"]
-    rules = request.get_json()["rules"]
-    print(f"[*] Overwatch request received for log: {raw_log}")
+    data = request.get_json()
+    raw_log = data["logs"]
+    rules = data["rules"]
+    print(f"[*] Overwatch request received for log: {raw_log} \nRules:\n{"-".join(rules)}")
 
     response = requests.post(OLLAMA_URL, json={
         "model": "llama3.2:3b",
