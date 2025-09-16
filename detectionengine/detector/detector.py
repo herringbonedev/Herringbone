@@ -27,6 +27,8 @@ while True:
         logs_mongo = MongoDatabaseHandler(collection=os.environ.get("LOGS_COLLECTION_NAME"))
         latest_not_detected = logs_mongo.get_latest_not_detected()
         del latest_not_detected["_id"]
+        del latest_not_detected["last_update"]
+        del latest_not_detected["last_processed"]
         
         if not latest_not_detected:
             raise Exception("No logs found to run detection.")
