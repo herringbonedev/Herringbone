@@ -19,7 +19,8 @@ def overwatch():
     data = request.get_json()
     raw_log = data["logs"]
     rules = data["rules"]
-    print(f"[*] Overwatch request received for log: {raw_log} \nRules: {rules}")
+    print(f"[*] Overwatch request received for log: {raw_log}")
+    print(rules)
 
     response = requests.post(OLLAMA_URL, json={
         "model": "llama3.2:3b",
