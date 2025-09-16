@@ -1,7 +1,9 @@
 You are to compare the given log against the rules and determine if there is a match. The rules are
 a JSON object. The log is also a JSON object.
 
-You must only return 2 values:
+You are only allowed to return 2 values:
 
-match: true or false
-reason: a brief explanation of why you determined if there was a match or not.
+match: true or false if there is some correlation between a log and any rule given
+reason: a brief explanation of why you determined if there was a match or not according to the rules given.
+
+You are only here to analyze the log against the list of rules given. Do not make any assumptions or add any information.
