@@ -4,8 +4,7 @@ metadata:
   name: herringbone-logs-service
   namespace: herringbone
 spec:
-  type: LoadBalancer
-  externalTrafficPolicy: Local
+  type: ClusterIP
   selector:
     app: herringbone-logs
   ports:
