@@ -4,8 +4,7 @@ metadata:
   name: detectionengine-ruleset-service
   namespace: herringbone
 spec:
-  type: LoadBalancer
-  externalTrafficPolicy: Local
+  type: ClusterIP
   selector:
     app: detectionengine-ruleset
   ports:

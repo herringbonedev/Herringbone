@@ -4,8 +4,7 @@ metadata:
   name: herringbone-mind-recon-service
   namespace: herringbone
 spec:
-  type: NodePort
-  externalTrafficPolicy: Local
+  type: ClusterIP
   selector:
     app: herringbone-mind-recon
   ports:
@@ -13,4 +12,3 @@ spec:
       protocol: TCP
       port: 8002
       targetPort: 8002
-      nodePort: 30012
