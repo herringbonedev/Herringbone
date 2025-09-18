@@ -48,9 +48,10 @@ while True:
                                      json=to_analyze,
                                      timeout=1000)
             analysis = json.loads(response.content.decode("utf-8"))
-
-            if analysis["match"]:
-                logs_mongo.update_detection_status(log_id)
+            
+            # Mark all logs as detected for now
+            logs_mongo.update_detection_status(log_id)
+            
 
     except Exception as e:
         print(e)
