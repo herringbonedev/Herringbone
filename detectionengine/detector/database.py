@@ -72,12 +72,12 @@ class MongoDatabaseHandler:
         
         return self.collection.find_one({"detected": False})
     
-    def update_detection_status(self, log_id):
+    def update_detection_status(self, log_id, analysis):
         """Adds detected: True to stop pulling the log on the next pass.
         """
 
         self.collection.update_one({"_id": log_id},
-                                   {"$set": {"detected": True}})
+                                   {"$set": {"detected": True, "detection":analysis["match"]}})
 
     def close(self):
         self.client.close()
