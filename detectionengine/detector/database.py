@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient, ReturnDocument
 from datetime import datetime
 from bson.objectid import ObjectId
 
@@ -77,7 +77,8 @@ class MongoDatabaseHandler:
         """
 
         result = self.collection.update_one({"_id": log_id},
-                                            {"$set": {"detected": True, "detection":analysis["match"]}})
+                                            {"$set": {"detected": True, "detection":analysis["match"]}},
+                                            return_document=ReturnDocument.AFTER)
         print(f"[✓] Updated log with detection: {result}")
 
     def close(self):
