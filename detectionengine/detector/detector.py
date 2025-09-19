@@ -2,6 +2,7 @@ from database import MongoDatabaseHandler
 import requests
 import time, os
 import json
+import traceback
 
 # Start message
 print(f"""[Detector] started with the following parameters.
@@ -50,10 +51,12 @@ while True:
             analysis = json.loads(response.content.decode("utf-8"))
             
             # Mark all logs as detected for now
+            print(f"Storing results: {str(analysis)}")
             logs_mongo.update_detection_status(log_id, analysis)
             
 
     except Exception as e:
         print(e)
+        print(traceback.format_exc())
     
     time.sleep(5)
