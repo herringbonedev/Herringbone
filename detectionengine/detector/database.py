@@ -76,8 +76,9 @@ class MongoDatabaseHandler:
         """Adds detected: True to stop pulling the log on the next pass.
         """
 
-        self.collection.update_one({"_id": log_id},
-                                   {"$set": {"detected": True, "detection":analysis["match"]}})
+        result = self.collection.update_one({"_id": log_id},
+                                            {"$set": {"detected": True, "detection":analysis["match"]}})
+        print(f"[✓] Updated log with detection: {result}")
 
     def close(self):
         self.client.close()
