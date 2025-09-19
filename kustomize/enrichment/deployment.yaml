@@ -18,7 +18,7 @@ spec:
           image: quay.io/herringbone/enrichment
           env:
             - name: MONGO_HOST
-              value: mongodb.mongodb.svc.cluster.local:27017
+              value: mongodb-headless.mongodb.svc.cluster.local:27017
             - name: DB_NAME
               value: herringbone
             - name: COLLECTION_NAME
