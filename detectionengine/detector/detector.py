@@ -50,7 +50,7 @@ while True:
             analysis = json.loads(response.content.decode("utf-8"))
             
             # Mark all logs as detected for now
-            logs_mongo.update_detection_status(log_id)
+            logs_mongo.update_detection_status(log_id, analysis)
             
 
     except Exception as e:
