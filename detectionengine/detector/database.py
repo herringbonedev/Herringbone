@@ -73,13 +73,24 @@ class MongoDatabaseHandler:
         return self.collection.find_one({"detected": False})
     
     def update_detection_status(self, log_id, analysis):
-        """Adds detected: True to stop pulling the log on the next pass.
+        """Update and return the updated log document.
         """
-
-        result = self.collection.update_one({"_id": log_id},
-                                            {"$set": {"detected": True, "detection":analysis["match"]}},
-                                            return_document=ReturnDocument.AFTER)
-        print(f"[✓] Updated log with detection: {result}")
+        
+        oid = log_id if isinstance(log_id, ObjectId) else ObjectId(str(log_id))
+        doc = self.collection.find_one_and_update(
+            {"_id": oid},
+            {"$set": {
+                "detected": True,
+                "detection": bool(analysis.get("match")),
+                "detection_reason": analysis.get("reason"),
+                "updated_at": datetime.utcnow(),
+            }},
+            return_document=ReturnDocument.AFTER
+        )
+        if doc is None:
+            print(f"[!] No document matched _id={oid}")
+        else:
+            print(f"[✓] Updated log {_id if (_id:=doc.get('_id')) else oid} detected={doc.get('detection')}")
 
     def close(self):
         self.client.close()
