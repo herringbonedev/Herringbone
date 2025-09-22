@@ -1,7 +1,6 @@
 # Herringbone
 
-A cloud-native engine for log management, detection rules, and security intelligence.
-
+#### Elements
 [![DetectionEngine Ruleset](https://github.com/herringbonedev/Herringbone/actions/workflows/detectionengine-ruleset.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/detectionengine-ruleset.yml)
 [![Enrichment](https://github.com/herringbonedev/Herringbone/actions/workflows/enrichment.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/enrichment.yml)
 [![Herringbone Apps](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-apps.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-apps.yml)
@@ -44,21 +43,12 @@ These principles allow you to host Herringbone components wherever you choose. W
 ## Getting Started  
 
 1. Familiarize yourself with the **Concepts** documentation to understand the principles of Herringbone.  
-2. Review the **Installation Guide** to deploy Herringbone on Kubernetes or in containers.  
-3. Explore the available **Units** and decide which elements fit your use case.  
-4. Enable or disable elements as needed to tailor the solution to your environment.  
-
-## Example  
-
-A simple deployment of the Detection Engine Unit might look like this:  
-
-- **Ruleset** manages detection rules.  
-- **Detector** applies those rules to incoming logs.  
-- Together they form a complete detection system, but you could also run only the Detector or Ruleset independently.  
+2. Explore the available **Units** and decide which elements fit your use case.  
+3. Enable or disable elements as needed to tailor the solution to your environment.  
 
 ## Contributing  
 
-Contributions are welcome. Please review the **Contributing Guide** before submitting issues or pull requests. Code reviews are required before merging into the main branch to maintain quality and consistency.  
+Contributions are welcome. Please review the **CONTRIBUTING.md** before submitting issues or pull requests. Code reviews are required before merging into the main branch to maintain quality and consistency.  
 
 ## License  
 
