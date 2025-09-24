@@ -3,7 +3,7 @@ import requests
 import json
 import os
 
-print(os.popen("tree /root/.ollama/models/").read())
+print(os.popen("ls -la /root/.ollama/models/").read())
 
 app = Flask(__name__)
 
@@ -21,7 +21,7 @@ def recon():
     print(f"[*] Recon request received for log: {raw_log}")
 
     response = requests.post(OLLAMA_URL, json={
-        "model": "llama3.2:3b",
+        "model": os.environ.get("OLLAMA_MODEL", "mattw/loganalyzer"),
         "prompt": prompt_template(raw_log),
         "stream": False,
         "format": "json"

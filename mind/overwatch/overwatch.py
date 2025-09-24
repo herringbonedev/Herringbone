@@ -3,7 +3,7 @@ import requests
 import json
 import os
 
-print(os.popen("tree /root/.ollama/models/").read())
+print(os.popen("ls -ls /root/.ollama/models/").read())
 
 app = Flask(__name__)
 
@@ -22,7 +22,7 @@ def overwatch():
     print(f"[*] Overwatch request received for log: {raw_log}")
 
     response = requests.post(OLLAMA_URL, json={
-        "model": "llama3.2:3b",
+        "model": os.environ.get("OLLAMA_MODEL", "mattw/loganalyzer"),
         "prompt": prompt_template(raw_log, rules),
         "stream": False,
         "format": "json"
@@ -36,7 +36,7 @@ def overwatch():
 def ready():
 
     response = requests.post(OLLAMA_URL, json={
-        "model": "llama3.2:3b",
+        "model": "mattw/loganalyzer",
         "prompt": "Send back just the word 'ready' if the model is ready to process requests.",
         "stream": False
     })
