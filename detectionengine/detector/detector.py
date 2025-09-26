@@ -31,15 +31,17 @@ while True:
 
         logs_mongo = MongoDatabaseHandler(collection=os.environ.get("LOGS_COLLECTION_NAME"))
         latest_not_detected = logs_mongo.get_latest_not_detected()
-        log_id = latest_not_detected.get("_id") if latest_not_detected else {}
-        latest_not_detected.pop("_id", None)
-        latest_not_detected.pop("last_update", None)
-        latest_not_detected.pop("last_processed", None)
+        log_id = latest_not_detected.get("_id") if latest_not_detected else None
         
         if not latest_not_detected or not log_id:
             raise Exception("No logs found to run detection.")
         
         else:
+            # Remove keys that hold unformatted and pointless data for analysis
+            latest_not_detected.pop("_id", None)
+            latest_not_detected.pop("last_update", None)
+            latest_not_detected.pop("last_processed", None)
+
             # Print out the data to be sent to overwatch
             to_analyze = {"log":latest_not_detected, "rules": rules}
             print(to_analyze)
