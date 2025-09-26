@@ -43,17 +43,21 @@ while True:
             # Print out the data to be sent to overwatch
             to_analyze = {"log":latest_not_detected, "rules": rules}
             print(to_analyze)
-
+            
             # Send the log over with the rules to overwatch for analysis
             response = requests.post(os.environ.get("OVERWATCH_HOST"), 
                                      json=to_analyze,
                                      timeout=1000)
+            
+            print(response.text)
+            print("Status code:", response.status_code)
+            print("Content:", response.text[:500])
+
             analysis = json.loads(response.content.decode("utf-8"))
             
             # Mark all logs as detected for now
             print(f"Storing results: {str(analysis)}")
             logs_mongo.update_detection_status(log_id, analysis)
-            
 
     except Exception as e:
         print(e)
