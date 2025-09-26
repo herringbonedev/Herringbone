@@ -29,9 +29,9 @@ spec:
               name: tcp-port
               protocol: TCP
       nodeSelector:
-        mind: "true"
+        mind: "recon"
       tolerations:
-        - key: "dedicated"
+        - key: "mind"
           operator: "Equal"
-          value: "mind"
+          value: "recon"
           effect: "NoSchedule"
