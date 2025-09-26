@@ -18,7 +18,7 @@ spec:
           image: quay.io/herringbone/mind_overwatch
           env:
             - name: OLLAMA_MODEL
-              value: "mattw/loganalyzer"
+              value: "mistral"
           args:
             - >
               ollama serve & sleep 10 &&
