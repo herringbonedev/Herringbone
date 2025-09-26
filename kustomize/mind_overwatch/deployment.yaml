@@ -29,9 +29,9 @@ spec:
               name: tcp-port
               protocol: TCP
       nodeSelector:
-        mind: "true"
+        mind: "overwatch"
       tolerations:
-        - key: "dedicated"
+        - key: "mind"
           operator: "Equal"
-          value: "mind"
+          value: "overwatch"
           effect: "NoSchedule"
