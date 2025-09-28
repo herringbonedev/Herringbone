@@ -1,26 +1,29 @@
 FROM registry.access.redhat.com/ubi8/python-311:1-56.1712880527
 
-# Make Python a bit saner in containers
+LABEL Project="Herringbone"
+LABEL Version="Beta 1.0.0"
+LABEL Tool="Receiver"
+
+# saner python defaults in containers
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/herringbone
+    PYTHONPATH=/app
 
 USER root
 
-# We’ll stage the app under /herringbone so that PYTHONPATH points to the package root
-WORKDIR /herringbone
+# Workdir at project root (inside container)
+WORKDIR /app
 
-# Copy just the requirements first to leverage Docker layer caching
-COPY logingestion/receiver/requirements.txt ./receiver/requirements.txt
-RUN pip install --no-cache-dir -r ./receiver/requirements.txt
+# Copy only requirements first (better layer caching)
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy only what the receiver needs (receiver + shared modules)
-COPY logingestion/receiver ./receiver
-COPY modules ./modules
+# Now copy the rest of the build context: receiver code + copied modules/
+COPY . .
 
-# Expose both protocols on 7002
+# Expose both protocols
 EXPOSE 7002/udp
 EXPOSE 7002/tcp
 
-# Run as a module so imports are package-safe (and PYTHONPATH already set)
-CMD ["python3", "-m", "receiver.receiver"]
+# Run the receiver (imports use PYTHONPATH=/app, so modules/ is visible)
+CMD ["python3", "receiver.py"]
