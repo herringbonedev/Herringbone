@@ -28,18 +28,27 @@ spec:
               memory: "256Mi"
               cpu: "200m"
           env:
-            - name: MONGO_HOST
-              value: mongodb-headless.mongodb.svc.cluster.local:27017
             - name: OVERWATCH_HOST
               value: http://herringbone-mind-overwatch-service.herringbone.svc.cluster.local:8002/overwatch
-            - name: DB_NAME
-              value: herringbone
             - name: RULES_COLLECTION_NAME
               value: rules
             - name: LOGS_COLLECTION_NAME
               value: logs
             - name: DETECTIONS_COLLECTION_NAME
               value: detections
+            - name: MONGO_HOST
+              value: mongodb-headless.mongodb.svc.cluster.local
+            - name: MONGO_PORT
+              value: "27017"
+            - name: DB_NAME
+              value: herringbone
+            - name: COLLECTION_NAME
+              value: logs
+            # Optional (set to your real values):
+#            - name: MONGO_AUTH_SOURCE
+#              value: admin
+            - name: MONGO_REPLICA_SET
+              value: rs0            # or leave unset for standalone
             - name: MONGO_USER
               valueFrom:
                 secretKeyRef:
