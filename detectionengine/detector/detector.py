@@ -1,90 +1,132 @@
-import requests
-import time, os
-import json
-import traceback
 from datetime import datetime
+import os
+import time
+import json
+import requests
+import traceback
 
 from modules.database.mongo_db import HerringboneMongoDatabase
 
-print(f"""[Detector] started with the following parameters.
 
-Overwatch endpoint: {os.environ.get("OVERWATCH_HOST")}
-MongoDB Host: {os.environ.get("MONGO_HOST")}
-MongoDB Database: {os.environ.get("DB_NAME")}
-Rules collection: {os.environ.get("RULES_COLLECTION_NAME")}
-Logs collection: {os.environ.get("LOGS_COLLECTION_NAME")}
-Detections collection: {os.environ.get("DETECTIONS_COLLECTION_NAME")}
-""")
+print("Detector service has started")
 
-def _db_for(collection_name: str) -> HerringboneMongoDatabase:
+def get_db(collection: str) -> HerringboneMongoDatabase:
+    mongo_host = os.environ.get("MONGO_HOST")
+    db_name = os.environ.get("DB_NAME")
+    if not mongo_host or not db_name or not collection:
+        raise RuntimeError("MONGO_HOST, DB_NAME, and collection must be set.")
     return HerringboneMongoDatabase(
         user=os.environ.get("MONGO_USER", ""),
         password=os.environ.get("MONGO_PASS", ""),
-        database=os.environ.get("DB_NAME", "herringbone"),
-        collection=collection_name,
-        host=os.environ.get("MONGO_HOST", "localhost"),
+        database=db_name,
+        collection=collection,
+        host=mongo_host,
         port=int(os.environ.get("MONGO_PORT", 27017)),
         replica_set=os.environ.get("MONGO_REPLICA_SET") or None,
     )
 
-while True:
+def load_rules(rules_db: HerringboneMongoDatabase) -> list[dict]:
+    client, db, coll = rules_db.open_mongo_connection()
     try:
-        print("[Detector] Loading rules.")
-        rules_db = _db_for(os.environ.get("RULES_COLLECTION_NAME"))
-        client, db, coll = rules_db.open_mongo_connection()
-        try:
-            rules = list(coll.find({}))
-        finally:
-            rules_db.close_mongo_connection()
-        for rule in rules:
-            rule.pop("_id", None)
+        items = list(coll.find({}))
+        for r in items:
+            r.pop("_id", None)
+        return items
+    finally:
+        rules_db.close_mongo_connection()
 
-        print("[Detector] Trying to find undetected logs.")
-        logs_db = _db_for(os.environ.get("LOGS_COLLECTION_NAME"))
-        client, db, coll = logs_db.open_mongo_connection()
-        try:
-            latest_not_detected = coll.find_one(
-                {"$or": [{"detected": {"$exists": False}}, {"detected": False}]},
-                sort=[("_id", -1)]
-            )
-        finally:
-            logs_db.close_mongo_connection()
-
-        log_id = latest_not_detected.get("_id") if latest_not_detected else None
-        if not latest_not_detected or not log_id:
-            raise Exception("No logs found to run detection.")
-
-        latest_not_detected.pop("_id", None)
-        latest_not_detected.pop("last_update", None)
-        latest_not_detected.pop("last_processed", None)
-        latest_not_detected.pop("updated_at", None)
-
-        to_analyze = {"log": latest_not_detected, "rules": rules}
-        print(to_analyze)
-
-        response = requests.post(
-            os.environ.get("OVERWATCH_HOST"),
-            json=to_analyze,
-            timeout=1000
+def fetch_one_undetected(logs_db: HerringboneMongoDatabase) -> dict | None:
+    client, db, coll = logs_db.open_mongo_connection()
+    try:
+        return coll.find_one(
+            {"$or": [{"detected": {"$exists": False}}, {"detected": False}]},
+            sort=[("_id", -1)]
         )
-        print(response.text)
-        print("Status code:", response.status_code)
-        print("Content:", response.text[:500])
+    finally:
+        logs_db.close_mongo_connection()
 
-        analysis = response.json() if response.headers.get("content-type","").startswith("application/json") else json.loads(response.content.decode("utf-8", "ignore"))
-        print(f"Storing results: {str(analysis)}")
+def set_pending(logs_db: HerringboneMongoDatabase, _id) -> None:
+    logs_db.update_log({"_id": _id}, {"status": "Detection in process."}, clean_codec=False)
 
-        update_doc = {"detected": True, "updated_at": datetime.utcnow()}
-        if isinstance(analysis, dict):
-            if "detection" in analysis:
-                update_doc["detection"] = bool(analysis["detection"])
-            if "detection_reason" in analysis:
-                update_doc["detection_reason"] = str(analysis["detection_reason"])
+def set_failed(logs_db: HerringboneMongoDatabase, _id, reason: str = "") -> None:
+    update = {"status": "Detection failed."}
+    if reason:
+        update["detection_reason"] = reason
+    logs_db.update_log({"_id": _id}, update, clean_codec=False)
 
-        logs_db.update_log({"_id": log_id}, update_doc, clean_codec=False)
+def set_result(logs_db: HerringboneMongoDatabase, _id, analysis: dict) -> None:
+    update = {"detected": True, "updated_at": datetime.utcnow()}
+    if isinstance(analysis, dict):
+        if "detection" in analysis:
+            update["detection"] = bool(analysis["detection"])
+        if "detection_reason" in analysis:
+            update["detection_reason"] = str(analysis["detection_reason"])
+        if "status" in analysis and isinstance(analysis["status"], str):
+            update["status"] = analysis["status"]
+        else:
+            update.setdefault("status", "Detection finished.")
+    logs_db.update_log({"_id": _id}, update, clean_codec=False)
 
-    except Exception as e:
-        print(e)
-        print(traceback.format_exc())
+def write_detection_record(det_db: HerringboneMongoDatabase | None, log_id, analysis: dict) -> None:
+    if not det_db:
+        return
+    client, db, coll = det_db.open_mongo_connection()
+    try:
+        coll.insert_one({"log_id": log_id, "analysis": analysis, "inserted_at": datetime.utcnow()})
+    finally:
+        det_db.close_mongo_connection()
 
-    time.sleep(5)
+def analyze(to_analyze: dict) -> dict:
+    url = os.environ.get("OVERWATCH_HOST")
+    if not url:
+        raise RuntimeError("OVERWATCH_HOST is not set.")
+    resp = requests.post(url, json=to_analyze, timeout=1000)
+    print(resp.text)
+    resp.raise_for_status()
+    ctype = resp.headers.get("content-type", "")
+    return resp.json() if ctype.startswith("application/json") else json.loads(resp.content.decode("utf-8", "ignore"))
+
+def main():
+    rules_db = get_db(os.environ.get("RULES_COLLECTION_NAME", "rules"))
+    logs_db = get_db(os.environ.get("LOGS_COLLECTION_NAME", "logs"))
+    det_db = get_db(os.environ.get("DETECTIONS_COLLECTION_NAME")) if os.environ.get("DETECTIONS_COLLECTION_NAME") else None
+
+    while True:
+        try:
+            print("[Detector] Loading rules.")
+            rules = load_rules(rules_db)
+
+            print("[Detector] Looking for undetected logs.")
+            doc = fetch_one_undetected(logs_db)
+            if not doc or "_id" not in doc:
+                time.sleep(5)
+                continue
+
+            log_id = doc["_id"]
+            to_send = dict(doc)
+            for k in ("_id", "last_update", "last_processed", "updated_at"):
+                to_send.pop(k, None)
+
+            set_pending(logs_db, log_id)
+
+            payload = {"log": to_send, "rules": rules}
+            print(payload)
+            analysis = analyze(payload)
+            print("[Detector] Overwatch response parsed.")
+
+            set_result(logs_db, log_id, analysis)
+            write_detection_record(det_db, log_id, analysis)
+
+        except Exception as e:
+            print(f"[Detector] Error: {e}")
+            print(traceback.format_exc())
+            try:
+                if "log_id" in locals():
+                    set_failed(logs_db, log_id, str(e))
+            except Exception as _:
+                pass
+
+        time.sleep(5)
+
+if __name__ == "__main__":
+    main()
