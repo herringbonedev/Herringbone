@@ -46,7 +46,7 @@ spec:
             exec:
               command:
                 - python
-                - /app/container_probenrichmentes.py
+                - /app/container_probes.py
                 - livez
             initialDelaySeconds: 10
             periodSeconds: 10
