@@ -46,6 +46,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Prepare build context (copy shared modules)
+        run: |
+          set -euo pipefail
+          rm -rf detectionengine/detector/modules
+          mkdir -p detectionengine/detector
+          cp -R modules detectionengine/detector/modules
+
       - name: Build Docker image
         env:
           SHORT_SHA: ${{ github.sha }}
