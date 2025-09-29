@@ -22,13 +22,20 @@ spec:
               protocol: UDP
           env:
             - name: RECEIVER_TYPE
-              value: UDP
+              value: HTTP
             - name: MONGO_HOST
-              value: mongodb-headless.mongodb.svc.cluster.local:27017
+              value: mongodb-headless.mongodb.svc.cluster.local   # no port here
+            - name: MONGO_PORT
+              value: "27017"
             - name: DB_NAME
               value: herringbone
             - name: COLLECTION_NAME
               value: logs
+            # Optional (set to your real values):
+#            - name: MONGO_AUTH_SOURCE
+#              value: admin
+            - name: MONGO_REPLICA_SET
+              value: rs0            # or leave unset for standalone
             - name: MONGO_USER
               valueFrom:
                 secretKeyRef:
