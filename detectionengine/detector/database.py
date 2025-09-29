@@ -70,7 +70,7 @@ class MongoDatabaseHandler:
         """Retrieve the latest document that has not been marked detected.
         """
         
-        return self.collection.find_one({"detected": False})
+        return self.collection.find_one({"detected": False, "recon": True})
     
     def update_detection_status(self, log_id, analysis):
         """Update and return the updated log document.
