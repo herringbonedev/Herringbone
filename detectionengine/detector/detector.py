@@ -11,8 +11,8 @@ from modules.database.mongo_db import HerringboneMongoDatabase
 print("Detector service has started")
 
 def get_db(collection: str) -> HerringboneMongoDatabase:
-    host = os.environ.get("MONGO_HOST", "").strip()
-    db   = (os.environ.get("DB_NAME") or "herringbone").strip()
+    host = os.environ.get("MONGO_HOST", None)
+    db   = os.environ.get("DB_NAME", None)
     coll = (collection or "").strip()
 
     print(f"[Detector] DB set -> host='{host}', db='{db}', coll='{coll}', port='{os.environ.get('MONGO_PORT', 27017)}'")
