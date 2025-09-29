@@ -1,5 +1,8 @@
 from functools import wraps
 from pymongo import MongoClient, errors
+from datetime import datetime
+import codecs
+from typing import Any, Dict
 
 
 def with_connection(method):
@@ -25,7 +28,8 @@ def with_connection(method):
 
 class HerringboneMongoDatabase:
     """
-    MongoDB wrapper with automatic connection handling and ergonomic updates.
+    MongoDB wrapper with automatic connection handling, optional codec cleaning,
+    and ergonomic update helpers ($set + $setOnInsert via {"$insertOnly": value}).
     """
 
     def __init__(self, user, password, database, collection, host, port=27017,
@@ -39,6 +43,8 @@ class HerringboneMongoDatabase:
         self.database = database
         self.collection = collection
         self.client = self.db = self.coll = None
+
+    # ---------- Connection mgmt ----------
 
     def open_mongo_connection(self):
         """
@@ -61,51 +67,106 @@ class HerringboneMongoDatabase:
             self.client.close()
             self.client = self.db = self.coll = None
 
+    # ---------- Cleaning helpers ----------
+
+    @staticmethod
+    def _clean_codec_str(value: str) -> str:
+        """
+        Apply legacy clean_codec behavior to a string:
+        - Decode unicode escapes (twice, as in original)
+        - Strip whitespace
+        """
+        # Guard against accidental non-str inputs
+        if not isinstance(value, str):
+            return value
+        decoded = value.encode("utf-8").decode("unicode_escape")
+        decoded = codecs.decode(decoded.encode("utf-8"), "unicode_escape")
+        return decoded.strip()
+
+    def _sanitize_payload(self, obj: Any, *, key_hint: str | None = None) -> Any:
+        """
+        Recursively sanitize dictionaries/lists/scalars:
+        - If key looks like 'raw_log', replace double quotes with single quotes first
+          (to mirror old behavior), then run codec cleaning.
+        - For any plain string, run codec cleaning.
+        - Preserve nested structures and non-string types as-is.
+        """
+        if isinstance(obj, dict):
+            out: Dict[str, Any] = {}
+            for k, v in obj.items():
+                # Handle {"$insertOnly": <value>} passthrough sentinel by cleaning its value too
+                if isinstance(v, dict) and set(v.keys()) == {"$insertOnly"}:
+                    inner = v["$insertOnly"]
+                    out[k] = {"$insertOnly": self._sanitize_payload(inner, key_hint=k)}
+                else:
+                    out[k] = self._sanitize_payload(v, key_hint=k)
+            return out
+
+        if isinstance(obj, list):
+            return [self._sanitize_payload(v) for v in obj]
+
+        if isinstance(obj, str):
+            # Special-case: raw_log should replace " with ' before decoding (legacy behavior)
+            if key_hint == "raw_log":
+                obj = obj.replace('"', "'")
+            return self._clean_codec_str(obj)
+
+        # For all other scalar types, return unchanged
+        return obj
+
+    # ---------- CRUD ops ----------
+
     @with_connection
-    def insert_log(self, doc: dict, *, mongo_coll):
-        """Insert one document; return inserted _id as string."""
-        res = mongo_coll.insert_one(doc)
+    def insert_log(self, doc: dict, *, clean_codec: bool = False, mongo_coll):
+        """
+        Insert one document; return inserted _id as string.
+
+        :param doc: the document to insert
+        :param clean_codec: when True, sanitize strings (including raw_log) before insert
+        """
+        payload = self._sanitize_payload(doc) if clean_codec else dict(doc)
+
+        # Optionally set default fields if they are missing (keeps your legacy defaults)
+        payload.setdefault("recon", False)
+        payload.setdefault("detected", False)
+        payload.setdefault("recon_data", None)
+        payload.setdefault("last_update", datetime.utcnow())
+
+        res = mongo_coll.insert_one(payload)
         return str(res.inserted_id)
 
     @with_connection
-    def clear_logs(self, *, mongo_coll):
-        """Delete all docs in the collection; return deleted count."""
-        return mongo_coll.delete_many({}).deleted_count
-
-    @with_connection
-    def drop_logs(self, *, mongo_db):
-        """Drop the collection; return drop result."""
-        return mongo_db.drop_collection(self.collection)
-
-    @with_connection
-    def update_log(self, filter_query: dict, update_fields: dict, *, mongo_coll):
+    def update_log(self, filter_query: dict, update_fields: dict, *,
+                   clean_codec: bool = False, mongo_coll):
         """
         Smart update (single doc):
-        - Normal keys -> $set (update/add)
-        - Insert-only keys -> pass {"$insertOnly": value} as the value,
-          these go to $setOnInsert (only applied if an upsert inserts a new doc)
+        - Normal keys -> $set (update/add; also creates fields if missing)
+        - Insert-only keys -> pass {"$insertOnly": value}, routed to $setOnInsert
+          (applied only if upsert inserts a new doc)
+        - When clean_codec=True, sanitize strings in both buckets.
 
-        Always uses upsert=True so you can create the doc if it doesn't exist.
+        Always uses upsert=True so doc can be created if it doesn't exist.
 
         Returns: {"matched": int, "modified": int, "upserted_id": ObjectId|None}
         """
+        # Optionally sanitize the incoming fields first (preserves $insertOnly sentinel)
+        fields = self._sanitize_payload(update_fields) if clean_codec else dict(update_fields)
+
         set_ops = {}
         insert_only_ops = {}
 
-        # Split incoming dict into $set and $setOnInsert buckets.
-        for k, v in update_fields.items():
+        for k, v in fields.items():
             if isinstance(v, dict) and set(v.keys()) == {"$insertOnly"}:
                 insert_only_ops[k] = v["$insertOnly"]
             else:
                 set_ops[k] = v
 
-        update_doc = {}
+        update_doc: Dict[str, Any] = {}
         if set_ops:
             update_doc["$set"] = set_ops
         if insert_only_ops:
             update_doc["$setOnInsert"] = insert_only_ops
 
-        # If the user passed an empty dict, no-op safely
         if not update_doc:
             return {"matched": 0, "modified": 0, "upserted_id": None}
 
@@ -117,23 +178,27 @@ class HerringboneMongoDatabase:
         }
 
     @with_connection
-    def update_many(self, filter_query: dict, update_fields: dict, *, mongo_coll):
+    def update_many(self, filter_query: dict, update_fields: dict, *,
+                    clean_codec: bool = False, mongo_coll):
         """
         Smart bulk update (many docs):
-        Same dictionary contract as update_log, but applies to all matches.
-        Upsert behavior with update_many can be surprising; we DO NOT upsert here
-        (MongoDB would insert at most one new doc anyway).
+        - Same dict contract as update_log.
+        - We do NOT upsert here (Mongo would insert at most one new doc anyway).
+
+        Returns: {"matched": int, "modified": int}
         """
+        fields = self._sanitize_payload(update_fields) if clean_codec else dict(update_fields)
+
         set_ops = {}
         insert_only_ops = {}
 
-        for k, v in update_fields.items():
+        for k, v in fields.items():
             if isinstance(v, dict) and set(v.keys()) == {"$insertOnly"}:
                 insert_only_ops[k] = v["$insertOnly"]
             else:
                 set_ops[k] = v
 
-        update_doc = {}
+        update_doc: Dict[str, Any] = {}
         if set_ops:
             update_doc["$set"] = set_ops
         if insert_only_ops:
