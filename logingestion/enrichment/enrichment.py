@@ -95,8 +95,8 @@ def set_enriched(
         {
             "recon": True,
             "recon_data": enrichment_result,
-            "status": "Recon finished."
-            "last_processed": datetime.utcnow(),
+            "status": "Recon finished.",
+            "last_processed": datetime.utcnow()
         },
         clean_codec=False,
     )
