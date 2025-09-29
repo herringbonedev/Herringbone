@@ -1,3 +1,4 @@
+from datetime import datetime
 import socket
 import os
 from modules.database.mongo_db import HerringboneMongoDatabase
@@ -45,7 +46,11 @@ def start_udp_receiver():
 
         try:
             mongo.insert_log(
-                {"source_address": addr, "raw_log": data},
+                {"source_address": addr, 
+                "raw_log": data, 
+                "recon": False, 
+                "detected": False,
+                "last_update": datetime.utcnow()},
                 clean_codec=True
             )
         except Exception as e:
@@ -74,7 +79,11 @@ def start_tcp_receiver():
 
         try:
             mongo.insert_log(
-                {"source_address": addr, "raw_log": data},
+                {"source_address": addr, 
+                "raw_log": data, 
+                "recon": False, 
+                "detected": False,
+                "last_update": datetime.utcnow()},
                 clean_codec=True
             )
         except Exception as e:
