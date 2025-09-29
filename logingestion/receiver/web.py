@@ -1,4 +1,5 @@
 from flask import Flask, request
+from datetime import datetime
 import os
 from modules.database.mongo_db import HerringboneMongoDatabase
 
@@ -52,7 +53,11 @@ def receiver():
 
     try:
         mongo.insert_log(
-            {"source_address": addr, "raw_log": data},
+            {"source_address": addr, 
+             "raw_log": data, 
+             "recon": False, 
+             "detected": False,
+             "last_update": datetime.utcnow()},
             clean_codec=True  # apply your legacy clean/escape behavior
         )
         return ("Data received", 200)
