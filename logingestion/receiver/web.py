@@ -57,6 +57,7 @@ def receiver():
              "raw_log": data, 
              "recon": False, 
              "detected": False,
+             "status": None,
              "last_update": datetime.utcnow()},
             clean_codec=True  # apply your legacy clean/escape behavior
         )

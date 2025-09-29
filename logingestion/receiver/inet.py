@@ -50,6 +50,7 @@ def start_udp_receiver():
                 "raw_log": data, 
                 "recon": False, 
                 "detected": False,
+                "status": None,
                 "last_update": datetime.utcnow()},
                 clean_codec=True
             )
@@ -83,6 +84,7 @@ def start_tcp_receiver():
                 "raw_log": data, 
                 "recon": False, 
                 "detected": False,
+                "status": None,
                 "last_update": datetime.utcnow()},
                 clean_codec=True
             )
