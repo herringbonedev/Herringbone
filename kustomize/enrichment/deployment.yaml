@@ -17,6 +17,8 @@ spec:
         - name: enrichment
           image: quay.io/herringbone/enrichment
           env:
+            - name: MIND_RECON_SVC
+              value: http://herringbone-mind-recon-service.herringbone.svc.cluster.local:8002/recon
             - name: MONGO_HOST
               value: mongodb-headless.mongodb.svc.cluster.local
             - name: MONGO_PORT
