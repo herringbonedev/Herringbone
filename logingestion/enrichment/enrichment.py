@@ -52,7 +52,6 @@ def get_mongo() -> HerringboneMongoDatabase | None:
     mongo_user = os.environ.get("MONGO_USER", "")
     mongo_pass = os.environ.get("MONGO_PASS", "")
     mongo_port = int(os.environ.get("MONGO_PORT", 27017))
-    auth_source = os.environ.get("MONGO_AUTH_SOURCE", "admin")
     replica_set = os.environ.get("MONGO_REPLICA_SET") or None
 
     if not mongo_host or not db_name or not coll_name:
@@ -65,7 +64,6 @@ def get_mongo() -> HerringboneMongoDatabase | None:
         collection=coll_name,
         host=mongo_host,
         port=mongo_port,
-        auth_source=auth_source,
         replica_set=replica_set,
     )
 

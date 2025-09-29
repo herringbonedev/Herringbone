@@ -17,10 +17,8 @@ spec:
         - name: enrichment
           image: quay.io/herringbone/enrichment
           env:
-            - name: RECEIVER_TYPE
-              value: HTTP
             - name: MONGO_HOST
-              value: mongodb-headless.mongodb.svc.cluster.local   # no port here
+              value: mongodb-headless.mongodb.svc.cluster.local
             - name: MONGO_PORT
               value: "27017"
             - name: DB_NAME
