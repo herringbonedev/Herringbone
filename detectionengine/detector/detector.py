@@ -140,5 +140,6 @@ if __name__ == "__main__":
 
     if os.environ.get("OVERWATCH_HOST") == "test.svc":
         print("[Test Mode] Skipping regular startup.")
+        time.sleep(10)
     else:
         main()
