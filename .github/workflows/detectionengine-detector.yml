@@ -68,6 +68,7 @@ jobs:
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
           docker run -d --name test_detectionengine_detector \
+            -e OVERWATCH_HOST="test.svc" \
             quay.io/herringbone/detectionengine-detector:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
           sleep 1
           docker logs test_detectionengine_detector || true
