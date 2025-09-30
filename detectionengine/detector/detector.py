@@ -10,14 +10,24 @@ from modules.database.mongo_db import HerringboneMongoDatabase
 
 print("Detector service has started")
 
-def get_db(coll: str) -> HerringboneMongoDatabase:
+def get_db(collection: str) -> HerringboneMongoDatabase:
+    host = os.environ.get("MONGO_HOST", None)
+    db   = os.environ.get("DB_NAME", None)
+    coll = (collection or "").strip()
+
+    print(f"[Detector] DB set -> host='{host}', db='{db}', coll='{coll}', port='{os.environ.get('MONGO_PORT', 27017)}'")
+
+    if not host:
+        raise RuntimeError("MONGO_HOST is not set")
+    if not coll:
+        raise RuntimeError("Collection name is not set")
 
     return HerringboneMongoDatabase(
         user=os.environ.get("MONGO_USER", ""),
         password=os.environ.get("MONGO_PASS", ""),
-        database=os.environ.get("DB_NAME", ""),
+        database=db,
         collection=coll,
-        host=os.environ.get("MONGO_HOST", ""),                               # supports FQDN, IPv4, IPv6, or host:port
+        host=host,                               # supports FQDN, IPv4, IPv6, or host:port
         port=int(os.environ.get("MONGO_PORT", 27017)),
         replica_set=os.environ.get("MONGO_REPLICA_SET") or None,
         # no authSource (per your note)
