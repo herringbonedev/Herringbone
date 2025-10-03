@@ -44,20 +44,17 @@ def load_rules(rules_db: HerringboneMongoDatabase) -> list[dict]:
         rules_db.close_mongo_connection()
 
 def fetch_one_undetected(logs_db: HerringboneMongoDatabase, wait_recon: bool) -> dict | None:
-    client, db, coll = logs_db.open_mongo_connection()
+    _, _, coll, _ = logs_db.open_mongo_connection()
     try:
+        query = {"$or": [{"detected": {"$exists": False}}, {"detected": False}]}
+
         if wait_recon:
-            return coll.find_one(
-                {"$or": [{"detected": {"$exists": False}}, {"detected": False}, {"recon": True}]},
-                sort=[("_id", -1)]
-            )
-        else:
-            return coll.find_one(
-                {"$or": [{"detected": {"$exists": False}}, {"detected": False}]},
-                sort=[("_id", -1)]
-            ) 
+            query["recon"] = True
+
+        return coll.find_one(query, sort=[("_id", -1)])
     finally:
         logs_db.close_mongo_connection()
+
 
 def set_pending(logs_db: HerringboneMongoDatabase, _id) -> None:
     logs_db.update_log({"_id": _id}, {"status": "Detection in process."}, clean_codec=False)
@@ -104,6 +101,7 @@ def main():
     rules_db = get_db(os.environ.get("RULES_COLLECTION_NAME", "rules"))
     logs_db = get_db(os.environ.get("LOGS_COLLECTION_NAME", "logs"))
     det_db = get_db(os.environ.get("DETECTIONS_COLLECTION_NAME")) if os.environ.get("DETECTIONS_COLLECTION_NAME") else None
+    wait_recon = os.environ.get("WAIT_FOR_RECON_TO_FINISH", "false").lower() in "true"
 
     while True:
         try:
