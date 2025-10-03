@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/mind_recon
-    newTag: latest-f2b679b8-6 # Image Updater will modify this
-    digest: sha256:f262720bf44d2985b95d9fda6821fd618aa028f01d518683368458c6b7024b68
+    newTag: latest-f9cd168e-7 # Image Updater will modify this
+    digest: sha256:82ac5c565fbc6a3211f148246756022a7f15a658204295db20aa5cf6bbd50341
