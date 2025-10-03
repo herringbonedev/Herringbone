@@ -44,7 +44,8 @@ def load_rules(rules_db: HerringboneMongoDatabase) -> list[dict]:
         rules_db.close_mongo_connection()
 
 def fetch_one_undetected(logs_db: HerringboneMongoDatabase, wait_recon: bool) -> dict | None:
-    _, _, coll, _ = logs_db.open_mongo_connection()
+    client, db, coll = logs_db.open_mongo_connection()
+
     try:
         query = {"$or": [{"detected": {"$exists": False}}, {"detected": False}]}
 
@@ -52,9 +53,9 @@ def fetch_one_undetected(logs_db: HerringboneMongoDatabase, wait_recon: bool) ->
             query["recon"] = True
 
         return coll.find_one(query, sort=[("_id", -1)])
+    
     finally:
         logs_db.close_mongo_connection()
-
 
 def set_pending(logs_db: HerringboneMongoDatabase, _id) -> None:
     logs_db.update_log({"_id": _id}, {"status": "Detection in process."}, clean_codec=False)
