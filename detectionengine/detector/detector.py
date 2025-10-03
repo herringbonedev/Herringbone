@@ -48,12 +48,12 @@ def fetch_one_undetected(logs_db: HerringboneMongoDatabase, wait_recon: bool) ->
     try:
         if wait_recon:
             return coll.find_one(
-                {"$or": [{"detected": {"$exists": False}}, {"detected": False}]},
+                {"$or": [{"detected": {"$exists": False}}, {"detected": False}, {"recon": True}]},
                 sort=[("_id", -1)]
             )
         else:
             return coll.find_one(
-                {"$or": [{"detected": {"$exists": False}}, {"detected": False}, {"recon": True}]},
+                {"$or": [{"detected": {"$exists": False}}, {"detected": False}]},
                 sort=[("_id", -1)]
             ) 
     finally:
@@ -104,7 +104,6 @@ def main():
     rules_db = get_db(os.environ.get("RULES_COLLECTION_NAME", "rules"))
     logs_db = get_db(os.environ.get("LOGS_COLLECTION_NAME", "logs"))
     det_db = get_db(os.environ.get("DETECTIONS_COLLECTION_NAME")) if os.environ.get("DETECTIONS_COLLECTION_NAME") else None
-    wait_recon = os.environ.get("WAIT_FOR_RECON_TO_FINISH", "false").lower() in "true"
 
     while True:
         try:
