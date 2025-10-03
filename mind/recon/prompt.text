@@ -12,7 +12,8 @@ Use the following schema as your API response. Don't change the keys. Only chang
     "tls_sni","ja3","ja3s","jarm",
     "cves","malware",
     "email_addresses","emails_from","emails_to","email_subject",
-    "asn","mac_addresses","cloud_resources","container_ids"
+    "asn","mac_addresses","cloud_resources","container_ids",
+    "description"
   ],
   "properties": {
     "log_type": {
@@ -86,6 +87,8 @@ Use the following schema as your API response. Don't change the keys. Only chang
     "container_ids":   { "oneOf": [ { "const": "" }, { "type": "string", "pattern": "^(?:[a-f0-9]{12,64})(?:,(?:[a-f0-9]{12,64}))*$" } ] }
   }
 }
+
+The description is for you to give your own best analysis in plain text of what this log or event is about. Be as detailed as possible.
 
 If you are even slightly unsure of your answer for any of the given fields in the JSON response simply don't fill it out.
 

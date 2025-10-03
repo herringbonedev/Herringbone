@@ -28,6 +28,8 @@ spec:
               memory: "256Mi"
               cpu: "200m"
           env:
+            - name: WAIT_FOR_RECON_TO_FINISH
+              value: "true"
             - name: OVERWATCH_HOST
               value: http://herringbone-mind-overwatch-service.herringbone.svc.cluster.local:8002/overwatch
             - name: RULES_COLLECTION_NAME
