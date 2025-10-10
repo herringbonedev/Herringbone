@@ -4,6 +4,8 @@ from database import MongoDatabaseHandler
 
 app = Flask(__name__)
 
+print("Ruleset has service started")
+
 EXPECTED_SCHEMA = {
     "type": str,
     "name": str,
