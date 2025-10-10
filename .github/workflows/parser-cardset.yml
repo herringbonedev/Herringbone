@@ -1,4 +1,4 @@
-name: (Herringbone Logs API) Build
+name: (Parser CardSet)) Build
 
 on:
   workflow_dispatch:
