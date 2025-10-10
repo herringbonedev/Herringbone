@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: herringbone-cardset
+  name: parser-cardset
   namespace: herringbone
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: herringbone-cardset
+      app: parser-cardset
   template:
     metadata:
       labels:
-        app: herringbone-cardset
+        app: parser-cardset
     spec:
       containers:
-        - name: herringbone-cardset
-          image: quay.io/herringbone/herringbone-cardset
+        - name: parser-cardset
+          image: quay.io/herringbone/parser-cardset
           ports:
             - containerPort: 7002
               name: tcp-port
