@@ -27,10 +27,9 @@ def get_db(collection: str) -> HerringboneMongoDatabase:
         password=os.environ.get("MONGO_PASS", ""),
         database=db,
         collection=coll,
-        host=host,                               # supports FQDN, IPv4, IPv6, or host:port
+        host=host,
         port=int(os.environ.get("MONGO_PORT", 27017)),
         replica_set=os.environ.get("MONGO_REPLICA_SET") or None,
-        # no authSource (per your note)
     )
 
 def load_rules(rules_db: HerringboneMongoDatabase) -> list[dict]:
