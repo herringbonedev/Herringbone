@@ -5,6 +5,6 @@ resources:
   - deployment.yaml
   - service.yaml
 images:
-  - name: quay.io/herringbone/herringbone-cardset
-    newTag: latest-93c43ad3-2
-    digest: sha256:fe1b08b5017018bb5f63d96eeb1ca6864b6a527c85209a0c0dff5e8e164ddd37
+  - name: quay.io/herringbone/parser-cardset
+    newTag:
+    digest:
