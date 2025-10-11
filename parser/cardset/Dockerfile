@@ -1,34 +1,35 @@
-# ---------- Build stage (with shell/tools) ----------
+# ---------- Build stage ----------
 FROM cgr.dev/chainguard/python:latest-dev AS builder
 WORKDIR /app
 USER root
 
-# Create a venv in a writable path and install deps
+# Create a venv and install deps
 ENV VENV_PATH=/app/.venv
 COPY requirements.txt .
 RUN python -m venv "$VENV_PATH" \
  && "$VENV_PATH/bin/pip" install --no-cache-dir -r requirements.txt
 
-# Copy your app code
+# Copy all app code (includes modules/, cardset.py, etc.)
 COPY . .
-
-# Ensure nonroot user can read everything at runtime
+# Ensure nonroot can read at runtime
 RUN chown -R 65532:65532 /app
 
-# ---------- Runtime stage (distroless, non-root) ----------
+# ---------- Runtime stage ----------
 FROM cgr.dev/chainguard/python:latest
 WORKDIR /app
-
-# Bring in the app + venv from builder
+# Bring in the built app + venv
 COPY --from=builder /app /app
 
-# Run as nonroot (Chainguard default UID)
+# Non-root user (Chainguard's default UID)
 USER 65532
 EXPOSE 7002
 
-# (optional) put venv first on PATH
-ENV PATH="/app/.venv/bin:${PATH}"
+# Make the venv first on PATH and ensure imports work
+ENV PATH="/app/.venv/bin:${PATH}" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
-# Option B: use the venv's python and run uvicorn as a module
-ENTRYPOINT ["/app/.venv/bin/python"]
-CMD ["-m","uvicorn","cardset:app","--host","0.0.0.0","--port","7002","--workers","2"]
+# Start FastAPI via uvicorn, bind to all interfaces
+ENTRYPOINT ["python","-m","uvicorn"]
+CMD ["cardset:app","--host","0.0.0.0","--port","7002"]
