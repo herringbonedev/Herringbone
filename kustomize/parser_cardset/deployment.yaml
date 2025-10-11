@@ -33,7 +33,7 @@ spec:
             - name: DB_NAME
               value: herringbone
             - name: COLLECTION_NAME
-              value: logs
+              value: cards
             - name: MONGO_USER
               valueFrom:
                 secretKeyRef:
