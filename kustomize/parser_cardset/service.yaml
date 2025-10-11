@@ -4,11 +4,11 @@ metadata:
   name: parser-cardset-service
   namespace: herringbone
 spec:
-  type: ClusterIP
+  type: LoadBalancer     # <-- exposes service externally
   selector:
     app: parser-cardset
   ports:
-    - name: tcp
+    - name: http
       protocol: TCP
-      port: 7002
-      targetPort: 7002
+      port: 7002          # external port
+      targetPort: 7002    # container port

@@ -1,5 +1,6 @@
 from datetime import datetime
 import os
+from bson import json_util
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from schema import CardSchema
@@ -18,6 +19,7 @@ def get_mongo_handler() -> HerringboneMongoDatabase:
         port=int(os.environ.get("MONGO_PORT", 27017))
     )
 
+
 @app.on_event("startup")
 def on_startup():
     try:
@@ -29,6 +31,7 @@ def on_startup():
         print(f"[✗] Mongo connection init failed: {e}")
         app.state.mongo = None
 
+
 @app.on_event("shutdown")
 def on_shutdown():
     mongo = getattr(app.state, "mongo", None)
@@ -37,6 +40,7 @@ def on_shutdown():
             mongo.close_mongo_connection()
         except Exception:
             pass
+
 
 @app.post("/parser/cardset/insert_card")
 async def insert_card(request: Request):
@@ -61,11 +65,46 @@ async def insert_card(request: Request):
 
     return {"ok": True, "message": "Valid card. Inserted into database."}
 
+
+@app.post("/parser/cardset/pull_cards")
+async def pull_cards(request: Request):
+    if getattr(app.state, "mongo", None) is None:
+        raise HTTPException(status_code=503, detail="Database not initialized")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    if not isinstance(payload, dict) or len(payload) != 1:
+        raise HTTPException(status_code=400, detail='Body must be like {"domain":"google.com"}')
+
+    (sel_type, sel_value) = next(iter(payload.items()))
+    if not isinstance(sel_type, str) or not isinstance(sel_value, str):
+        raise HTTPException(status_code=400, detail="Type and value must be strings")
+
+    query = {"selector.type": sel_type, "selector.value": sel_value}
+
+    try:
+        docs = list(app.state.mongo.collection.find(query))
+        return JSONResponse(
+            content={
+                "ok": True,
+                "count": len(docs),
+                "cards": json.loads(json_util.dumps(docs))
+            },
+            status_code=200
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Query failed: {e}")
+        
+
 #
 # Herringbone requires Liveness and Readiness probes for all services.
 #
 # The routes below contain the logic for livez and readyz
 #
+
 
 @app.get("/parser/cardset/readyz")
 def readyz():
@@ -73,6 +112,8 @@ def readyz():
         return JSONResponse({"ok": False, "error": "mongo not ready"}, status_code=503)
     return {"ok": True}
 
+
 @app.get("/parser/cardset/livez")
 def livez():
     return {"ok": True}
+
