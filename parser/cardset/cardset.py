@@ -38,12 +38,6 @@ def on_shutdown():
         except Exception:
             pass
 
-@app.get("/healthz")
-def healthz():
-    if getattr(app.state, "mongo", None) is None:
-        return JSONResponse({"ok": False, "error": "mongo not ready"}, status_code=503)
-    return {"ok": True}
-
 @app.post("/parser/cardset/insert_card")
 async def insert_card(request: Request):
     if getattr(app.state, "mongo", None) is None:
@@ -66,3 +60,19 @@ async def insert_card(request: Request):
         raise HTTPException(status_code=500, detail=f"Insert failed: {e}")
 
     return {"ok": True, "message": "Valid card. Inserted into database."}
+
+#
+# Herringbone requires Liveness and Readiness probes for all services.
+#
+# The routes below contain the logic for livez and readyz
+#
+
+@app.get("/parser/cardset/readyz")
+def readyz():
+    if getattr(app.state, "mongo", None) is None:
+        return JSONResponse({"ok": False, "error": "mongo not ready"}, status_code=503)
+    return {"ok": True}
+
+@app.get("/parser/cardset/livez")
+def livez():
+    return {"ok": True}
