@@ -1,14 +1,56 @@
 from datetime import datetime
 import os
 import json
+from typing import Any, Dict, List, Optional
 from bson import json_util
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from schema import CardSchema
 from modules.database.mongo_db import HerringboneMongoDatabase
 
 app = FastAPI(title="CardSet Service (FastAPI)")
 validator = CardSchema()
+
+# ---------- Pydantic models ----------
+
+class SelectorModel(BaseModel):
+    type: str = Field(..., example="domain")
+    value: str = Field(..., example="google.com")
+
+class CardModel(BaseModel):
+    selector: SelectorModel
+    regex: Optional[List[Dict[str, str]]] = Field(None, example=[{"domain": "(?:[a-z0-9-]+\\.)*google\\.com"}])
+    jsonp: Optional[List[Dict[str, str]]] = Field(None, example=[{"ip": "$.network.source.ip"}])
+
+class InsertCardResponse(BaseModel):
+    ok: bool
+    message: str
+
+class PullCardsRequest(BaseModel):
+    selector_type: str = Field(..., example="domain", description="Key you previously used as the single body key, e.g. 'domain'")
+    selector_value: str = Field(..., example="google.com", description="Value associated with that key")
+    limit: Optional[int] = Field(None, ge=1, example=100)
+
+class PullCardsResponse(BaseModel):
+    ok: bool
+    count: int
+    cards: List[Dict[str, Any]]
+
+class DeleteCardsRequest(BaseModel):
+    selector_type: str = Field(..., example="domain")
+    selector_value: str = Field(..., example="google.com")
+
+class DeleteCardsResponse(BaseModel):
+    ok: bool
+    deleted: int
+
+class UpdateCardResponse(BaseModel):
+    ok: bool
+    matched: int
+    modified: int
+    upserted_id: Optional[str] = None
+
 
 def get_mongo_handler() -> HerringboneMongoDatabase:
     return HerringboneMongoDatabase(
@@ -43,26 +85,22 @@ def on_shutdown():
             pass
 
 
-@app.post("/parser/cardset/insert_card")
-async def insert_card(request: Request):
-
+@app.post("/parser/cardset/insert_card", response_model=InsertCardResponse)
+async def insert_card(card: CardModel):
     print("Attempting to insert a new card...")
 
     if getattr(app.state, "mongo", None) is None:
         raise HTTPException(status_code=503, detail="Database not initialized")
-
-    try:
-        payload = await request.json()
-        print(f"New card payload: {str(payload)}")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    
+    payload = card.model_dump()
+    print(f"New card payload: {payload}")
 
     print("Validating payload...")
     result = validator(payload)
     print(result)
     if not result.get("valid"):
         raise HTTPException(status_code=400, detail=f"Schema validation failed: {result.get('error')}")
-    
+
     payload["last_updated"] = datetime.utcnow()
 
     try:
@@ -74,83 +112,68 @@ async def insert_card(request: Request):
     return {"ok": True, "message": "Valid card. Inserted into database."}
 
 
-@app.post("/parser/cardset/pull_cards")
-async def pull_cards(request: Request):
+@app.post("/parser/cardset/pull_cards", response_model=PullCardsResponse)
+async def pull_cards(body: PullCardsRequest):
     if getattr(app.state, "mongo", None) is None:
         raise HTTPException(status_code=503, detail="Database not initialized")
+    
+    sel_type = body.selector_type
+    sel_value = body.selector_value
+    limit = body.limit
 
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
-
-    if not isinstance(payload, dict) or len(payload) != 1:
-        raise HTTPException(status_code=400, detail='Body must be like {"domain":"google.com"}')
-
-    sel_type, sel_value = next(iter(payload.items()))
     if not isinstance(sel_type, str) or not isinstance(sel_value, str):
         raise HTTPException(status_code=400, detail="Type and value must be strings")
 
     try:
-        docs = app.state.mongo.find_cards_by_selector(sel_type, sel_value, limit=int(payload.get("limit", 0)) or None)
+        docs = app.state.mongo.find_cards_by_selector(sel_type, sel_value, limit=int(limit or 0) or None)
         return JSONResponse(
             content={"ok": True, "count": len(docs), "cards": json.loads(json_util.dumps(docs))},
             status_code=200
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
-    
-@app.post("/parser/cardset/delete_cards")
-async def delete_cards(request: Request):
+
+
+@app.post("/parser/cardset/delete_cards", response_model=DeleteCardsResponse)
+async def delete_cards(body: DeleteCardsRequest):
     if getattr(app.state, "mongo", None) is None:
         raise HTTPException(status_code=503, detail="Database not initialized")
 
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    sel_type = body.selector_type
+    sel_value = body.selector_value
 
-    if not isinstance(payload, dict) or len(payload) != 1:
-        raise HTTPException(status_code=400, detail='Body must be like {"domain":"google.com"}')
-
-    sel_type, sel_value = next(iter(payload.items()))
     if not isinstance(sel_type, str) or not isinstance(sel_value, str):
         raise HTTPException(status_code=400, detail="Type and value must be strings")
 
     try:
         res = app.state.mongo.delete_cards_by_selector(sel_type, sel_value)
-        # res -> {"deleted": int}
         return {"ok": True, "deleted": res.get("deleted", 0)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
 
 
-@app.post("/parser/cardset/update_card")
-async def update_card(request: Request):
+@app.post("/parser/cardset/update_card", response_model=UpdateCardResponse)
+async def update_card(new_card: CardModel):
     if getattr(app.state, "mongo", None) is None:
         raise HTTPException(status_code=503, detail="Database not initialized")
-
-    try:
-        new_card = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
     
-    result = validator(new_card)
+    payload = new_card.model_dump()
+    result = validator(payload)
     if not result.get("valid"):
         raise HTTPException(status_code=400, detail=f"Schema validation failed: {result.get('error')}")
 
-    sel = new_card.get("selector") or {}
+    sel = payload.get("selector") or {}
     sel_type, sel_value = sel.get("type"), sel.get("value")
     if not isinstance(sel_type, str) or not isinstance(sel_value, str):
         raise HTTPException(status_code=400, detail="selector.type and selector.value must be strings")
-    
+
     filter_query = {"selector.type": sel_type, "selector.value": sel_value}
-    new_card["last_updated"] = datetime.utcnow()
-    new_card["deleted"] = False
-    new_card.pop("deleted_at", None)
+    payload["last_updated"] = datetime.utcnow()
+    payload["deleted"] = False
+    payload.pop("deleted_at", None)
 
     try:
-        res = app.state.mongo.update_log(filter_query, new_card, clean_codec=False)
+        res = app.state.mongo.update_log(filter_query, payload, clean_codec=False)
         return JSONResponse(
             content={
                 "ok": True,
@@ -181,4 +204,3 @@ def readyz():
 @app.get("/parser/cardset/livez")
 def livez():
     return {"ok": True}
-
