@@ -250,6 +250,37 @@ class HerringboneMongoDatabase:
     # ---------- CRUD ops ----------
 
     @with_connection
+    def delete_one(self, filter_query: dict, *, mongo_coll):
+        """
+        Delete a single document matching filter_query.
+
+        Returns: {"deleted": int}
+        """
+        res = mongo_coll.delete_one(filter_query)
+        return {"deleted": res.deleted_count}
+
+    @with_connection
+    def delete_many(self, filter_query: dict, *, mongo_coll):
+        """
+        Delete all documents matching filter_query.
+
+        Returns: {"deleted": int}
+        """
+        res = mongo_coll.delete_many(filter_query)
+        return {"deleted": res.deleted_count}
+    
+    @with_connection
+    def delete_cards_by_selector(self, sel_type: str, sel_value: str, *, mongo_coll):
+        """
+        Delete all cards where selector.type == sel_type and selector.value == sel_value.
+
+        Returns: {"deleted": int}
+        """
+        q = {"selector.type": sel_type, "selector.value": sel_value}
+        res = mongo_coll.delete_many(q)
+        return {"deleted": res.deleted_count}
+
+    @with_connection
     def insert_log(self, doc: dict, *, clean_codec: bool = False, mongo_coll):
         """
         Insert one document; return inserted _id as string.
