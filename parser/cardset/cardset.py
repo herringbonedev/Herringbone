@@ -99,7 +99,70 @@ async def pull_cards(request: Request):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
-        
+    
+@app.post("/parser/cardset/delete_cards")
+async def delete_cards(request: Request):
+    if getattr(app.state, "mongo", None) is None:
+        raise HTTPException(status_code=503, detail="Database not initialized")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    if not isinstance(payload, dict) or len(payload) != 1:
+        raise HTTPException(status_code=400, detail='Body must be like {"domain":"google.com"}')
+
+    sel_type, sel_value = next(iter(payload.items()))
+    if not isinstance(sel_type, str) or not isinstance(sel_value, str):
+        raise HTTPException(status_code=400, detail="Type and value must be strings")
+
+    try:
+        res = app.state.mongo.delete_cards_by_selector(sel_type, sel_value)
+        # res -> {"deleted": int}
+        return {"ok": True, "deleted": res.get("deleted", 0)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
+
+
+@app.post("/parser/cardset/update_card")
+async def update_card(request: Request):
+    if getattr(app.state, "mongo", None) is None:
+        raise HTTPException(status_code=503, detail="Database not initialized")
+
+    try:
+        new_card = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    
+    result = validator(new_card)
+    if not result.get("valid"):
+        raise HTTPException(status_code=400, detail=f"Schema validation failed: {result.get('error')}")
+
+    sel = new_card.get("selector") or {}
+    sel_type, sel_value = sel.get("type"), sel.get("value")
+    if not isinstance(sel_type, str) or not isinstance(sel_value, str):
+        raise HTTPException(status_code=400, detail="selector.type and selector.value must be strings")
+    
+    filter_query = {"selector.type": sel_type, "selector.value": sel_value}
+    new_card["last_updated"] = datetime.utcnow()
+    new_card["deleted"] = False
+    new_card.pop("deleted_at", None)
+
+    try:
+        res = app.state.mongo.update_log(filter_query, new_card, clean_codec=False)
+        return JSONResponse(
+            content={
+                "ok": True,
+                "matched": (res or {}).get("matched", 0),
+                "modified": (res or {}).get("modified", 0),
+                "upserted_id": str((res or {}).get("upserted_id")) if (res or {}).get("upserted_id") else None
+            },
+            status_code=200
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Update failed: {e}")
+
 
 #
 # Herringbone requires Liveness and Readiness probes for all services.
