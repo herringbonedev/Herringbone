@@ -348,3 +348,43 @@ class HerringboneMongoDatabase:
         Returns drop result.
         """
         return mongo_db.drop_collection(self.collection)
+    
+    # ---------- Search ----------
+    
+    @with_connection
+    def find(self, filter_query: dict, *, projection: dict | None = None, limit: int | None = None, mongo_coll):
+        """
+        Return a list of documents matching filter_query.
+        """
+        cur = mongo_coll.find(filter_query, projection or None)
+        if isinstance(limit, int) and limit > 0:
+            cur = cur.limit(limit)
+        return list(cur)
+
+    @with_connection
+    def find_one(self, filter_query: dict, *, projection: dict | None = None, mongo_coll):
+        """
+        Return a single document or None.
+        """
+        return mongo_coll.find_one(filter_query, projection or None)
+
+    @with_connection
+    def ensure_selector_index(self, *, mongo_coll):
+        """
+        Create an index to speed up selector lookups.
+        """
+        return mongo_coll.create_index(
+            [("selector.type", 1), ("selector.value", 1)],
+            name="selector_type_value_idx"
+        )
+    
+    @with_connection
+    def find_cards_by_selector(self, sel_type: str, sel_value: str, *, limit: int | None = None, projection: dict | None = None, mongo_coll):
+        """
+        Find cards where selector.type == sel_type and selector.value == sel_value.
+        """
+        q = {"selector.type": sel_type, "selector.value": sel_value}
+        cur = mongo_coll.find(q, projection or None)
+        if isinstance(limit, int) and limit > 0:
+            cur = cur.limit(limit)
+        return list(cur)
