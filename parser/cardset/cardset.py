@@ -44,21 +44,28 @@ def on_shutdown():
 
 @app.post("/parser/cardset/insert_card")
 async def insert_card(request: Request):
+
+    print("Attempting to insert a new card...")
+
     if getattr(app.state, "mongo", None) is None:
         raise HTTPException(status_code=503, detail="Database not initialized")
 
     try:
         payload = await request.json()
+        print(f"New card payload: {str(payload)}")
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON body")
 
+    print("Validating payload...")
     result = validator(payload)
+    print(result)
     if not result.get("valid"):
         raise HTTPException(status_code=400, detail=f"Schema validation failed: {result.get('error')}")
     
     payload["last_updated"] = datetime.utcnow()
 
     try:
+        print("Inserting into MongoDB...")
         app.state.mongo.insert_log(payload)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Insert failed: {e}")

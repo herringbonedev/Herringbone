@@ -31,16 +31,16 @@ class CardSchema:
             "required": ["selector"]
         }
 
-    def __call__(self, data: dict, schema: str) -> dict:
+    def __call__(self, data: dict) -> dict:
         """
         Allow instance to be called directly for validation.
         Example:
             validator = CardSchema()
             result = validator(data)
         """
-        return self.validate(data, schema)
+        return self.validate(data)
 
-    def validate(self, data: dict, schema: str) -> dict:
+    def validate(self, data: dict) -> dict:
         """
         Validate a JSON object against the Card schema.
 
