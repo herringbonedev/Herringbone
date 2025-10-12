@@ -5,6 +5,6 @@ resources:
   - deployment.yaml
   - service.yaml
 images:
-  - name: quay.io/herringbone/parser_extractor
+  - name: quay.io/herringbone/parser-extractor
     newTag: 
     digest: 
