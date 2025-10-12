@@ -8,6 +8,7 @@ on:
     paths:
       - 'parser/cardset/**'
       - '.github/workflows/parser-cardset.yml'
+      - '!parser/cardset/README.md'
 
 permissions:
   contents: write
