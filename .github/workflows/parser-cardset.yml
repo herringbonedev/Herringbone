@@ -42,6 +42,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Prepare build context (copy shared modules)
+        run: |
+          set -euo pipefail
+          rm -rf parser/cardset/modules
+          mkdir -p parser/cardset
+          cp -R modules parser/cardset/modules
+
       # Build, test, and push the Docker image
       - name: Build Docker image
         env:

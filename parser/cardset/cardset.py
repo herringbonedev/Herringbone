@@ -86,29 +86,14 @@ async def pull_cards(request: Request):
     if not isinstance(payload, dict) or len(payload) != 1:
         raise HTTPException(status_code=400, detail='Body must be like {"domain":"google.com"}')
 
-    (sel_type, sel_value) = next(iter(payload.items()))
+    sel_type, sel_value = next(iter(payload.items()))
     if not isinstance(sel_type, str) or not isinstance(sel_value, str):
         raise HTTPException(status_code=400, detail="Type and value must be strings")
 
-    query = {"selector.type": sel_type, "selector.value": sel_value}
-
     try:
-        # Build Mongo connection using existing app.state.mongo values
-        m = app.state.mongo
-        if getattr(m, "user", None) and getattr(m, "password", None):
-            uri = f"mongodb://{m.user}:{m.password}@{m.host}:{m.port}/{m.database}?authSource=admin"
-        else:
-            uri = f"mongodb://{m.host}:{m.port}/{m.database}"
-
-        coll = MongoClient(uri, serverSelectionTimeoutMS=2000)[m.database][m.collection]
-        docs = list(coll.find(query))
-
+        docs = app.state.mongo.find_cards_by_selector(sel_type, sel_value, limit=int(payload.get("limit", 0)) or None)
         return JSONResponse(
-            content={
-                "ok": True,
-                "count": len(docs),
-                "cards": json.loads(json_util.dumps(docs))
-            },
+            content={"ok": True, "count": len(docs), "cards": json.loads(json_util.dumps(docs))},
             status_code=200
         )
     except Exception as e:
