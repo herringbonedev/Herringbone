@@ -93,7 +93,10 @@ async def pull_cards(request: Request):
     query = {"selector.type": sel_type, "selector.value": sel_value}
 
     try:
-        docs = list(app.state.mongo.collection.find(query))
+        mongo = app.state.mongo
+        collection = mongo.client_connection[mongo.database][mongo.collection]
+        docs = list(collection.find(query))
+
         return JSONResponse(
             content={
                 "ok": True,
