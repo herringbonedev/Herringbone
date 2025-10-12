@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parser-extractor
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parser-extractor
+  template:
+    metadata:
+      labels:
+        app: parser-extractor
+    spec:
+      containers:
+        - name: parser-extractor
+          image: quay.io/herringbone/parser_extractor
+          ports:
+            - containerPort: 7002
+              name: tcp-port
+              protocol: TCP

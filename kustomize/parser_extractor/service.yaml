@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: parser-extractor-service
+  namespace: herringbone
+spec:
+  type: LoadBalancer     # <-- exposes service externally
+  selector:
+    app: parser-extractor
+  ports:
+    - name: http
+      protocol: TCP
+      port: 7002          # external port
+      targetPort: 7002    # container port
