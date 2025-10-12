@@ -93,9 +93,15 @@ async def pull_cards(request: Request):
     query = {"selector.type": sel_type, "selector.value": sel_value}
 
     try:
-        mongo = app.state.mongo
-        collection = mongo.client_connection[mongo.database][mongo.collection]
-        docs = list(collection.find(query))
+        # Build Mongo connection using existing app.state.mongo values
+        m = app.state.mongo
+        if getattr(m, "user", None) and getattr(m, "password", None):
+            uri = f"mongodb://{m.user}:{m.password}@{m.host}:{m.port}/{m.database}?authSource=admin"
+        else:
+            uri = f"mongodb://{m.host}:{m.port}/{m.database}"
+
+        coll = MongoClient(uri, serverSelectionTimeoutMS=2000)[m.database][m.collection]
+        docs = list(coll.find(query))
 
         return JSONResponse(
             content={
