@@ -8,6 +8,7 @@ on:
     paths:
       - 'parser/extractor/**'
       - '.github/workflows/parser-extractor.yml'
+      - '!parser/extractor/README.md'
 
 permissions:
   contents: write
