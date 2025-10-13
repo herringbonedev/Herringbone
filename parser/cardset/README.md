@@ -121,23 +121,6 @@ class HerringboneMongoDatabase:
 
 ---
 
-## 📦 Dockerfile Summary
-
-This image is based on a **Chainguard Python** base for security hardening and builds Python wheels in a two-stage process:
-- **Builder Stage**: Installs all dependencies securely
-- **Runtime Stage**: Runs the FastAPI app under a minimal non-root user
-
----
-
-## 🔒 Security
-
-- Chainguard base image for reduced CVEs  
-- No root privileges inside container  
-- No cached dependencies  
-- JSON schema validation for all inputs  
-
----
-
 ## 🧭 Example Responses
 
 **Insert valid card**

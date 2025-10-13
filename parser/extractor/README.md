@@ -163,20 +163,9 @@ curl -X POST http://localhost:7003/parser/extractor/parse   -H "Content-Type: ap
 
 ---
 
-## 🔒 Security
-
-- **Regex isolation:** safely runs compiled regex patterns under `re.IGNORECASE`
-- **JSONPath parsing:** powered by `jsonpath-ng==1.7.0` (latest secure version, no known CVEs)
-- **Stateless container:** no local data retention
-- **Error-safe responses:** all exceptions are sanitized before returning
-
----
-
 ## 🩺 Health Probes
 
 | Route | Purpose |
 |--------|----------|
 | `/parser/cardset/livez` | Checks if the container is running |
 | `/parser/cardset/readyz` | Always returns `{ok: true}` |
-
----
