@@ -132,6 +132,21 @@ async def pull_cards(body: PullCardsRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
+    
+
+@app.post("/parser/cardset/pull_all_cards", response_model=PullCardsResponse)
+async def pull_cards(body: PullCardsRequest):
+    if getattr(app.state, "mongo", None) is None:
+        raise HTTPException(status_code=503, detail="Database not initialized")
+
+    try:
+        docs = app.state.mongo.find_all_cards(mongo_coll=app.state.mongo.cards)
+        return JSONResponse(
+            content={"ok": True, "count": len(docs), "cards": json.loads(json_util.dumps(docs))},
+            status_code=200
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Query failed: {e}")
 
 
 @app.post("/parser/cardset/delete_cards", response_model=DeleteCardsResponse)
