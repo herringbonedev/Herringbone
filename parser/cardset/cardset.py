@@ -134,7 +134,7 @@ async def pull_cards(body: PullCardsRequest):
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
     
 
-@app.post("/parser/cardset/pull_all_cards", response_model=PullCardsResponse)
+@app.get("/parser/cardset/pull_all_cards", response_model=PullCardsResponse)
 async def pull_cards(body: PullCardsRequest):
     if getattr(app.state, "mongo", None) is None:
         raise HTTPException(status_code=503, detail="Database not initialized")
