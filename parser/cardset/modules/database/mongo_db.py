@@ -419,3 +419,13 @@ class HerringboneMongoDatabase:
         if isinstance(limit, int) and limit > 0:
             cur = cur.limit(limit)
         return list(cur)
+    
+    @with_connection
+    def find_all_cards(self, *, limit: int | None = None, projection: dict | None = None, mongo_coll):
+        """
+        Return all cards in the collection.
+        """
+        cur = mongo_coll.find({}, projection or None)
+        if isinstance(limit, int) and limit > 0:
+            cur = cur.limit(limit)
+        return list(cur)
