@@ -17,7 +17,26 @@ if USE_TEST:
     print("[Test Service] Started in test mode")
 
 
-def perform_recon(raw_log: str) -> dict:
+def fetch_metadata(doc: dict) -> dict:
+    """If the METADATA_SVC is not None then grab the additional data.
+    """
+
+    metadata_url = os.environ.get("METADATA_SVC", None)
+
+    if metadata_url is not None:
+        print(f"[→] Loading metadat from {metadata_url}")
+
+        try:
+            result = requests.post(metadata_url, json=doc)
+            print(f"[✓] Metadata loaded for next enrichment request.")
+            print(result.json())
+            return result.json()
+        except Exception as e:
+            print(f"[✗] Failed to gather metadata {e}")
+            return {}
+
+
+def perform_recon(raw_log: str, metadata: dict) -> dict:
     """
     Call the enrichment endpoint with the raw log.
     Honors test mode when ENRICHMENT_SVC == 'test.service'.
@@ -28,7 +47,7 @@ def perform_recon(raw_log: str) -> dict:
         print("[Test Service] Using mock enrichment")
         return {"pass": True}
 
-    payload = {"record": raw_log}
+    payload = {"card": metadata, "input": raw_log}
     try:
         response = requests.post(url, json=payload, timeout=1000)
         print(response.text)
@@ -150,7 +169,8 @@ def main():
 
         try:
             set_pending(mongo, doc["_id"])
-            enrichment_result = perform_recon(doc["raw_log"])
+            metadata = fetch_metadata(doc)
+            enrichment_result = perform_recon(doc["raw_log"], metadata)
             if not USE_TEST:
                 print("[→] Updating enriched log in MongoDB")
                 set_enriched(mongo, doc["_id"], enrichment_result)
