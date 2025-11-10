@@ -32,10 +32,11 @@ def fetch_metadata(doc: dict) -> dict:
                                                        "limit": 1})
             
             print(f"[✓] Metadata loaded for next enrichment request.")
-            print(result.json()["cards"][0])
-            return result.json()["cards"][0]
+            metadata = result.json()
+            return metadata["cards"][0]
+
         except Exception as e:
-            print(f"[✗] Failed to gather metadata {e}")
+            print(f"[✗] Failed to gather metadata {e}...running enrichment without metadata.")
             return {}
 
 

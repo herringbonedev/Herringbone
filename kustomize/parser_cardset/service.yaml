@@ -4,7 +4,7 @@ metadata:
   name: parser-cardset-service
   namespace: herringbone
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: parser-cardset
   ports:
