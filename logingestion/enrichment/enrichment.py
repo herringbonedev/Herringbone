@@ -24,7 +24,7 @@ def fetch_metadata(doc: dict) -> dict:
     metadata_url = os.environ.get("METADATA_SVC", None)
 
     if metadata_url is not None:
-        print(f"[→] Loading metadat from {metadata_url}")
+        print(f"[→] Loading metadata from {metadata_url}")
 
         try:
             result = requests.post(metadata_url, json={"selector_type":"ip", 
@@ -32,8 +32,8 @@ def fetch_metadata(doc: dict) -> dict:
                                                        "limit": 1})
             
             print(f"[✓] Metadata loaded for next enrichment request.")
-            print(result.json())
-            return result.json()
+            print(result.json()["cards"][0])
+            return result.json()["cards"][0]
         except Exception as e:
             print(f"[✗] Failed to gather metadata {e}")
             return {}
