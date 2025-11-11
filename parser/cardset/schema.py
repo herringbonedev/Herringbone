@@ -29,15 +29,9 @@ class CardSchema:
                 }
             },
             "required": ["selector"],
-            "oneOf": [
-                {
-                    "required": ["regex"],
-                    "not": {"required": ["jsonp"]}
-                },
-                {
-                    "required": ["jsonp"],
-                    "not": {"required": ["regex"]}
-                }
+            "anyOf": [
+                {"required": ["regex"]},
+                {"required": ["jsonp"]}
             ]
         }
 
