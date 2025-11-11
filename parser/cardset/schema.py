@@ -17,19 +17,30 @@ class CardSchema:
                 },
                 "regex": {
                     "type": "array",
-                    "items": {"type": "object"}
+                    "items": {
+                        "type": "object"
+                    }
                 },
                 "jsonp": {
                     "type": "array",
-                    "items": {"type": "object"}
+                    "items": {
+                        "type": "object"
+                    }
                 }
             },
+            "required": ["selector"],
             "oneOf": [
-                {"required": ["regex"]},
-                {"required": ["jsonp"]}
-            ],
-            "required": ["selector"]
+                {
+                    "required": ["regex"],
+                    "not": {"required": ["jsonp"]}
+                },
+                {
+                    "required": ["jsonp"],
+                    "not": {"required": ["regex"]}
+                }
+            ]
         }
+
 
     def __call__(self, data: dict) -> dict:
         """
