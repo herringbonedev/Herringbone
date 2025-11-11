@@ -52,9 +52,10 @@ def perform_recon(raw_log: str, metadata: dict) -> dict:
         return {"pass": True}
 
     payload = {"card": metadata, "input": raw_log}
+    print(f"[→] Sending {str(payload)} to {url}")
     try:
         response = requests.post(url, json=payload, timeout=1000)
-        print(response.text)
+        print(f"[→] Response {response.text}")
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
