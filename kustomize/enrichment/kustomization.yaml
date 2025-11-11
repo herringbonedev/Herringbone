@@ -5,5 +5,5 @@ resources:
   - deployment.yaml
 images:
   - name: quay.io/herringbone/enrichment
-    newTag: latest-7e3a7a48-55 # Image Updater will modify this
-    digest: "sha256:7079a8bd2918e75d550d81a2b9d728668f73f0e0a26140f87b19fd64d79bb0d2"
+    newTag: latest-4c986d9d-56 # Image Updater will modify this
+    digest: "sha256:6227c245a52f909bd8953b6099a87b59581c425c81ada60f5de32e385d320417"
