@@ -31,7 +31,7 @@ def fetch_metadata(doc: dict) -> dict:
                                                        "selector_value": doc["source_address"],
                                                        "limit": 1})
             
-            print(f"[✓] Metadata loaded for next enrichment request.")
+            print(f"[✓] Metadata loaded for next enrichment request. {str(result.json())}")
             metadata = result.json()
             return metadata["cards"][0]
 
