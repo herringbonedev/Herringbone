@@ -140,13 +140,19 @@ async def pull_all_cards():
         raise HTTPException(status_code=503, detail="Database not initialized")
 
     try:
-        docs = app.state.mongo.find_all_cards(mongo_coll=app.state.mongo._db["cards"])
+        # ✅ just call find_all_cards() — no ._db or .cards
+        docs = app.state.mongo.find_all_cards()
         return JSONResponse(
-            content={"ok": True, "count": len(docs), "cards": json.loads(json_util.dumps(docs))},
+            content={
+                "ok": True,
+                "count": len(docs),
+                "cards": json.loads(json_util.dumps(docs))
+            },
             status_code=200
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
+
 
 
 @app.post("/parser/cardset/delete_cards", response_model=DeleteCardsResponse)
