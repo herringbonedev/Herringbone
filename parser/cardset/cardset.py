@@ -140,7 +140,6 @@ async def pull_all_cards():
         raise HTTPException(status_code=503, detail="Database not initialized")
 
     try:
-        # ✅ just call find_all_cards() — no ._db or .cards
         docs = app.state.mongo.find_all_cards()
         return JSONResponse(
             content={
