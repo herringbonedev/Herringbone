@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/parser-cardset
-    newTag: latest-d5bf5115-24
-    digest: sha256:3be3cddac25fe033c1c79bb9dff278c12888173e117129501e15b3d58f1111c6
+    newTag: latest-944bd7fb-25
+    digest: sha256:14e2463719ce846158ce3be4586e82189317c3af491e8fea164113d81f92d49b
