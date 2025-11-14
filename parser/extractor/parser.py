@@ -1,6 +1,6 @@
 import re
 import json
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 from jsonpath_ng import parse as jsonpath_parse
 
 
