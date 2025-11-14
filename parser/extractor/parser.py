@@ -1,6 +1,6 @@
 import re
 import json
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Tuple
 from jsonpath_ng import parse as jsonpath_parse
 
 
@@ -30,27 +30,31 @@ class CardParser:
             raise RuntimeError(f"Unsupported mode: {self.mode}")
 
     def _apply_regex(self, regex_rules: List[Dict[str, str]], text: str) -> Dict[str, Any]:
-        results = {}
+        results: Dict[str, Any] = {}
         for rule in regex_rules:
             for name, pattern in rule.items():
                 try:
-                    match = re.search(pattern, text, flags=re.IGNORECASE)
-                    if match:
-                        results[name] = match.group(1) if match.groups() else match.group(0)
+                    matches = re.findall(pattern, text, flags=re.IGNORECASE)
+                    # Normalize: if exactly one capture group, ensure List[str]
+                    if matches and isinstance(matches[0], tuple):
+                        # multiple groups per match -> keep tuples
+                        results[name] = matches  # List[Tuple[str,...]]
                     else:
-                        results[name] = None
+                        # matches is either [] or List[str]
+                        results[name] = matches  # List[str]
                 except re.error as e:
                     results[name] = f"[regex error: {e}]"
         return results
 
     def _apply_jsonp(self, jsonp_rules: List[Dict[str, str]], json_data: Dict[str, Any]) -> Dict[str, Any]:
-        results = {}
+        results: Dict[str, Any] = {}
         for rule in jsonp_rules:
             for name, path in rule.items():
                 try:
                     expr = jsonpath_parse(path)
                     matches = [match.value for match in expr.find(json_data)]
-                    results[name] = matches[0] if matches else None
+                    results[name] = matches  # List[Any], possibly empty
                 except Exception as e:
                     results[name] = f"[jsonpath error: {e}]"
         return results
+

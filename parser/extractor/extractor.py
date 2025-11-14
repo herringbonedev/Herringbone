@@ -34,9 +34,9 @@ class ExtractResponse(BaseModel):
 async def parse(payload: ExtractRequest):
     card = payload.card.model_dump()
     input_data = payload.input
-
     selector = card["selector"]
     results: Dict[str, Any] = {}
+    print(f"[→] Using card: {str(card)} to parse {str(input_data)}")
 
     # Regex
     if card.get("regex"):
