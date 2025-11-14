@@ -101,6 +101,12 @@ async def insert_card(card: CardModel):
     if not result.get("valid"):
         raise HTTPException(status_code=400, detail=f"Schema validation failed: {result.get('error')}")
 
+    # Check if selector already exists
+    existing_card = app.state.mongo.find_one({"selector": payload.get("selector")})
+    if existing_card:
+        print(f"Card with selector {payload.get('selector')} already exists. Skipping insert.")
+        return {"ok": False, "message": "Card with this selector already exists."}
+
     payload["last_updated"] = datetime.utcnow()
 
     try:
