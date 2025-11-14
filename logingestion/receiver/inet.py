@@ -46,7 +46,7 @@ def start_udp_receiver():
 
         try:
             mongo.insert_log(
-                {"source_address": addr, 
+                {"source_address": addr[0], 
                 "raw_log": data, 
                 "recon": False, 
                 "detected": False,
@@ -80,7 +80,7 @@ def start_tcp_receiver():
 
         try:
             mongo.insert_log(
-                {"source_address": addr, 
+                {"source_address": addr[0], 
                 "raw_log": data, 
                 "recon": False, 
                 "detected": False,
