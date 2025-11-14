@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional, Union
 from parser import CardParser
+import json
 
 app = FastAPI(title="Extractor Service (FastAPI)")
 
@@ -47,13 +48,12 @@ async def parse(payload: ExtractRequest):
     if card.get("jsonp"):
         jsonp_parser = CardParser("jsonp")
         try:
-            import json
             json_input = input_data if isinstance(input_data, dict) else json.loads(input_data)
             results.update(jsonp_parser(card["jsonp"], json_input))
         except Exception as e:
             results["jsonp_error"] = f"Invalid JSON input or evaluation error: {e}"
 
-    return JSONResponse(content={"selector": selector, "results": results}, status_code=200)
+    return JSONResponse(content={"results": results}, status_code=200)
 
 
 #
