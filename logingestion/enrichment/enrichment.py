@@ -184,7 +184,7 @@ def main():
             if not USE_TEST and "_id" in doc:
                 print("[→] Marking log as not enriched in MongoDB")
                 try:
-                    set_failed(mongo, doc["_id"])
+                    set_enriched(mongo, doc["_id"], {"enrichment":e})
                 except Exception as e2:
                     print(f"[✗] Failed to update failure state for {doc['_id']}: {e2}")
             print(f"[✗] Failed to enrich log {doc.get('_id', 'test_doc')}: {e}")
