@@ -22,7 +22,7 @@ spec:
               protocol: UDP
           env:
             - name: RECEIVER_TYPE
-              value: HTTP
+              value: UDP
             - name: MONGO_HOST
               value: mongodb-headless.mongodb.svc.cluster.local   # no port here
             - name: MONGO_PORT
