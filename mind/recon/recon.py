@@ -9,20 +9,20 @@ app = Flask(__name__)
 
 OLLAMA_URL = 'http://localhost:11434/api/generate'
 
-def prompt_template(raw_log):
+def prompt_template(raw_logs):
     """Generate prompt template for recon from prompt.text
     """
-    return open("prompt.text", "r").read() + "here is the log for you to analyze: "+ raw_log
+    return open("prompt.text", "r").read() + "here is the list of logs for you to analyze: "+ raw_logs
 
 @app.route('/recon', methods=['POST'])
 def recon():
     data = request.get_json()
-    raw_log = data.get('record', '')
-    print(f"[*] Recon request received for log: {raw_log}")
+    raw_logs = data.get('record', '')
+    print(f"[*] Recon request received for log: {raw_logs}")
 
     response = requests.post(OLLAMA_URL, json={
         "model": os.environ.get("OLLAMA_MODEL", "llama3.2:3b"),
-        "prompt": prompt_template(raw_log),
+        "prompt": prompt_template(raw_logs),
         "stream": False,
         "format": "json"
     })
@@ -31,8 +31,8 @@ def recon():
 
     return response.json().get('response', 'No response from model')
 
-@app.route('/ready', methods=['GET'])
-def ready():
+@app.route('/readyz', methods=['GET'])
+def readyz():
 
     response = requests.post(OLLAMA_URL, json={
         "model": "llama3.2:3b",
@@ -42,9 +42,9 @@ def ready():
 
     return response.json().get('response', 'No response from model')
 
-@app.route('/healthz', methods=['GET'])
-def healthz():
-    return jsonify({"status": "healthy"}), 200
+@app.route('/livez', methods=['GET'])
+def livez():
+    return jsonify({"status": "alive"}), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8002)
