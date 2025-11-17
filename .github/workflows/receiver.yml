@@ -1,9 +1,8 @@
 name: (Receiver) Build
 
 on:
-  workflow_dispatch:
   pull_request:
-    # Trigger on any branch **except main**
+    types: [opened, synchronize, reopened]
     branches-ignore:
       - main
     paths:
@@ -18,7 +17,7 @@ permissions:
 jobs:
   build-test-push:
     runs-on: ubuntu-latest
-
+    # This makes the job report back as a PR check
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
@@ -32,7 +31,7 @@ jobs:
           sudo wget https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 -O /usr/bin/yq
           sudo chmod +x /usr/bin/yq
           sudo apt-get update
-          sudo apt-get install -y skopeo jq
+          sudo apt-get install -y skopeo jq netcat
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -105,12 +104,12 @@ jobs:
           yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_udp/kustomization.yaml
           yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_http/kustomization.yaml
 
-      - name: Commit and push kustomize updates
+      - name: Commit kustomize updates to PR branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add kustomize/receiver_udp/kustomization.yaml kustomize/receiver_http/kustomization.yaml
-          git commit -m "ci: bump receiver image to ${{ steps.digest.outputs.digest }}" || echo "No changes to commit"
+          git diff --quiet || git commit -m "ci: bump receiver image to ${{ steps.digest.outputs.digest }}"
           git push origin HEAD
 
       - name: Cleanup
