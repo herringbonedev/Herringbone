@@ -3,8 +3,8 @@ name: (Receiver) Build
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches-ignore:
-      - main
+    branches:
+      - main        # PRs targeting main
     paths:
       - 'logingestion/receiver/**'
       - '.github/workflows/receiver.yml'
