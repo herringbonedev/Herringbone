@@ -1,10 +1,11 @@
 name: (Receiver) Build
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
-      - main        # PRs targeting main
+      - main   # PRs targeting main
     paths:
       - 'logingestion/receiver/**'
       - '.github/workflows/receiver.yml'
@@ -17,7 +18,7 @@ permissions:
 jobs:
   build-test-push:
     runs-on: ubuntu-latest
-    # This makes the job report back as a PR check
+
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
@@ -31,7 +32,7 @@ jobs:
           sudo wget https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 -O /usr/bin/yq
           sudo chmod +x /usr/bin/yq
           sudo apt-get update
-          sudo apt-get install -y skopeo jq netcat
+          sudo apt-get install -y skopeo jq netcat-openbsd
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -104,7 +105,7 @@ jobs:
           yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_udp/kustomization.yaml
           yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_http/kustomization.yaml
 
-      - name: Commit kustomize updates to PR branch
+      - name: Commit and push kustomize updates to PR branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
