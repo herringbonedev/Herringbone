@@ -2,8 +2,9 @@ name: (Receiver) Build
 
 on:
   workflow_dispatch:
-  push:
-    branches:
+  pull_request:
+    # Trigger on any branch **except main**
+    branches-ignore:
       - main
     paths:
       - 'logingestion/receiver/**'
@@ -19,10 +20,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref }}
 
       - name: Install tools (yq, skopeo, jq)
         run: |
@@ -49,7 +51,6 @@ jobs:
           mkdir -p logingestion/receiver
           cp -R modules logingestion/receiver/modules
 
-      # Build, test, and push the Docker image
       - name: Build Docker image
         env:
           SHORT_SHA: ${{ github.sha }}
@@ -84,7 +85,6 @@ jobs:
           SHORT_SHA=${SHORT_SHA::8}
           docker push quay.io/herringbone/receiver:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
 
-      # Update kustomization.yaml with the new image tag & digest
       - name: Get image digest
         id: digest
         env:
@@ -105,46 +105,14 @@ jobs:
           yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_udp/kustomization.yaml
           yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_http/kustomization.yaml
 
-      - name: Detect changes
-        id: bump
+      - name: Commit and push kustomize updates
         run: |
-          set -euo pipefail
-          if git diff --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add kustomize/receiver_udp/kustomization.yaml kustomize/receiver_http/kustomization.yaml
+          git commit -m "ci: bump receiver image to ${{ steps.digest.outputs.digest }}" || echo "No changes to commit"
+          git push origin HEAD
 
-      # Create/Update PR using peter-evans (gracefully no-ops if no diff)
-      - name: Create PR (only if changes exist)
-        if: steps.bump.outputs.changed == 'true'
-        id: cpr
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(receiver): bump image to ${{ steps.digest.outputs.digest }}"
-          title: "chore(receiver): bump receiver image"
-          body: |
-            Automated update to kustomization for receiver image.
-            - Tag & digest updated by CI
-            - This PR respects branch protection.
-          branch: auto/update/receiver
-          delete-branch: true
-          signoff: true
-          labels: |
-            automation
-
-      - name: Log PR result
-        if: steps.bump.outputs.changed == 'true'
-        run: |
-          echo "operation=${{ steps.cpr.outputs.pull-request-operation }}"
-          echo "pr=${{ steps.cpr.outputs.pull-request-number || 'none' }}"
-
-      - name: No changes
-        if: steps.bump.outputs.changed != 'true'
-        run: echo "No changes; skipping PR."
-
-      # Cleanup
       - name: Cleanup
         if: always()
         run: |
