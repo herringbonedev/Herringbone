@@ -109,9 +109,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B "${GITHUB_HEAD_REF}"   # ensure local branch matches PR branch
           git add kustomize/receiver_udp/kustomization.yaml kustomize/receiver_http/kustomization.yaml
-          git diff --quiet || git commit -m "ci: bump receiver image to ${{ steps.digest.outputs.digest }}"
-          git push origin HEAD:${GITHUB_HEAD_REF}
+          if ! git diff --cached --quiet; then
+            git commit -m "ci: bump receiver image to ${{ steps.digest.outputs.digest }}"
+            git push origin "${GITHUB_HEAD_REF}"
+          else
+            echo "No changes to commit"
+          fi
+
 
 
       - name: Cleanup
