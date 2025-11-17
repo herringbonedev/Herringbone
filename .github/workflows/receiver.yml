@@ -111,7 +111,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add kustomize/receiver_udp/kustomization.yaml kustomize/receiver_http/kustomization.yaml
           git diff --quiet || git commit -m "ci: bump receiver image to ${{ steps.digest.outputs.digest }}"
-          git push origin HEAD
+          git push origin HEAD:${GITHUB_HEAD_REF}
+
 
       - name: Cleanup
         if: always()
