@@ -57,7 +57,9 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
-          docker build -t quay.io/herringbone/detectionengine-ruleset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} ./detectionengine/ruleset
+          docker build -f detectionengine/ruleset/docker/Dockerfile \
+            -t quay.io/herringbone/detectionengine-ruleset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} \
+            detectionengine/ruleset
 
       - name: Run container for smoke test
         env:
