@@ -2,7 +2,8 @@ name: (Ruleset) Build
 
 on:
   workflow_dispatch:
-  push:
+  pull_request:
+    types: [opened, synchronize, reopened]
     branches:
       - main
     paths:
@@ -19,10 +20,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref }}
 
       - name: Install tools (yq, skopeo, jq)
         run: |
@@ -42,6 +44,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Prepare build context (copy shared modules)
+        run: |
+          set -euo pipefail
+          rm -rf detectionengine/ruleset/modules
+          mkdir -p detectionengine/ruleset
+          cp -R modules detectionengine/ruleset/modules
+
       - name: Build Docker image
         env:
           SHORT_SHA: ${{ github.sha }}
@@ -56,9 +65,8 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
-          docker run -d --name test_detectionengine_ruleset \
-            quay.io/herringbone/detectionengine-ruleset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
-          sleep 1
+          docker run -d --name test_detectionengine_ruleset quay.io/herringbone/detectionengine-ruleset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
+          sleep 5
           docker logs test_detectionengine_ruleset || true
           docker inspect test_detectionengine_ruleset --format='{{.State.Running}}' | grep true
 
@@ -98,7 +106,6 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Create/Update PR using peter-evans (gracefully no-ops if no diff)
       - name: Create PR (only if changes exist)
         if: steps.bump.outputs.changed == 'true'
         id: cpr
