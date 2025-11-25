@@ -47,9 +47,9 @@ jobs:
       - name: Prepare build context (copy shared modules)
         run: |
           set -euo pipefail
-          rm -rf detectionengine/ruleset/modules
+          rm -rf detectionengine/ruleset/app/modules
           mkdir -p detectionengine/ruleset
-          cp -R modules detectionengine/ruleset/modules
+          cp -R modules detectionengine/ruleset/app/modules
 
       - name: Build Docker image
         env:
