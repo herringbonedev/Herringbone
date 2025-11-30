@@ -31,7 +31,7 @@ spec:
             - name: WAIT_FOR_RECON_TO_FINISH
               value: "true"
             - name: MATCHER_API
-              value: http://herringbone-matcher-service.herringbone.svc.cluster.local:7003/detectionengine/matcher/find_match
+              value: http://detectionengine-matcher-service.herringbone.svc.cluster.local:7003/detectionengine/matcher/find_match
             - name: RULES_COLLECTION_NAME
               value: rules
             - name: LOGS_COLLECTION_NAME
