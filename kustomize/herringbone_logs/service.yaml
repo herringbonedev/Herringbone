@@ -4,11 +4,11 @@ metadata:
   name: herringbone-logs-service
   namespace: herringbone
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: herringbone-logs
   ports:
-    - name: tcp
+    - name: http
       protocol: TCP
       port: 7002
       targetPort: 7002
