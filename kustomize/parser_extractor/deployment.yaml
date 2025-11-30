@@ -4,7 +4,7 @@ metadata:
   name: parser-extractor
   namespace: herringbone
 spec:
-  replicas: 6
+  replicas: 10
   selector:
     matchLabels:
       app: parser-extractor
