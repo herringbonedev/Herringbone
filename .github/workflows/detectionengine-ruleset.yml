@@ -48,7 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf detectionengine/ruleset/app/modules
-          mkdir -p detectionengine/ruleset
+          mkdir -p detectionengine/ruleset/app
           cp -R modules detectionengine/ruleset/app/modules
 
       - name: Build Docker image
@@ -57,22 +57,24 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
-          docker build -f detectionengine/ruleset/docker/Dockerfile \
+          docker build \
             -t quay.io/herringbone/detectionengine-ruleset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} \
+            -f detectionengine/ruleset/docker/Dockerfile \
             detectionengine/ruleset
 
-      - name: Run container for smoke test
+      - name: Smoke test container
         env:
           SHORT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
-          docker run -d --name test_detectionengine_ruleset quay.io/herringbone/detectionengine-ruleset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
-          sleep 5
+          docker run -d --name test_detectionengine_ruleset \
+            quay.io/herringbone/detectionengine-ruleset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
+          sleep 3
           docker logs test_detectionengine_ruleset || true
-          docker inspect test_detectionengine_ruleset --format='{{.State.Running}}' | grep true
+          test "$(docker inspect test_detectionengine_ruleset --format='{{.State.Running}}')" = "true"
 
-      - name: Push image (only if tests pass)
+      - name: Push image
         env:
           SHORT_SHA: ${{ github.sha }}
         run: |
@@ -90,7 +92,7 @@ jobs:
           DIGEST=$(skopeo inspect docker://quay.io/herringbone/detectionengine-ruleset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} | jq -r '.Digest')
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
-      - name: Update kustomization.yaml with new image tag & digest
+      - name: Update kustomization.yaml with new tag & digest
         run: |
           set -euo pipefail
           SHORT_SHA=${GITHUB_SHA::8}
@@ -118,8 +120,8 @@ jobs:
           title: "chore(ruleset): bump ruleset image"
           body: |
             Automated update to kustomization for ruleset image.
-            - Tag & digest updated by CI
-            - This PR respects branch protection.
+            - Tag & digest updated automatically by CI
+            - Respects branch protection
           branch: auto/update/ruleset-digest
           delete-branch: true
           signoff: true
