@@ -7,12 +7,12 @@ Internal ports represent the port each container listens on, while external port
 |----------------|------------|---------------|----------------|
 | detectionengine | matcher    | 7003          | 7003           |
 | detectionengine | ruleset    | 7002          | 7002           |
-| detectionengine | detector   | 7002          | null           |
-| herringbone     | apps       | 7002          | null           |
-| herringbone     | logs       | 7002          | null           |
-| logingestion    | enrichment | 7002          | null           |
-| logingestion    | receiver   | 7002          | null           |
-| mind            | recon      | 8002          | null           |
-| mind            | overwatch  | 8002          | null           |
-| parser          | cardset    | 7002          | null           |
-| parser          | extractor  | 7002          | null           |
+| detectionengine | detector   | None          | None           |
+| herringbone     | apps       | 7002          | 7002           |
+| herringbone     | logs       | 7002          | 7002           |
+| logingestion    | enrichment | None          | None           |
+| logingestion    | receiver   | 7002          | 7002           |
+| mind            | recon      | 8002          | 8002           |
+| mind            | overwatch  | 8002          | 8002           |
+| parser          | cardset    | 7002          | 7002           |
+| parser          | extractor  | 7002          | 7002           |
