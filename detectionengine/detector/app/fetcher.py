@@ -26,8 +26,8 @@ def fetch_one_undetected(wait_recon: bool = False) -> dict | None:
     try:
         query = {
             "$or": [
-                {"detected": {"$exists": False}},
-                {"detected": False},
+                {"detection_results.detected": {"$exists": False}},
+                {"detection_results.detected": False},
             ]
         }
 

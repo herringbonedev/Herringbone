@@ -35,7 +35,7 @@ def get_detections_db() -> HerringboneMongoDatabase | None:
 
 def set_failed(log_id, reason: str = ""):
     """Mark a log as failed detection."""
-    update = {"detected": True,"detection_results": {"status": "Detection failed."}}
+    update = {"detection_results": {"detected": True, "status": "Detection failed."}}
     if reason:
         update["detection_results"]["detection_reason"] = reason
 
@@ -47,8 +47,8 @@ def set_failed(log_id, reason: str = ""):
 def apply_result(log_id, analysis: dict):
     """Apply detection result and optionally store record."""
     update = {
-        "detected": True,
         "detection_results": {
+            "detected": True,
             "updated_at": datetime.utcnow(),
             "analysis": analysis
         }
