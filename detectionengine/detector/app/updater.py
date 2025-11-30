@@ -50,18 +50,9 @@ def apply_result(log_id, analysis: dict):
         "detected": True,
         "detection_results": {
             "updated_at": datetime.utcnow(),
+            "analysis": analysis
         }
     }
-
-    if isinstance(analysis, dict):
-        if "detection" in analysis:
-            update["detection_results"]["detection"] = bool(analysis["detection"])
-        if "detection_reason" in analysis:
-            update["detection_results"]["detection_reason"] = str(analysis["detection_reason"])
-        if "status" in analysis:
-            update["detection_results"]["status"] = analysis["status"]
-        else:
-            update["detection_results"].setdefault("status", "Detection finished.")
 
     logs_db = get_logs_db()
     print(f"[*] Updating logs collection with {str(update)}")
