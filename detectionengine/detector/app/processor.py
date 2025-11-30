@@ -2,7 +2,7 @@ from datetime import datetime
 from fetcher import fetch_one_undetected
 from rules import load_rules
 from analyzer import analyze_log_with_rules
-from updater import set_pending, apply_result, set_failed
+from updater import apply_result, set_failed
 
 
 def process_one():
@@ -23,12 +23,12 @@ def process_one():
             continue
         to_send[key] = value
 
-    set_pending(log_id)
-
     try:
         analysis = analyze_log_with_rules(to_send, rules)
+        print(f"[✓] Analysis results: {str(analysis)}")
         apply_result(log_id, analysis)
         return {"status": True, "log_id": str(log_id), "analysis": analysis}
     except Exception as e:
+        print(f"[✗] Analysis failed {str(e)}")
         set_failed(log_id, str(e))
         return {"status": False, "log_id": str(log_id), "error": str(e)}

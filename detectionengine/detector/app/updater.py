@@ -33,19 +33,14 @@ def get_detections_db() -> HerringboneMongoDatabase | None:
     )
 
 
-def set_pending(log_id):
-    """Mark a log as pending detection."""
-    db = get_logs_db()
-    db.update_log({"_id": log_id}, {"status": "Detection in process."}, clean_codec=False)
-
-
 def set_failed(log_id, reason: str = ""):
     """Mark a log as failed detection."""
-    update = {"status": "Detection failed."}
+    update = {"detected": True,"detection_results": {"status": "Detection failed."}}
     if reason:
-        update["detection_reason"] = reason
+        update["detection_results"]["detection_reason"] = reason
 
     db = get_logs_db()
+    print(f"[*] Updating logs collection with {str(update)}")
     db.update_log({"_id": log_id}, update, clean_codec=False)
 
 
@@ -53,20 +48,23 @@ def apply_result(log_id, analysis: dict):
     """Apply detection result and optionally store record."""
     update = {
         "detected": True,
-        "updated_at": datetime.utcnow(),
+        "detection_results": {
+            "updated_at": datetime.utcnow(),
+        }
     }
 
     if isinstance(analysis, dict):
         if "detection" in analysis:
-            update["detection"] = bool(analysis["detection"])
+            update["detection_results"]["detection"] = bool(analysis["detection"])
         if "detection_reason" in analysis:
-            update["detection_reason"] = str(analysis["detection_reason"])
+            update["detection_results"]["detection_reason"] = str(analysis["detection_reason"])
         if "status" in analysis:
-            update["status"] = analysis["status"]
+            update["detection_results"]["status"] = analysis["status"]
         else:
-            update.setdefault("status", "Detection finished.")
+            update["detection_results"].setdefault("status", "Detection finished.")
 
     logs_db = get_logs_db()
+    print(f"[*] Updating logs collection with {str(update)}")
     logs_db.update_log({"_id": log_id}, update, clean_codec=False)
 
     det_db = get_detections_db()

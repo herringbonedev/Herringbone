@@ -7,7 +7,7 @@ down:
 	docker compose -f docker/docker-compose.yml down -v
 
 rebuild:
-	docker compose -f docker/docker-compose.yml build --no-cache --progress=plain
+	docker compose -f docker/docker-compose.yml build --no-cache
 
 logs:
 	docker compose -f docker/docker-compose.yml logs -f detectionengine-detector
