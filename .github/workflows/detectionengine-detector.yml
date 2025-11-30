@@ -46,9 +46,6 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # -----------------------------------------------
-      # FIXED: Correct build context for detector
-      # -----------------------------------------------
       - name: Build Docker image
         env:
           SHORT_SHA: ${{ github.sha }}
@@ -58,6 +55,7 @@ jobs:
 
           docker build \
             -t quay.io/herringbone/detectionengine-detector:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} \
+            -f detectionengine/detector/docker/Dockerfile \
             detectionengine/detector
 
       - name: Smoke test container
