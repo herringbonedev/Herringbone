@@ -30,12 +30,12 @@ spec:
           livenessProbe:
             httpGet:
               path: /detectionengine/matcher/livez
-              port: 7002
+              port: 7003
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /detectionengine/matcher/readyz
-              port: 7002
+              port: 7003
             initialDelaySeconds: 10
             periodSeconds: 10
