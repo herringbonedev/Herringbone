@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: herringbone
 resources:
   - deployment.yaml
+  - service.yaml
 images:
   - name: quay.io/herringbone/detectionengine-matcher
     newTag: 
