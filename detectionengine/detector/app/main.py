@@ -11,14 +11,13 @@ def main():
     while True:
         try:
             processed = process_one()
-            print(processed)
 
             if not processed.get("status"):
-                time.sleep(5)
+                time.sleep(0.05)
 
         except Exception as e:
-            print(e)
-            time.sleep(10)
+            print(f"[✗] Detector failed {str(e)}")
+            time.sleep(0.05)
 
 if __name__ == "__main__":
     main()
