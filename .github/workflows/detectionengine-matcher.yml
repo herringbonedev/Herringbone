@@ -1,4 +1,4 @@
-name: (Detector) Build
+name: (Matcher) Build
 
 on:
   workflow_dispatch:
@@ -6,8 +6,8 @@ on:
     branches:
       - main
     paths:
-      - 'detectionengine/detector/**'
-      - '.github/workflows/detectionengine-detector.yml'
+      - 'detectionengine/matcher/**'
+      - '.github/workflows/detectionengine-matcher.yml'
 
 permissions:
   contents: write
@@ -15,7 +15,7 @@ permissions:
   checks: write
 
 concurrency:
-  group: detector-build-${{ github.ref }}
+  group: matcher-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -46,9 +47,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # -----------------------------------------------
-      # FIXED: Correct build context for detector
-      # -----------------------------------------------
+      - name: Prepare build context (copy shared modules)
+        run: |
+          set -euo pipefail
+          rm -rf detectionengine/matcher/app/modules
+          mkdir -p detectionengine/matcher/app/modules
+          cp -R modules detectionengine/matcher/app/modules
+
       - name: Build Docker image
         env:
           SHORT_SHA: ${{ github.sha }}
@@ -57,8 +62,9 @@ jobs:
           SHORT_SHA=${SHORT_SHA::8}
 
           docker build \
-            -t quay.io/herringbone/detectionengine-detector:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} \
-            detectionengine/detector
+            -t quay.io/herringbone/detectionengine-matcher:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} \
+            -f detectionengine/matcher/docker/Dockerfile \
+            detectionengine/matcher
 
       - name: Smoke test container
         env:
@@ -67,13 +73,15 @@ jobs:
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
 
-          docker run -d --name test_detectionengine_detector \
+          docker run -d --name test_detectionengine_matcher \
+            -p 7003:7003 \
             -e OVERWATCH_HOST="test.svc" \
-            quay.io/herringbone/detectionengine-detector:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
+            quay.io/herringbone/detectionengine-matcher:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
 
-          sleep 1
-          docker logs test_detectionengine_detector || true
-          test "$(docker inspect test_detectionengine_detector --format='{{.State.Running}}')" = "true"
+          sleep 2
+          docker logs test_detectionengine_matcher || true
+
+          test "$(docker inspect test_detectionengine_matcher --format='{{.State.Running}}')" = "true"
 
       - name: Push image
         env:
@@ -81,8 +89,7 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
-
-          docker push quay.io/herringbone/detectionengine-detector:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
+          docker push quay.io/herringbone/detectionengine-matcher:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
 
       - name: Get image digest
         id: digest
@@ -91,19 +98,16 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
-
-          DIGEST=$(skopeo inspect docker://quay.io/herringbone/detectionengine-detector:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} | jq -r '.Digest')
+          DIGEST=$(skopeo inspect docker://quay.io/herringbone/detectionengine-matcher:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} | jq -r '.Digest')
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Update kustomization.yaml with new tag & digest
         run: |
           set -euo pipefail
           SHORT_SHA=${GITHUB_SHA::8}
-
           TAG="latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
-
-          yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/detectionengine_detector/kustomization.yaml
-          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/detectionengine_detector/kustomization.yaml
+          yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/detectionengine_matcher/kustomization.yaml
+          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/detectionengine_matcher/kustomization.yaml
 
       - name: Detect changes
         id: bump
@@ -121,13 +125,12 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(detector): bump image to ${{ steps.digest.outputs.digest }}"
-          title: "chore(detector): bump detector image"
+          commit-message: "chore(matcher): bump image to ${{ steps.digest.outputs.digest }}"
+          title: "chore(matcher): bump matcher image"
           body: |
-            Automated update to kustomization for detector image.
-            - Tag & digest updated by CI
-            - This PR respects branch protection.
-          branch: auto/update/detector-digest
+            Automated update to kustomization for matcher image.
+            Tag & digest updated by CI.
+          branch: auto/update/matcher-digest
           delete-branch: true
           signoff: true
           labels: |
@@ -147,4 +150,4 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f test_detectionengine_detector || true
+          docker rm -f test_detectionengine_matcher || true

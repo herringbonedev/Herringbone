@@ -30,14 +30,12 @@ spec:
           env:
             - name: WAIT_FOR_RECON_TO_FINISH
               value: "true"
-            - name: OVERWATCH_HOST
-              value: http://herringbone-mind-overwatch-service.herringbone.svc.cluster.local:8002/overwatch
+            - name: MATCHER_API
+              value: http://herringbone-matcher-service.herringbone.svc.cluster.local:7003/detectionengine/matcher/find_match
             - name: RULES_COLLECTION_NAME
               value: rules
             - name: LOGS_COLLECTION_NAME
               value: logs
-            - name: DETECTIONS_COLLECTION_NAME
-              value: detections
             - name: MONGO_HOST
               value: mongodb-headless.mongodb.svc.cluster.local
             - name: MONGO_PORT

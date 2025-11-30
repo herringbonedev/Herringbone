@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: detectionengine-matcher
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: detectionengine-matcher
+  template:
+    metadata:
+      labels:
+        app: detectionengine-matcher
+    spec:
+      containers:
+        - name: detectionengine-matcher
+          image: quay.io/herringbone/detectionengine-matcher
+          ports:
+            - containerPort: 7003
+              name: tcp-port
+              protocol: TCP
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "150m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /detectionengine/matcher/livez
+              port: 7002
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /detectionengine/matcher/readyz
+              port: 7002
+            initialDelaySeconds: 10
+            periodSeconds: 10
