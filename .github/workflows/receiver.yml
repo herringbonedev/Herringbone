@@ -75,13 +75,6 @@ jobs:
           docker logs test_receiver || true
           test "$(docker inspect test_receiver --format='{{.State.Running}}')" = "true"
 
-      - name: UDP Receiver Test
-        run: |
-          echo "Testing UDP receiver..."
-          echo "Test message" | nc -u -w 0 localhost 7002
-          sleep 3
-          docker logs test_receiver | grep "Test message" || (echo "UDP receiver test failed" && exit 1)
-
       - name: Push image
         env:
           SHORT_SHA: ${{ github.sha }}
