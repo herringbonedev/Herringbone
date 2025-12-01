@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: herringbone-receiver-http
+  name: herringbone-receiver-remote
   namespace: herringbone
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: herringbone-receiver-http
+      app: herringbone-receiver-remote
   template:
     metadata:
       labels:
-        app: herringbone-receiver-http
+        app: herringbone-receiver-remote
     spec:
       containers:
         - name: receiver
           image: quay.io/herringbone/receiver
           ports:
-            - containerPort: 7002
+            - containerPort: 7004
               name: tcp-port
               protocol: TCP
           env:
