@@ -2,10 +2,9 @@ name: (Receiver) Build
 
 on:
   workflow_dispatch:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
     branches:
-      - main   # PRs targeting main
+      - main
     paths:
       - 'logingestion/receiver/**'
       - '.github/workflows/receiver.yml'
@@ -15,16 +14,19 @@ permissions:
   pull-requests: write
   checks: write
 
+concurrency:
+  group: receiver-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test-push:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout PR branch
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref }}
 
       - name: Install tools (yq, skopeo, jq)
         run: |
@@ -44,45 +46,49 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Prepare build context (copy shared modules)
-        run: |
-          set -euo pipefail
-          rm -rf logingestion/receiver/modules
-          mkdir -p logingestion/receiver
-          cp -R modules logingestion/receiver/modules
-
       - name: Build Docker image
         env:
           SHORT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
-          docker build -t quay.io/herringbone/receiver:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} ./logingestion/receiver
 
-      - name: Run container for smoke test
+          docker build \
+            -t quay.io/herringbone/receiver:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} \
+            -f logingestion/receiver/docker/Dockerfile \
+            logingestion/receiver
+
+      - name: Smoke test container
         env:
           SHORT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
-          docker run -d -p 7002:7002/udp --name test_receiver -e RECEIVER_TYPE=UDP quay.io/herringbone/receiver:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
-          sleep 5
+
+          docker run -d \
+            -p 7002:7002/udp \
+            --name test_receiver \
+            -e RECEIVER_TYPE=UDP \
+            quay.io/herringbone/receiver:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
+
+          sleep 3
           docker logs test_receiver || true
-          docker inspect test_receiver --format='{{.State.Running}}' | grep true
+          test "$(docker inspect test_receiver --format='{{.State.Running}}')" = "true"
 
       - name: UDP Receiver Test
         run: |
           echo "Testing UDP receiver..."
           echo "Test message" | nc -u -w 0 localhost 7002
-          sleep 5
+          sleep 3
           docker logs test_receiver | grep "Test message" || (echo "UDP receiver test failed" && exit 1)
 
-      - name: Push image (only if tests pass)
+      - name: Push image
         env:
           SHORT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
+
           docker push quay.io/herringbone/receiver:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
 
       - name: Get image digest
@@ -92,33 +98,58 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA=${SHORT_SHA::8}
+
           DIGEST=$(skopeo inspect docker://quay.io/herringbone/receiver:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} | jq -r '.Digest')
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
-      - name: Update kustomization.yaml with new image tag & digest
+      - name: Update kustomization.yaml with new tag & digest
         run: |
           set -euo pipefail
           SHORT_SHA=${GITHUB_SHA::8}
-          TAG="latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
-          yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/receiver_udp/kustomization.yaml
-          yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/receiver_http/kustomization.yaml
-          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_udp/kustomization.yaml
-          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_http/kustomization.yaml
 
-      - name: Commit and push kustomize updates to PR branch
+          TAG="latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+
+          yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/receiver_remote/kustomization.yaml
+          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/receiver_remote/kustomization.yaml
+
+      - name: Detect changes
+        id: bump
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -B "${GITHUB_HEAD_REF}"   # ensure local branch matches PR branch
-          git add kustomize/receiver_udp/kustomization.yaml kustomize/receiver_http/kustomization.yaml
-          if ! git diff --cached --quiet; then
-            git commit -m "ci: bump receiver image to ${{ steps.digest.outputs.digest }}"
-            git push origin "${GITHUB_HEAD_REF}"
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "No changes to commit"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Create PR (only if changes exist)
+        if: steps.bump.outputs.changed == 'true'
+        id: cpr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(receiver): bump image to ${{ steps.digest.outputs.digest }}"
+          title: "chore(receiver): bump receiver image"
+          body: |
+            Automated update to kustomization for receiver image.
+            - Tag & digest updated by CI
+            - This PR respects branch protection.
+          branch: auto/update/receiver-digest
+          delete-branch: true
+          signoff: true
+          labels: |
+            automation
+            digest
 
+      - name: Log PR result
+        if: steps.bump.outputs.changed == 'true'
+        run: |
+          echo "operation=${{ steps.cpr.outputs.pull-request-operation }}"
+          echo "pr=${{ steps.cpr.outputs.pull-request-number || 'none' }}"
+
+      - name: No changes
+        if: steps.bump.outputs.changed != 'true'
+        run: echo "No changes; skipping PR."
 
       - name: Cleanup
         if: always()
