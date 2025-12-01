@@ -135,7 +135,7 @@ class HerringboneMongoDatabase:
         host: str,
         port: int = 27017,
         auth_source: str = "herringbone",
-        replica_set: str | None = "rs0",
+        replica_set: str | None = None,
     ):
         """
         Build a safe MongoDB URI:

@@ -2,7 +2,9 @@ from datetime import datetime
 import socket
 import os
 from modules.database.mongo_db import HerringboneMongoDatabase
+from forwarder import forward_data
 
+forward_route = os.environ.get("FORWARD_ROUTE", None)
 
 def get_mongo():
     """
@@ -16,7 +18,8 @@ def get_mongo():
             database=os.environ.get("DB_NAME", "herringbone"),
             collection=os.environ.get("COLLECTION_NAME", "logs"),
             host=os.environ.get("MONGO_HOST", "localhost"),
-            port=int(os.environ.get("MONGO_PORT", 27017))
+            port=int(os.environ.get("MONGO_PORT", 27017)),
+            replica_set=(os.environ.get("MONGO_REPLICA_SET", None))
         )
         print("[✓] Connected to MongoDB")
         return mongo
@@ -36,8 +39,8 @@ def start_udp_receiver():
 
     print("Receiver type set to UDP...")
     udp_receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    udp_receiver.bind(("0.0.0.0", 7002))
-    print("UDP receiver started on port 7002")
+    udp_receiver.bind(("0.0.0.0", 7004))
+    print("UDP receiver started on port 7004")
 
     while True:
         data, addr = udp_receiver.recvfrom(1024)
@@ -57,6 +60,29 @@ def start_udp_receiver():
         except Exception as e:
             print(f"[✗] Mongo insert operation failed: {e}")
 
+        if forward_route == None:
+            try:
+                mongo.insert_log(
+                {"source_address": addr[0], 
+                "raw_log": data, 
+                "recon": False, 
+                "detected": False,
+                "status": None,
+                "last_update": datetime.utcnow()},
+                clean_codec=True  # Legacy behavior
+                )
+                return ("Data received", 200)
+            except Exception as e:
+                print(f"[✗] Mongo insert operation failed: {e}")
+                return (f"Insert failed: {e}", 500)
+        
+        else:
+            result = forward_data(forward_route, data, addr[0])
+            if result:
+                return (f"Forward succeed", 200)
+            else:
+                return (f"Forward failed", 500)
+
 
 def start_tcp_receiver():
     """
@@ -69,26 +95,32 @@ def start_tcp_receiver():
 
     print("Receiver type set to TCP...")
     tcp_receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    tcp_receiver.bind(("0.0.0.0", 7002))
+    tcp_receiver.bind(("0.0.0.0", 7004))
     tcp_receiver.listen(5)  # TCP needs to listen before accept
-    print("TCP receiver started on port 7002")
+    print("TCP receiver started on port 7004")
 
     while True:
         conn, addr = tcp_receiver.accept()
         data = conn.recv(1024).decode("utf-8")
         print(f"[Source Address: {addr}] {data}")
 
-        try:
-            mongo.insert_log(
-                {"source_address": addr[0], 
-                "raw_log": data, 
-                "recon": False, 
-                "detected": False,
-                "status": None,
-                "last_update": datetime.utcnow()},
-                clean_codec=True
-            )
-        except Exception as e:
-            print(f"[✗] Mongo insert operation failed: {e}")
-        finally:
-            conn.close()
+        if forward_route == None:
+            try:
+                mongo.insert_log(
+                    {"source_address": addr[0], 
+                    "raw_log": data, 
+                    "recon": False, 
+                    "detected": False,
+                    "status": None,
+                    "last_update": datetime.utcnow()},
+                    clean_codec=True
+                )
+            except Exception as e:
+                print(f"[✗] Mongo insert operation failed: {e}")
+        else:
+            result = forward_data(forward_route, data, addr[0])
+            if result:
+                return (f"Forward succeed", 200)
+            else:
+                return (f"Forward failed", 500)
+        conn.close()
