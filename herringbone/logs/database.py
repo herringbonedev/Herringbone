@@ -42,14 +42,8 @@ class MongoDatabaseHandler:
         recon == True AND detection_results.detected == True
         """
         try:
-            query = {
-                "recon": True,
-                "detection_results.detected": True
-            }
-
             documents = (
                 self.collection
-                    .find(query)
                     .sort("_id", -1)
                     .limit(n)
             )
