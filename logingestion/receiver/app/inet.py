@@ -32,10 +32,6 @@ def start_udp_receiver():
     """
     Start a UDP socket listener and write received logs to MongoDB.
     """
-    mongo = get_mongo()
-    if not mongo:
-        print("UDP receiver exiting due to database init failure.")
-        return
 
     print("Receiver type set to UDP...")
     udp_receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -47,20 +43,11 @@ def start_udp_receiver():
         data = data.decode("utf-8")
         print(f"[Source Address: {addr}] {data}")
 
-        try:
-            mongo.insert_log(
-                {"source_address": addr[0], 
-                "raw_log": data, 
-                "recon": False, 
-                "detected": False,
-                "status": None,
-                "last_update": datetime.utcnow()},
-                clean_codec=True
-            )
-        except Exception as e:
-            print(f"[✗] Mongo insert operation failed: {e}")
-
         if forward_route == None:
+            mongo = get_mongo()
+            if not mongo:
+                print("UDP receiver exiting due to database init failure.")
+                return
             try:
                 mongo.insert_log(
                 {"source_address": addr[0], 
@@ -88,10 +75,6 @@ def start_tcp_receiver():
     """
     Start a TCP socket listener and write received logs to MongoDB.
     """
-    mongo = get_mongo()
-    if not mongo:
-        print("TCP receiver exiting due to database init failure.")
-        return
 
     print("Receiver type set to TCP...")
     tcp_receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -105,6 +88,10 @@ def start_tcp_receiver():
         print(f"[Source Address: {addr}] {data}")
 
         if forward_route == None:
+            mongo = get_mongo()
+            if not mongo:
+                print("UDP receiver exiting due to database init failure.")
+                return
             try:
                 mongo.insert_log(
                     {"source_address": addr[0], 
