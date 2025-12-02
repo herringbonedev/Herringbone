@@ -37,19 +37,10 @@ class MongoDatabaseHandler:
             raise Exception(f"Failed to connect to MongoDB: {e}")
     
     def get_latest_documents(self, n):
-        """
-        Retrieve n most recent documents where:
-        recon == True AND detection_results.detected == True
-        """
+        """Retrieve n most recent documents sorted by _id descending"""
         try:
-            documents = (
-                self.collection
-                    .sort("_id", -1)
-                    .limit(n)
-            )
-
+            documents = self.collection.find().sort("_id", -1).limit(n)
             return list(documents)
-
         except Exception as e:
             raise Exception(f"Failed to retrieve latest documents: {e}")
     
