@@ -7,15 +7,15 @@ if TYPE == "UDP":
     import inet
     inet.start_udp_receiver()
 
-if TYPE == "TCP":
+elif TYPE == "TCP":
     import inet
     inet.start_tcp_receiver()
 
-if TYPE == "HTTP":
+elif TYPE == "HTTP":
     import web
     web.start_http_receiver()
 
-if TYPE == "REMOTE":
+elif TYPE == "REMOTE":
     import remote
     remote.start_remote_receiver()
 
