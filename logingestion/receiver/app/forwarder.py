@@ -11,7 +11,7 @@ def forward_data(route, data, source_addr):
     }
 
     try:
-        response = requests.get(route, json=payload)
+        response = requests.post(route, json=payload)
         print(f"[*] Forwarded log to {route}")
         print(f"[*] Response: {str(response.content)}")
         return True
