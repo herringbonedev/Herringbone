@@ -66,9 +66,9 @@ def start_udp_receiver():
         else:
             result = forward_data(forward_route, data, addr[0])
             if result:
-                return (f"Forward succeed", 200)
+                print("[✓] Forward succeed 200")
             else:
-                return (f"Forward failed", 500)
+                print("[✗] Forward failed 500")
 
 
 def start_tcp_receiver():

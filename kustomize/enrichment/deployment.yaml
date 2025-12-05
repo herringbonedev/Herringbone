@@ -4,7 +4,7 @@ metadata:
   name: herringbone-enrichment
   namespace: herringbone
 spec:
-  replicas: 10
+  replicas: 1
   selector:
     matchLabels:
       app: herringbone-enrichment
