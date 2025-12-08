@@ -84,6 +84,8 @@ Example:
 │   │   └── requirements.txt
 ```
 
+A README must be included at the **Unit** and **Element** root directories.
+
 ### Milestones, Issues, and Projects
 
 Herringbone uses **Milestones** as Epics to deliver new features.
