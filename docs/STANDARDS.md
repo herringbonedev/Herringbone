@@ -125,3 +125,8 @@ Example:
 **Unit**: Parser
 **Element**: CardSet
 **Route**: update_card
+
+### Networking standards
+
+Each **Element** that accepts network connections of any protocol must register what port in which it serves
+in the [PORTMAP](PORTMAP.md).
