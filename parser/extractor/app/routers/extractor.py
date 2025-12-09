@@ -1,13 +1,14 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional, Union
 from parser import CardParser
 import json
 
-app = FastAPI(title="Extractor Service (FastAPI)")
-
-# ---------- Pydantic models ----------
+router = APIRouter(
+    prefix="/parser/extractor",
+    tags=["extractor"],
+)
 
 class Selector(BaseModel):
     type: str
@@ -15,19 +16,20 @@ class Selector(BaseModel):
 
 class Card(BaseModel):
     selector: Selector
-    regex: Optional[List[Dict[str, str]]] = Field(default=None, description="List of {name: pattern}")
-    jsonp: Optional[List[Dict[str, str]]] = Field(default=None, description="List of {name: jsonpath}")
+    regex: Optional[List[Dict[str, str]]] = Field(default=None)
+    jsonp: Optional[List[Dict[str, str]]] = Field(default=None)
 
 class ExtractRequest(BaseModel):
-    card: Card = Field(..., description="Full card JSON")
-    input: Union[str, Dict[str, Any]] = Field(..., description="Raw log string or JSON object")
+    card: Card
+    input: Union[str, Dict[str, Any]]
 
 class ExtractResponse(BaseModel):
     selector: Dict[str, str]
     results: Dict[str, Any]
 
-@app.post(
-    "/parser/extractor/parse",
+
+@router.post(
+    "/parse",
     response_model=ExtractResponse,
     summary="Run regex and/or JSONPath extraction over input",
     description="Receives a full card and an input (string or JSON) and returns {selector, results}."
@@ -39,12 +41,10 @@ async def parse(payload: ExtractRequest):
     results: Dict[str, Any] = {}
     print(f"[→] Using card: {str(card)} to parse {str(input_data)}")
 
-    # Regex
     if card.get("regex"):
         regex_parser = CardParser("regex")
         results.update(regex_parser(card["regex"], str(input_data)))
 
-    # JSONPath
     if card.get("jsonp"):
         jsonp_parser = CardParser("jsonp")
         try:
@@ -56,20 +56,21 @@ async def parse(payload: ExtractRequest):
     return JSONResponse(content={"results": results}, status_code=200)
 
 
-#
-# Herringbone requires Liveness and Readiness probes for all services.
-#
-# The routes below contain the logic for livez and readyz
-#
-
-
-@app.get("/parser/cardset/readyz")
-def readyz():
-    if getattr(app.state, "mongo", None) is None:
+@router.get("/readyz")
+async def readyz():
+    try:
+        mongo = get_mongo_handler()
+        mongo.open_mongo_connection()
+        return {"ok": True}
+    except Exception:
         return JSONResponse({"ok": False, "error": "mongo not ready"}, status_code=503)
-    return {"ok": True}
+    finally:
+        try:
+            mongo.close_mongo_connection()
+        except Exception:
+            pass
 
 
-@app.get("/parser/cardset/livez")
-def livez():
+@router.get("/livez")
+async def livez():
     return {"ok": True}

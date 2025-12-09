@@ -1,3 +1,4 @@
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from datetime import datetime
 import os
 import json
@@ -9,28 +10,30 @@ from pydantic import BaseModel, Field
 from schema import CardSchema
 from modules.database.mongo_db import HerringboneMongoDatabase
 
-app = FastAPI(title="CardSet Service (FastAPI)")
+router = APIRouter(
+    prefix="/parser/cardset",
+    tags=["cardset"],
+)
+
 validator = CardSchema()
 
-# ---------- Pydantic models ----------
-
 class SelectorModel(BaseModel):
-    type: str = Field(..., example="domain")
-    value: str = Field(..., example="google.com")
+    type: str
+    value: str
 
 class CardModel(BaseModel):
     selector: SelectorModel
-    regex: Optional[List[Dict[str, str]]] = Field(None, example=[{"domain": "(?:[a-z0-9-]+\\.)*google\\.com"}])
-    jsonp: Optional[List[Dict[str, str]]] = Field(None, example=[{"ip": "$.network.source.ip"}])
+    regex: Optional[List[Dict[str, str]]] = None
+    jsonp: Optional[List[Dict[str, str]]] = None
 
 class InsertCardResponse(BaseModel):
     ok: bool
     message: str
 
 class PullCardsRequest(BaseModel):
-    selector_type: str = Field(..., example="domain", description="Key you previously used as the single body key, e.g. 'domain'")
-    selector_value: str = Field(..., example="google.com", description="Value associated with that key")
-    limit: Optional[int] = Field(None, ge=1, example=100)
+    selector_type: str
+    selector_value: str
+    limit: Optional[int] = None
 
 class PullCardsResponse(BaseModel):
     ok: bool
@@ -38,8 +41,8 @@ class PullCardsResponse(BaseModel):
     cards: List[Dict[str, Any]]
 
 class DeleteCardsRequest(BaseModel):
-    selector_type: str = Field(..., example="domain")
-    selector_value: str = Field(..., example="google.com")
+    selector_type: str
+    selector_value: str
 
 class DeleteCardsResponse(BaseModel):
     ok: bool
@@ -63,46 +66,26 @@ def get_mongo_handler() -> HerringboneMongoDatabase:
     )
 
 
-@app.on_event("startup")
-def on_startup():
-    try:
-        mongo = get_mongo_handler()
-        mongo.open_mongo_connection()
-        app.state.mongo = mongo
-        print("[✓] Mongo handler initialized (FastAPI)")
-    except Exception as e:
-        print(f"[✗] Mongo connection init failed: {e}")
-        app.state.mongo = None
-
-
-@app.on_event("shutdown")
-def on_shutdown():
-    mongo = getattr(app.state, "mongo", None)
-    if mongo and getattr(mongo, "client_connection", None):
-        try:
-            mongo.close_mongo_connection()
-        except Exception:
-            pass
-
-
-@app.post("/parser/cardset/insert_card", response_model=InsertCardResponse)
+@router.post("/insert_card", response_model=InsertCardResponse)
 async def insert_card(card: CardModel):
     print("Attempting to insert a new card...")
 
-    if getattr(app.state, "mongo", None) is None:
+    try:
+        mongo = get_mongo_handler()
+        mongo.open_mongo_connection()
+    except Exception:
         raise HTTPException(status_code=503, detail="Database not initialized")
     
     payload = card.model_dump()
     print(f"New card payload: {payload}")
-
     print("Validating payload...")
     result = validator(payload)
     print(result)
+
     if not result.get("valid"):
         raise HTTPException(status_code=400, detail=f"Schema validation failed: {result.get('error')}")
 
-    # Check if selector already exists
-    existing_card = app.state.mongo.find_one({"selector": payload.get("selector")})
+    existing_card = mongo.find_one({"selector": payload.get("selector")})
     if existing_card:
         print(f"Card with selector {payload.get('selector')} already exists. Skipping insert.")
         return {"ok": False, "message": "Card with this selector already exists."}
@@ -111,16 +94,24 @@ async def insert_card(card: CardModel):
 
     try:
         print("Inserting into MongoDB...")
-        app.state.mongo.insert_log(payload)
+        mongo.insert_log(payload)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Insert failed: {e}")
+    finally:
+        try:
+            mongo.close_mongo_connection()
+        except Exception:
+            pass
 
     return {"ok": True, "message": "Valid card. Inserted into database."}
 
 
-@app.post("/parser/cardset/pull_cards", response_model=PullCardsResponse)
+@router.post("/pull_cards", response_model=PullCardsResponse)
 async def pull_cards(body: PullCardsRequest):
-    if getattr(app.state, "mongo", None) is None:
+    try:
+        mongo = get_mongo_handler()
+        mongo.open_mongo_connection()
+    except Exception:
         raise HTTPException(status_code=503, detail="Database not initialized")
     
     sel_type = body.selector_type
@@ -131,22 +122,30 @@ async def pull_cards(body: PullCardsRequest):
         raise HTTPException(status_code=400, detail="Type and value must be strings")
 
     try:
-        docs = app.state.mongo.find_cards_by_selector(sel_type, sel_value, limit=int(limit or 0) or None)
+        docs = mongo.find_cards_by_selector(sel_type, sel_value, limit=int(limit or 0) or None)
         return JSONResponse(
             content={"ok": True, "count": len(docs), "cards": json.loads(json_util.dumps(docs))},
             status_code=200
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
+    finally:
+        try:
+            mongo.close_mongo_connection()
+        except Exception:
+            pass
     
 
-@app.get("/parser/cardset/pull_all_cards")
+@router.get("/pull_all_cards")
 async def pull_all_cards():
-    if getattr(app.state, "mongo", None) is None:
+    try:
+        mongo = get_mongo_handler()
+        mongo.open_mongo_connection()
+    except Exception:
         raise HTTPException(status_code=503, detail="Database not initialized")
 
     try:
-        docs = app.state.mongo.find_all_cards()
+        docs = mongo.find_all_cards()
         return JSONResponse(
             content={
                 "ok": True,
@@ -157,12 +156,19 @@ async def pull_all_cards():
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
+    finally:
+        try:
+            mongo.close_mongo_connection()
+        except Exception:
+            pass
 
 
-
-@app.post("/parser/cardset/delete_cards", response_model=DeleteCardsResponse)
+@router.post("/delete_cards", response_model=DeleteCardsResponse)
 async def delete_cards(body: DeleteCardsRequest):
-    if getattr(app.state, "mongo", None) is None:
+    try:
+        mongo = get_mongo_handler()
+        mongo.open_mongo_connection()
+    except Exception:
         raise HTTPException(status_code=503, detail="Database not initialized")
 
     sel_type = body.selector_type
@@ -172,24 +178,34 @@ async def delete_cards(body: DeleteCardsRequest):
         raise HTTPException(status_code=400, detail="Type and value must be strings")
 
     try:
-        res = app.state.mongo.delete_cards_by_selector(sel_type, sel_value)
+        res = mongo.delete_cards_by_selector(sel_type, sel_value)
         return {"ok": True, "deleted": res.get("deleted", 0)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
+    finally:
+        try:
+            mongo.close_mongo_connection()
+        except Exception:
+            pass
 
 
-@app.post("/parser/cardset/update_card", response_model=UpdateCardResponse)
+@router.post("/update_card", response_model=UpdateCardResponse)
 async def update_card(new_card: CardModel):
-    if getattr(app.state, "mongo", None) is None:
+    try:
+        mongo = get_mongo_handler()
+        mongo.open_mongo_connection()
+    except Exception:
         raise HTTPException(status_code=503, detail="Database not initialized")
     
     payload = new_card.model_dump()
     result = validator(payload)
+
     if not result.get("valid"):
         raise HTTPException(status_code=400, detail=f"Schema validation failed: {result.get('error')}")
 
     sel = payload.get("selector") or {}
     sel_type, sel_value = sel.get("type"), sel.get("value")
+
     if not isinstance(sel_type, str) or not isinstance(sel_value, str):
         raise HTTPException(status_code=400, detail="selector.type and selector.value must be strings")
 
@@ -199,7 +215,7 @@ async def update_card(new_card: CardModel):
     payload.pop("deleted_at", None)
 
     try:
-        res = app.state.mongo.update_log(filter_query, payload, clean_codec=False)
+        res = mongo.update_log(filter_query, payload, clean_codec=False)
         return JSONResponse(
             content={
                 "ok": True,
@@ -211,22 +227,28 @@ async def update_card(new_card: CardModel):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Update failed: {e}")
+    finally:
+        try:
+            mongo.close_mongo_connection()
+        except Exception:
+            pass
 
 
-#
-# Herringbone requires Liveness and Readiness probes for all services.
-#
-# The routes below contain the logic for livez and readyz
-#
-
-
-@app.get("/parser/cardset/readyz")
-def readyz():
-    if getattr(app.state, "mongo", None) is None:
+@router.get("/readyz")
+async def readyz():
+    try:
+        mongo = get_mongo_handler()
+        mongo.open_mongo_connection()
+        return {"ok": True}
+    except Exception:
         return JSONResponse({"ok": False, "error": "mongo not ready"}, status_code=503)
-    return {"ok": True}
+    finally:
+        try:
+            mongo.close_mongo_connection()
+        except Exception:
+            pass
 
 
-@app.get("/parser/cardset/livez")
-def livez():
+@router.get("/livez")
+async def livez():
     return {"ok": True}

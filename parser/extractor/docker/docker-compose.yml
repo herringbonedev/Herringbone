@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  parser-extractor:
+    container_name: parser-extractor
+
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+
+    restart: unless-stopped
+
+    ports:
+      - "7006:7006"
+
+    env_file:
+      - .env
