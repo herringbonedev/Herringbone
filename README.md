@@ -40,7 +40,7 @@ These principles allow you to host Herringbone components wherever you choose. W
 
 ## Contributing  
 
-Contributions are welcome. Please review the **CONTRIBUTING.md** before submitting issues or pull requests. Code reviews are required before merging into the main branch to maintain quality and consistency.  
+Contributions are welcome. Please review the [Contributing document](./CONTRIBUTING.md) before submitting issues or pull requests. Code reviews are required before merging into the main branch to maintain quality and consistency.  
 
 ## License  
 
