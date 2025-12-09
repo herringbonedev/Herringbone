@@ -2,7 +2,7 @@
 
 **Herringbone** is a modular framework for building your own SIEM or log management solution. Inspired by the defensive herringbone formation, it is designed around independence, flexibility, and interoperability.  
 
-## To learn how to use Herringbone
+## Learn how to use Herringbone
 
 Checkout the [Wiki](https://github.com/herringbonedev/Herringbone/wiki) for all the user guides!
 
