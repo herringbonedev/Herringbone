@@ -58,17 +58,7 @@ async def parse(payload: ExtractRequest):
 
 @router.get("/readyz")
 async def readyz():
-    try:
-        mongo = get_mongo_handler()
-        mongo.open_mongo_connection()
-        return {"ok": True}
-    except Exception:
-        return JSONResponse({"ok": False, "error": "mongo not ready"}, status_code=503)
-    finally:
-        try:
-            mongo.close_mongo_connection()
-        except Exception:
-            pass
+    return {"ok": True}
 
 
 @router.get("/livez")
