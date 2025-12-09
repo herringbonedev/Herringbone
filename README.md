@@ -1,18 +1,10 @@
-# Herringbone
-
-#### Elements
-[![DetectionEngine Ruleset](https://github.com/herringbonedev/Herringbone/actions/workflows/detectionengine-ruleset.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/detectionengine-ruleset.yml)
-[![Enrichment](https://github.com/herringbonedev/Herringbone/actions/workflows/enrichment.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/enrichment.yml)
-[![Herringbone Apps](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-apps.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-apps.yml)
-[![Herringbone Logs](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-logs.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/herringbone-logs.yml)
-[![Receiver](https://github.com/herringbonedev/Herringbone/actions/workflows/receiver.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/receiver.yml)
-[![Mind Recon](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-recon.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-recon.yml)
-[![Mind Overwatch](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-overwatch.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/mind-overwatch.yml)
-[![DetectionEngine Detetor](https://github.com/herringbonedev/Herringbone/actions/workflows/detectionengine-detector.yml/badge.svg?branch=main)](https://github.com/herringbonedev/Herringbone/actions/workflows/detectionengine.detector.yml)
-
 # Herringbone  
 
 **Herringbone** is a modular framework for building your own SIEM or log management solution. Inspired by the defensive herringbone formation, it is designed around independence, flexibility, and interoperability.  
+
+## To learn how to use Herringbone
+
+Checkout the [Wiki](https://github.com/herringbonedev/Herringbone/wiki) for all the user guides!
 
 ## Overview  
 
