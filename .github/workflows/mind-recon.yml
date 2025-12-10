@@ -7,6 +7,11 @@ on:
       - 'mind/recon/**'
       - '.github/workflows/mind-recon.yml'
 
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
 jobs:
   build:
     uses: ./.github/workflows/build-test-push.yml

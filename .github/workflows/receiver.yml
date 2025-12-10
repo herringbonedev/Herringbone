@@ -7,6 +7,11 @@ on:
       - 'logingestion/receiver/**'
       - '.github/workflows/receiver.yml'
 
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
 jobs:
   build-test-push:
     uses: ./.github/workflows/build-test-push.yml
