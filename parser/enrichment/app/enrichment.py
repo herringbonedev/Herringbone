@@ -65,7 +65,7 @@ def perform_recon(raw_log: str, metadata: dict) -> dict:
 def get_mongo() -> HerringboneMongoDatabase | None:
     """
     Construct the DB helper from env. Returns None in test mode.
-    The helper safely handles credentials, IPv6 hosts, and host:port strings.
+    The helper safely handles credentials, IPv6 hosts, and host:port strings
     """
     if USE_TEST:
         return None
