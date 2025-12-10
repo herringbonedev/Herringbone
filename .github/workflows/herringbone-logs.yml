@@ -15,6 +15,7 @@ permissions:
 jobs:
   build:
     uses: ./.github/workflows/build-test-push.yml
+    secrets: inherit
     with:
       service_name: herringbone-logs
       service_path: herringbone/logs

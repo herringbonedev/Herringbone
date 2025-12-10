@@ -15,6 +15,7 @@ permissions:
 jobs:
   build:
     uses: ./.github/workflows/build-test-push.yml
+    secrets: inherit
     with:
       service_name: parser-cardset
       service_path: parser/cardset
