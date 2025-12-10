@@ -25,7 +25,7 @@ spec:
               ollama pull ${OLLAMA_MODEL} &&
               python3 recon.py
           ports:
-            - containerPort: 8002
+            - containerPort: 8001
               name: tcp-port
               protocol: TCP
       nodeSelector:

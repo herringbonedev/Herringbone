@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parser-enrichment
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parser-enrichment
+  template:
+    metadata:
+      labels:
+        app: parser-enrichment
+    spec:
+      containers:
+        - name: enrichment
+          image: quay.io/herringbone/enrichment
+          env:
+            - name: METADATA_SVC
+              value: http://parser-cardset-service:7005/parser/cardset/pull_cards
+            - name: ENRICHMENT_SVC
+              value: http://parser-extractor-service:7006/parser/extractor/parse
+            - name: MONGO_HOST
+              value: mongodb-headless.mongodb.svc.cluster.local
+            - name: MONGO_PORT
+              value: "27017"
+            - name: DB_NAME
+              value: herringbone
+            - name: COLLECTION_NAME
+              value: logs
+            # Optional (set to your real values):
+#            - name: MONGO_AUTH_SOURCE
+#              value: admin
+            - name: MONGO_REPLICA_SET
+              value: rs0            # or leave unset for standalone
+            - name: MONGO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: username
+            - name: MONGO_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: password
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - /app/container_probes.py
+                - livez
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - /app/container_probes.py
+                - readyz
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3

@@ -26,4 +26,4 @@ USER appuser
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-ENTRYPOINT ["python3", "main.py"]
+ENTRYPOINT ["python3", "enrichment.py"]

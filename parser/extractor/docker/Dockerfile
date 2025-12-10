@@ -26,4 +26,6 @@ USER appuser
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-ENTRYPOINT ["python3", "main.py"]
+EXPOSE 7006
+
+ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7006"]
