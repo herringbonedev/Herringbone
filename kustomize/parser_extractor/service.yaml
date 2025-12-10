@@ -10,5 +10,5 @@ spec:
   ports:
     - name: http
       protocol: TCP
-      port: 7002          # external port
-      targetPort: 7002    # container port
+      port: 7006          # external port
+      targetPort: 7006    # container port

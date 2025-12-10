@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  mind-recon:
+    container_name: mind-recon
+
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+
+    restart: unless-stopped
+
+    ports:
+      - "8001:8001"
+
+    env_file:
+      - .env

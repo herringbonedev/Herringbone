@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: herringbone-enrichment
+  name: parser-enrichment
   namespace: herringbone
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: herringbone-enrichment
+      app: parser-enrichment
   template:
     metadata:
       labels:
-        app: herringbone-enrichment
+        app: parser-enrichment
     spec:
       containers:
         - name: enrichment
           image: quay.io/herringbone/enrichment
           env:
             - name: METADATA_SVC
-              value: http://parser-cardset-service.herringbone.svc.cluster.local:7002/parser/cardset/pull_cards
+              value: http://parser-cardset-service:7005/parser/cardset/pull_cards
             - name: ENRICHMENT_SVC
-              value: http://parser-extractor-service.herringbone.svc.cluster.local:7002/parser/extractor/parse
+              value: http://parser-extractor-service:7006/parser/extractor/parse
             - name: MONGO_HOST
               value: mongodb-headless.mongodb.svc.cluster.local
             - name: MONGO_PORT

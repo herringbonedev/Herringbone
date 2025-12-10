@@ -1,144 +1,18 @@
 name: (Parser CardSet) Build
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'parser/cardset/**'
       - '.github/workflows/parser-cardset.yml'
-      - '!parser/cardset/README.md'
-
-permissions:
-  contents: write
-  pull-requests: write
-  checks: write
 
 jobs:
-  build-test-push:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install tools (yq, skopeo, jq)
-        run: |
-          set -euo pipefail
-          sudo wget https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 -O /usr/bin/yq
-          sudo chmod +x /usr/bin/yq
-          sudo apt-get update
-          sudo apt-get install -y skopeo jq
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Quay
-        uses: docker/login-action@v3
-        with:
-          registry: quay.io
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Prepare build context (copy shared modules)
-        run: |
-          set -euo pipefail
-          rm -rf parser/cardset/modules
-          mkdir -p parser/cardset
-          cp -R modules parser/cardset/modules
-
-      # Build, test, and push the Docker image
-      - name: Build Docker image
-        env:
-          SHORT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          SHORT_SHA=${SHORT_SHA::8}
-          docker build -t quay.io/herringbone/parser-cardset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} ./parser/cardset
-
-      - name: Run container for smoke test
-        env:
-          SHORT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          SHORT_SHA=${SHORT_SHA::8}
-          docker run -d \
-            --name test_parser_cardset \
-            quay.io/herringbone/parser-cardset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
-          sleep 1
-          docker logs test_parser_cardset || true
-          docker inspect test_parser_cardset --format='{{.State.Running}}' | grep true
-
-      - name: Push image (only if tests pass)
-        env:
-          SHORT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          SHORT_SHA=${SHORT_SHA::8}
-          docker push quay.io/herringbone/parser-cardset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}
-
-      - name: Get image digest
-        id: digest
-        env:
-          SHORT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          SHORT_SHA=${SHORT_SHA::8}
-          DIGEST=$(skopeo inspect docker://quay.io/herringbone/parser-cardset:latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER} | jq -r '.Digest')
-          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
-
-      - name: Update kustomization.yaml with new image tag & digest
-        run: |
-          set -euo pipefail
-          SHORT_SHA=${GITHUB_SHA::8}
-          TAG="latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
-          yq eval -i ".images[0].newTag = \"$TAG\"" kustomize/parser_cardset/kustomization.yaml
-          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" kustomize/parser_cardset/kustomization.yaml
-
-      - name: Detect changes
-        id: bump
-        run: |
-          set -euo pipefail
-          if git diff --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      # Create/Update PR using peter-evans (gracefully no-ops if no diff)
-      - name: Create PR (only if changes exist)
-        if: steps.bump.outputs.changed == 'true'
-        id: cpr
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(parser-cardset): bump image to ${{ steps.digest.outputs.digest }}"
-          title: "chore(parser-cardset): bump parser-cardset image"
-          body: |
-            Automated update to kustomization for parser-cardset image.
-            - Tag & digest updated by CI
-            - This PR respects branch protection.
-          branch: auto/update/parser-cardset
-          delete-branch: true
-          signoff: true
-          labels: |
-            automation
-
-      - name: Log PR result
-        if: steps.bump.outputs.changed == 'true'
-        run: |
-          echo "operation=${{ steps.cpr.outputs.pull-request-operation }}"
-          echo "pr=${{ steps.cpr.outputs.pull-request-number || 'none' }}"
-
-      - name: No changes
-        if: steps.bump.outputs.changed != 'true'
-        run: echo "No changes; skipping PR."
-
-      # Cleanup
-      - name: Cleanup
-        if: always()
-        run: |
-          docker rm -f test_parser_cardset || true
+  build:
+    uses: ./.github/workflows/build-test-push.yml
+    with:
+      service_name: parser-cardset
+      service_path: parser/cardset
+      dockerfile: parser/cardset/docker/Dockerfile
+      kustomization_path: kustomize/parser_cardset/kustomization.yaml
+      image_repo: quay.io/herringbone/parser-cardset

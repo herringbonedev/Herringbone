@@ -17,6 +17,6 @@ spec:
         - name: parser-extractor
           image: quay.io/herringbone/parser-extractor
           ports:
-            - containerPort: 7002
+            - containerPort: 7006
               name: tcp-port
               protocol: TCP

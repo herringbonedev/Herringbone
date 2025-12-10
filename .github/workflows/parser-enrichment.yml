@@ -1,0 +1,18 @@
+name: (Enrichment) Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'logingestion/enrichment/**'
+      - '.github/workflows/enrichment.yml'
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-test-push.yml
+    with:
+      service_name: enrichment
+      service_path: logingestion/enrichment
+      dockerfile: logingestion/enrichment/docker/Dockerfile
+      kustomization_path: kustomize/enrichment/kustomization.yaml
+      image_repo: quay.io/herringbone/enrichment
