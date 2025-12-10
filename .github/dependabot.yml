@@ -1,0 +1,124 @@
+version: 2
+updates:
+  # ----------------------------------------
+  # 1. GitHub Actions dependency updates
+  # ----------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "actions"
+    commit-message:
+      prefix: "deps(actions)"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # ----------------------------------------
+  # 2. Dockerfile updates for every service
+  # ----------------------------------------
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "deps(docker)"
+    # Dependabot automatically scans all Dockerfiles in the repo
+    # No need to list them individually
+
+  # ----------------------------------------
+  # 3. Python dependencies for each microservice
+  # ----------------------------------------
+  # Parser Extractor
+  - package-ecosystem: "pip"
+    directory: "/parser/extractor"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(parser-extractor)"
+
+  # Parser Cardset
+  - package-ecosystem: "pip"
+    directory: "/parser/cardset"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(parser-cardset)"
+
+  # Parser Enrichment
+  - package-ecosystem: "pip"
+    directory: "/parser/enrichment"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(enrichment)"
+
+  # Detection Engine: Detector
+  - package-ecosystem: "pip"
+    directory: "/detectionengine/detector"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(detector)"
+
+  # Detection Engine: Matcher
+  - package-ecosystem: "pip"
+    directory: "/detectionengine/matcher"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(matcher)"
+
+  # Detection Engine: Ruleset
+  - package-ecosystem: "pip"
+    directory: "/detectionengine/ruleset"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(ruleset)"
+
+  # Mind Recon
+  - package-ecosystem: "pip"
+    directory: "/mind/recon"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(mind-recon)"
+
+  # Herringbone Logs service
+  - package-ecosystem: "pip"
+    directory: "/herringbone/logs"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(herringbone-logs)"
