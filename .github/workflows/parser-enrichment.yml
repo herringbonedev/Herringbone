@@ -5,7 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'parser/enrichment/**'
-      - '.github/workflows/enrichment.yml'
+      - '.github/workflows/parser-enrichment.yml'
 
 permissions:
   contents: write
@@ -16,8 +16,8 @@ jobs:
   build:
     uses: ./.github/workflows/build-test-push.yml
     with:
-      service_name: enrichment
+      service_name: parser-enrichment
       service_path: parser/enrichment
       dockerfile: parser/enrichment/docker/Dockerfile
       kustomization_path: kustomize/enrichment/kustomization.yaml
-      image_repo: quay.io/herringbone/enrichment
+      image_repo: quay.io/herringbone/parser-enrichment
