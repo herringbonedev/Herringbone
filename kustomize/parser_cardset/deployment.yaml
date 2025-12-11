@@ -17,7 +17,7 @@ spec:
         - name: parser-cardset
           image: quay.io/herringbone/parser-cardset
           ports:
-            - containerPort: 7002
+            - containerPort: 7005
               name: tcp-port
               protocol: TCP
           resources:
