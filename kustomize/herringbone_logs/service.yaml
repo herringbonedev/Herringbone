@@ -10,5 +10,5 @@ spec:
   ports:
     - name: http
       protocol: TCP
-      port: 7002
-      targetPort: 7002
+      port: 7010
+      targetPort: 7010
