@@ -20,12 +20,6 @@ def get_docs():
     except Exception as e:
         del mongo_handler
         return jsonify({"error": str(e)}), 500
-    
-#
-# Herringbone requires Liveness and Readiness probes for all services.
-#
-# The routes below contain the logic for livez and readyz
-#
 
 @app.route('/herringbone/logs/livez', methods=['GET'])
 def liveness_probe():

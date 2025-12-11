@@ -107,10 +107,10 @@ jobs:
           SHORT_SHA=${GITHUB_SHA::8}
           TAG="latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
 
-          echo "[*] Updating kustomization: $KUSTOMIZE_PATH"
+          echo "[*] Updating kustomization: ${{ inputs.kustomization_path }} with tag $TAG and digest ${{ steps.digest.outputs.digest }}"
 
-          yq eval -i ".images[0].newTag = \"$TAG\"" $KUSTOMIZE_PATH
-          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" $KUSTOMIZE_PATH
+          yq eval -i ".images[0].newTag = \"$TAG\"" ${{ inputs.kustomization_path }}
+          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" ${{ inputs.kustomization_path }}
 
       - name: Detect changes
         id: bump
@@ -127,12 +127,12 @@ jobs:
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(${SERVICE_NAME}): bump image to ${{ steps.digest.outputs.digest }}"
-          title: "chore(${SERVICE_NAME}): bump ${SERVICE_NAME} image"
+          commit-message: "chore(${{ inputs.service_name }}): bump image to ${{ steps.digest.outputs.digest }}"
+          title: "chore(${{ inputs.service_name }}): bump ${{ inputs.service_name }} image"
           body: |
-            Automated update for $SERVICE_NAME.
-            - Updated tag & digest in $KUSTOMIZE_PATH
-          branch: auto/update/${SERVICE_NAME}-digest
+            Automated update for ${{ inputs.service_name }}.
+            - Updated tag & digest in ${{ inputs.kustomization_path }}
+          branch: auto/update/${{ inputs.service_name }}-digest
           delete-branch: true
           signoff: true
           labels: |
