@@ -36,7 +36,7 @@ def readyz():
 
     response = requests.post(OLLAMA_URL, json={
         "model": "llama3.2:3b",
-        "prompt": "Send back just the word 'ready' if the model is ready to process requests.",
+        "prompt": "Send back just the word 'ready' if the model is ready to process requests",
         "stream": False
     })
 
