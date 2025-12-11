@@ -68,7 +68,7 @@ def get_mongo_handler() -> HerringboneMongoDatabase:
 
 @router.post("/insert_card", response_model=InsertCardResponse)
 async def insert_card(card: CardModel):
-    print("Attempting to insert a new card...")
+    print("]*] Attempting to insert a new card...")
 
     try:
         mongo = get_mongo_handler()
@@ -77,8 +77,8 @@ async def insert_card(card: CardModel):
         raise HTTPException(status_code=503, detail="Database not initialized")
     
     payload = card.model_dump()
-    print(f"New card payload: {payload}")
-    print("Validating payload...")
+    print(f"[*] New card payload: {payload}")
+    print("[*] Validating payload...")
     result = validator(payload)
     print(result)
 
