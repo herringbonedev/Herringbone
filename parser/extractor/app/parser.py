@@ -6,7 +6,7 @@ from jsonpath_ng import parse as jsonpath_parse
 
 class CardParser:
     """
-    A unified parser that can operate in either 'regex' or 'jsonp' mode.
+    A unified parser that can operate in either 'regex' or 'jsonp' mode
     - regex mode: takes a list of {name: pattern} and a string input
     - jsonp mode: takes a list of {name: jsonpath} and a dict input
     """
