@@ -26,4 +26,6 @@ USER appuser
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
+EXPOSE 7002
+
 ENTRYPOINT ["python3", "main.py"]
