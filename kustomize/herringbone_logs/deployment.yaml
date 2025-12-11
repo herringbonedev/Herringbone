@@ -17,7 +17,7 @@ spec:
         - name: herringbone-logs
           image: quay.io/herringbone/herringbone-logs
           ports:
-            - containerPort: 9002
+            - containerPort: 7010
               name: tcp-port
               protocol: TCP
           resources:
@@ -47,12 +47,12 @@ spec:
           livenessProbe:
             httpGet:
               path: /herringbone/logs/livez
-              port: 7002
+              port: 7010
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /herringbone/logs/readyz
-              port: 7002
+              port: 7010
             initialDelaySeconds: 10
             periodSeconds: 10

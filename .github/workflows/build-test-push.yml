@@ -34,7 +34,7 @@ permissions:
   checks: write
 
 concurrency:
-  group: microservice-build-${{ github.ref }}
+  group: microservice-build-${{ inputs.service_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
