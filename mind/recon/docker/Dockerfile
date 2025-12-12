@@ -8,9 +8,12 @@ RUN apt-get update && \
 EXPOSE 8001
 
 WORKDIR /app
-COPY . .
+COPY ./app .
+COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
+
+RUN pwd && ls -la
 
 ENTRYPOINT ["/bin/sh", "-c"]
 CMD ["ollama serve & sleep 10 && ollama pull llama3.2:3b && python3 recon.py"]
