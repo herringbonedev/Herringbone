@@ -12,7 +12,7 @@ OLLAMA_URL = 'http://localhost:11434/api/generate'
 def prompt_template(raw_logs):
     """Generate prompt template for recon from prompt.text
     """
-    return open("app/prompt.text", "r").read() + "here is the list of logs for you to analyze: "+ raw_logs
+    return open("prompt.text", "r").read() + "here is the list of logs for you to analyze: "+ raw_logs
 
 @app.route('/recon', methods=['POST'])
 def recon():
