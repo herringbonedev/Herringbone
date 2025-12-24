@@ -20,6 +20,6 @@ jobs:
       service_name: parser-enrichment
       service_path: parser/enrichment
       dockerfile: parser/enrichment/docker/Dockerfile
-      kustomization_path: kustomize/enrichment/kustomization.yaml
+      kustomization_path: kustomize/parser_enrichment/kustomization.yaml
       image_repo: quay.io/herringbone/parser-enrichment
 
