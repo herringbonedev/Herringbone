@@ -7,6 +7,9 @@ class CardSchema:
         self.schema = {
             "type": "object",
             "properties": {
+                "name": {
+                    "type": "string"
+                },
                 "selector": {
                     "type": "object",
                     "properties": {

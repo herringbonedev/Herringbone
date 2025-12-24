@@ -1,8 +1,10 @@
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from bson.json_util import dumps
 from database import MongoDatabaseHandler
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route("/herringbone/logs/get_docs", methods=["GET"])
 def get_docs():
