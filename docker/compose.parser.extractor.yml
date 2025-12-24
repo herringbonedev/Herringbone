@@ -1,0 +1,23 @@
+services:
+  parser-extractor:
+    container_name: parser-extractor
+    image: quay.io/herringbone/parser-extractor:latest-67bf7b0e-11
+
+    restart: unless-stopped
+
+    networks:
+      - herringbone
+
+    ports:
+      - "7006:7006"
+
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  herringbone:
+    external: true
+    name: herringbone_net
