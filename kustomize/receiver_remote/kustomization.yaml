@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/receiver
-    newTag: latest-20acaf57-43 # Image Updater will modify this
-    digest: "sha256:9b06cbea116696865923c8cc508c50b979f668f2854e0471a1ad0246ac42837c"
+    newTag: latest-79844e38-47 # Image Updater will modify this
+    digest: "sha256:03c1d2fffd74f2c91839475a2afa098ed97b159768cfeaf15feb95ae51f31685"
