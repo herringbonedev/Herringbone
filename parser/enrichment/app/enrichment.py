@@ -182,12 +182,25 @@ def main():
                 print(f"[✓] Enriched log {doc['_id']}")
         except Exception as e:
             if not USE_TEST and "_id" in doc:
-                print("[→] Marking log as not enriched in MongoDB")
+                print("[→] Marking log as failed in MongoDB")
                 try:
-                    set_enriched(mongo, doc["_id"], {"enrichment":e})
+                    mongo.update_log(
+                        {"_id": doc["_id"]},
+                        {
+                            "recon": False,
+                            "recon_data": {
+                                "enrichment_error": str(e)
+                            },
+                            "status": "Recon failed.",
+                            "last_processed": datetime.utcnow()
+                        },
+                        clean_codec=False,
+                    )
                 except Exception as e2:
                     print(f"[✗] Failed to update failure state for {doc['_id']}: {e2}")
+
             print(f"[✗] Failed to enrich log {doc.get('_id', 'test_doc')}: {e}")
+
 
 
 if __name__ == "__main__":
