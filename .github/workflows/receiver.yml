@@ -15,6 +15,7 @@ permissions:
 jobs:
   build-test-push:
     uses: ./.github/workflows/build-test-push.yml
+    secrets: inherit
     with:
       service_name: receiver
       service_path: logingestion/receiver
