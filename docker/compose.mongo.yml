@@ -1,0 +1,37 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    restart: unless-stopped
+
+    networks:
+      - herringbone
+
+    ports:
+      - "27017:27017"
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS}
+
+    command: ["mongod", "--auth", "--bind_ip_all"]
+
+    stop_signal: SIGTERM
+    stop_grace_period: 60s
+
+    volumes:
+      - mongo_data:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  herringbone:
+    name: herringbone_net
+
+volumes:
+  mongo_data:

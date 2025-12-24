@@ -129,6 +129,7 @@ async def pull_cards(body: PullCardsRequest):
             status_code=200
         )
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
     finally:
         try:
@@ -156,6 +157,7 @@ async def pull_all_cards():
             status_code=200
         )
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
     finally:
         try:
@@ -184,6 +186,7 @@ async def delete_cards(body: DeleteCardsRequest):
         res = mongo.delete_cards_by_selector(sel_type, sel_value)
         return {"ok": True, "deleted": res.get("deleted", 0)}
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
     finally:
         try:
@@ -229,6 +232,7 @@ async def update_card(new_card: CardModel):
             status_code=200
         )
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Update failed: {e}")
     finally:
         try:
