@@ -58,7 +58,7 @@ def start_udp_receiver():
                 "last_update": datetime.utcnow()},
                 clean_codec=True  # Legacy behavior
                 )
-                return ("Data received", 200)
+                print("[✓] Data received and inserted into MongoDB 200")
             except Exception as e:
                 print(f"[✗] Mongo insert operation failed: {e}")
                 return (f"Insert failed: {e}", 500)

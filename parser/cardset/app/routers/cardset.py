@@ -22,9 +22,10 @@ class SelectorModel(BaseModel):
     value: str
 
 class CardModel(BaseModel):
+    name: str
     selector: SelectorModel
-    regex: Optional[List[Dict[str, str]]] = None
-    jsonp: Optional[List[Dict[str, str]]] = None
+    regex: Optional[List[Dict[str, str]]] = []
+    jsonp: Optional[List[Dict[str, str]]] = []
 
 class InsertCardResponse(BaseModel):
     ok: bool
@@ -170,6 +171,8 @@ async def delete_cards(body: DeleteCardsRequest):
         mongo.open_mongo_connection()
     except Exception:
         raise HTTPException(status_code=503, detail="Database not initialized")
+    
+    print(body)
 
     sel_type = body.selector_type
     sel_value = body.selector_value
