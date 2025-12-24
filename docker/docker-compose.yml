@@ -1,6 +1,6 @@
 services:
   mongodb:
-    image: mongo
+    image: mongo:7.0
     container_name: mongodb
     restart: unless-stopped
 
@@ -14,7 +14,10 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS}
 
-    command: ["--auth", "--bind_ip_all"]
+    command: ["mongod", "--auth", "--bind_ip_all"]
+
+    stop_signal: SIGTERM
+    stop_grace_period: 60s
 
     volumes:
       - mongo_data:/data/db
@@ -28,7 +31,7 @@ services:
 
   logingestion-receiver:
     container_name: logingestion-receiver
-    image: quay.io/herringbone/receiver:latest-20acaf57-43
+    image: quay.io/herringbone/receiver:latest-79844e38-47@sha256:03c1d2fffd74f2c91839475a2afa098ed97b159768cfeaf15feb95ae51f31685
     restart: unless-stopped
 
     profiles: ["receiver"]
@@ -56,6 +59,36 @@ services:
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  herringbone-logs:
+    container_name: herringbone-logs
+    image: quay.io/herringbone/herringbone-logs:latest-28bf0bfc-16
+    restart: unless-stopped
+
+    profiles: ["logs"]
+
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+    networks:
+      - herringbone
+
+    ports:
+      - "7010:7010"
+
+    environment:
+      MONGO_HOST: mongodb:27017
+      DB_NAME: herringbone
+      COLLECTION_NAME: logs
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASS: ${MONGO_PASS}
 
     read_only: true
     tmpfs:

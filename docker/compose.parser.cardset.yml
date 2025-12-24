@@ -1,0 +1,30 @@
+services:
+  parser-cardset:
+    container_name: parser-cardset
+    image: quay.io/herringbone/parser-cardset:latest-28bf0bfc-30
+    restart: unless-stopped
+
+    networks:
+      - herringbone
+
+    ports:
+      - "7005:7005"
+
+    environment:
+      MONGO_HOST: ${MONGO_HOST}
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASS: ${MONGO_PASS}
+      DB_NAME: ${DB_NAME}
+      AUTH_DB: ${AUTH_DB}
+      COLLECTION_NAME: "cards"
+
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  herringbone:
+    external: true
+    name: herringbone_net
