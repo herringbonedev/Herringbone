@@ -27,7 +27,7 @@ def fetch_metadata(doc: dict) -> dict:
         print(f"[→] Loading metadata from {metadata_url}")
 
         try:
-            result = requests.post(metadata_url, json={"selector_type":"ip", 
+            result = requests.post(metadata_url, json={"selector_type":"source_address", 
                                                        "selector_value": doc["source_address"],
                                                        "limit": 1})
             
