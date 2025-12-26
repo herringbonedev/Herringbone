@@ -125,6 +125,7 @@ async def pull_cards(body: PullCardsRequest):
 
     try:
         docs = mongo.find_cards_by_selector(sel_type, sel_value, limit=int(limit or 0) or None)
+        print(f"[*] Loaded docs: {str(docs)}")
         return JSONResponse(
             content={"ok": True, "count": len(docs), "cards": json.loads(json_util.dumps(docs))},
             status_code=200
