@@ -109,6 +109,7 @@ async def insert_card(card: CardModel):
 
 @router.post("/pull_cards", response_model=PullCardsResponse)
 async def pull_cards(body: PullCardsRequest):
+    print(f"[*] Incoming pull card request: {str(body)}")
     try:
         mongo = get_mongo_handler()
         mongo.open_mongo_connection()
