@@ -1,0 +1,34 @@
+services:
+  detectionengine-detector:
+    container_name: detectionengine-detector
+    image: quay.io/herringbone/detectionengine-detector:latest-d053458d-67
+    restart: unless-stopped
+
+    networks:
+      - herringbone
+
+    environment:
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASS: ${MONGO_PASS}
+      DB_NAME: ${DB_NAME}
+      AUTH_DB: ${AUTH_DB}
+
+      LOGS_COLLECTION_NAME: "logs"
+      RULES_COLLECTION_NAME: "rules"
+      DETECTIONS_COLLECTION_NAME: "detections"
+
+      MATCHER_API: "http://detectionengine-matcher:7003/detectionengine/matcher/find_match"
+      WAIT_FOR_RECON_TO_FINISH: "false"
+
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  herringbone:
+    external: true
+    name: herringbone_net
