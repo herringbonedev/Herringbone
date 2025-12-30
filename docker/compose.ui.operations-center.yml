@@ -1,0 +1,18 @@
+  operations-center:
+    image: quay.io/herringbone/operations-center:latest-6f406d32-13
+    container_name: operations-center
+    restart: unless-stopped
+
+    profiles: ["ops"]
+
+    networks:
+      - herringbone
+
+    ports:
+      - "8080:8080"
+
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
