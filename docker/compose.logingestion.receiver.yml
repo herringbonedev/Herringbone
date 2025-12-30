@@ -1,7 +1,7 @@
 services:
   logingestion-receiver:
     container_name: logingestion-receiver
-    image: quay.io/herringbone/receiver:latest-18de6b10-48
+    image: quay.io/herringbone/receiver:latest-c72bf032-49
     restart: unless-stopped
 
     depends_on:
@@ -20,7 +20,7 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-      COLLECTION_NAME: "logs"
+      COLLECTION_NAME: "events"
       RECEIVER_TYPE: ${RECEIVER_TYPE}
 
     extra_hosts:
