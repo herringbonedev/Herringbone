@@ -1,7 +1,7 @@
 from flask import Flask, request
 from datetime import datetime
 import os
-from modules.database.mongo_db_2 import HerringboneMongoDatabase
+from modules.database.mongo_db import HerringboneMongoDatabase
 
 app = Flask(__name__)
 
