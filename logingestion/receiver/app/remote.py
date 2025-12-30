@@ -1,33 +1,27 @@
 from flask import Flask, request
 from datetime import datetime
 import os
-from modules.database.mongo_db import HerringboneMongoDatabase
+from modules.database.mongo_db_2 import HerringboneMongoDatabase
 
 app = Flask(__name__)
 
 def get_mongo():
-    """
-    Initialize a MongoDB handler from environment variables.
-    Returns an instance or raises an Exception (caught at import time below).
-    """
     return HerringboneMongoDatabase(
         user=os.environ.get("MONGO_USER", "admin"),
         password=os.environ.get("MONGO_PASS", "secret"),
         database=os.environ.get("DB_NAME", "herringbone"),
-        collection=os.environ.get("COLLECTION_NAME", "logs"),
         host=os.environ.get("MONGO_HOST", "localhost"),
         port=int(os.environ.get("MONGO_PORT", 27017)),
-        replica_set=(os.environ.get("MONGO_REPLICA_SET", None))
+        replica_set=os.environ.get("MONGO_REPLICA_SET", None),
     )
 
-# Create a single reusable instance for this process
 try:
     print("Connecting to database...")
     mongo = get_mongo()
     print("[✓] Mongo handler initialized")
 except Exception as e:
     print(f"[✗] Mongo connection init failed: {e}")
-    mongo = None  # allow app to start; requests will error cleanly
+    mongo = None
 
 @app.route("/logingestion/remote", methods=["POST"])
 def receiver_v2():
@@ -42,9 +36,9 @@ def receiver_v2():
 
     remote = payload.get("remote_from")
     if (
-        not isinstance(remote, dict)      # remote_from missing or wrong type
-        or "source_addr" not in remote     # key missing
-        or not remote["source_addr"]       # empty, null, or ""
+        not isinstance(remote, dict)
+        or "source_addr" not in remote
+        or not remote["source_addr"]
     ):
         return ('Missing "remote_from.source_addr"', 400)
 
@@ -57,17 +51,23 @@ def receiver_v2():
     print(f"[Source Address: {addr}] {data}")
 
     try:
-        mongo.insert_log(
-            {
-                "source_address": addr,
-                "raw_log": data,
-                "recon": False,
-                "detected": False,
-                "status": None,
-                "last_update": datetime.utcnow(),
+        event_id = mongo.insert_event({
+            "raw": data,
+            "source": {
+                "address": addr,
+                "kind": "remote",
             },
-            clean_codec=True,
-        )
+            "event_time": datetime.utcnow(),
+            "ingested_at": datetime.utcnow(),
+        })
+
+        mongo.upsert_event_state(event_id, {
+            "parsed": False,
+            "enriched": False,
+            "detected": False,
+            "severity": None,
+        })
+
         return ("Data received", 200)
 
     except Exception as e:
