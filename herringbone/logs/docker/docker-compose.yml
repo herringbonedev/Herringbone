@@ -46,7 +46,7 @@ services:
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
 
-      COLLECTION_NAME: "logs"
+      COLLECTION_NAME: "events"
 
     depends_on:
       - mongodb

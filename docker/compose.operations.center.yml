@@ -1,3 +1,4 @@
+services:
   operations-center:
     image: quay.io/herringbone/operations-center:latest-6f406d32-13
     container_name: operations-center
@@ -14,5 +15,7 @@
     read_only: true
     tmpfs:
       - /tmp
+      - /var/lib/nginx/tmp
+      - /run
     security_opt:
       - no-new-privileges:true
