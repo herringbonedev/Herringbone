@@ -62,9 +62,18 @@ def call_extractor(card: dict, raw_log: str) -> dict:
     resp = requests.post(EXTRACTOR_SVC, json=payload, timeout=30)
     resp.raise_for_status()
 
+    data = resp.json()
+
     print("[✓] Extractor call succeeded")
-    print(resp.json())
-    return resp.json()
+    print(data)
+    
+    if isinstance(data, dict) and "results" in data and isinstance(data["results"], dict):
+        return data["results"]
+
+    if not isinstance(data, dict):
+        raise RuntimeError("Extractor returned invalid result shape")
+
+    return data
 
 
 def main():
@@ -116,7 +125,14 @@ def main():
 
             try:
                 result = call_extractor(card, event.get("raw", ""))
-                print(f"[*] Extractor results: {str(result)}")
+
+                if not isinstance(result, dict):
+                    raise RuntimeError("Extractor returned invalid result shape")
+
+                for k, v in result.items():
+                    if not isinstance(v, list):
+                        raise RuntimeError("Extractor returned invalid result shape")
+
                 mongo.insert_parse_result(
                     {
                         "event_id": event["_id"],
