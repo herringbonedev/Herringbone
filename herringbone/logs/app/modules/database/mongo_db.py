@@ -190,6 +190,22 @@ class HerringboneMongoDatabase:
         return list(cur)
 
     @with_connection
+    def find_sorted(
+        self,
+        collection: str,
+        filter_query: dict,
+        *,
+        sort: list,
+        limit: int | None = None,
+        projection: dict | None = None,
+        mongo_db
+    ):
+        cur = mongo_db[collection].find(filter_query, projection).sort(sort)
+        if limit:
+            cur = cur.limit(limit)
+        return list(cur)
+
+    @with_connection
     def find_one(
         self,
         collection: str,

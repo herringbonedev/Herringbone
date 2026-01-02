@@ -55,12 +55,13 @@ def merge_parse_results(mongo, event_ids):
 def list_events(n: int = Query(25, ge=1, le=500)):
     mongo = get_mongo()
 
-    events = mongo.find(
+    events = mongo.find_sorted(
         collection="events",
         filter_query={},
+        sort=[("_id", -1)],
         limit=n,
     )
-
+    
     if not events:
         return JSONResponse(content=[])
 
