@@ -23,10 +23,32 @@ def get_mongo():
 def encode(obj):
     return jsonable_encoder(
         obj,
-        custom_encoder={
-            ObjectId: lambda x: str(x)
-        }
+        custom_encoder={ObjectId: lambda x: str(x)},
     )
+
+
+def merge_parse_results(mongo, event_ids):
+    """
+    Build {event_id: {field: [values]}} from parse_results
+    """
+    results = mongo.find(
+        collection="parse_results",
+        filter_query={"event_id": {"$in": event_ids}},
+    )
+
+    parsed_map = {}
+
+    for r in results:
+        eid = r.get("event_id")
+        if not eid:
+            continue
+
+        parsed_map.setdefault(eid, {})
+
+        for k, values in (r.get("results") or {}).items():
+            parsed_map[eid].setdefault(k, []).extend(values)
+
+    return parsed_map
 
 
 @router.get("/events")
@@ -39,17 +61,23 @@ def list_events(n: int = Query(25, ge=1, le=500)):
         limit=n,
     )
 
+    if not events:
+        return JSONResponse(content=[])
+
     event_ids = [e["_id"] for e in events]
 
     states = mongo.find(
         collection="event_state",
         filter_query={"event_id": {"$in": event_ids}},
     )
-
     state_map = {s["event_id"]: s for s in states if "event_id" in s}
 
+    parsed_map = merge_parse_results(mongo, event_ids)
+
     for e in events:
-        e["state"] = state_map.get(e["_id"], {})
+        eid = e["_id"]
+        e["state"] = state_map.get(eid, {})
+        e["parsed"] = parsed_map.get(eid, {})
 
     return JSONResponse(content=encode(events))
 
@@ -72,8 +100,10 @@ def get_event(event_id: str):
         collection="event_state",
         filter_query={"event_id": oid},
     )
-
     event["state"] = state or {}
+
+    parsed_map = merge_parse_results(mongo, [oid])
+    event["parsed"] = parsed_map.get(oid, {})
 
     return JSONResponse(content=encode(event))
 

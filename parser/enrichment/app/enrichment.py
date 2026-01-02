@@ -63,6 +63,7 @@ def call_extractor(card: dict, raw_log: str) -> dict:
     resp.raise_for_status()
 
     print("[✓] Extractor call succeeded")
+    print(resp.json())
     return resp.json()
 
 
@@ -115,7 +116,7 @@ def main():
 
             try:
                 result = call_extractor(card, event.get("raw", ""))
-
+                print(f"[*] Extractor results: {str(result)}")
                 mongo.insert_parse_result(
                     {
                         "event_id": event["_id"],
