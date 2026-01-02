@@ -1,7 +1,7 @@
 services:
   parser-enrichment:
     container_name: parser-enrichment
-    image: quay.io/herringbone/parser-enrichment:latest-01310cab-7
+    image: quay.io/herringbone/parser-enrichment:latest-ac0f5534-10
     restart: unless-stopped
 
     networks:
