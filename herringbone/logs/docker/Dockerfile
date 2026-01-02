@@ -28,5 +28,4 @@ ENV PYTHONUNBUFFERED=1 \
 
 EXPOSE 7010
 
-ENTRYPOINT ["python3", "app.py"]
-
+ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7010"]

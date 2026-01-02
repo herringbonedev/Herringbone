@@ -1,7 +1,7 @@
 services:
   herringbone-logs:
     container_name: herringbone-logs
-    image: quay.io/herringbone/herringbone-logs:latest-28bf0bfc-16
+    image: quay.io/herringbone/herringbone-logs:latest-259153b1-17
     restart: unless-stopped
 
     depends_on:
@@ -17,7 +17,7 @@ services:
     environment:
       MONGO_HOST: mongodb:27017
       DB_NAME: herringbone
-      COLLECTION_NAME: logs
+      COLLECTION_NAME: events
       MONGO_USER: ${MONGO_USER}
       MONGO_PASS: ${MONGO_PASS}
 
