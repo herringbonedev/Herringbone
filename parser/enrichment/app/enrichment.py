@@ -6,189 +6,150 @@ import requests
 from modules.database.mongo_db import HerringboneMongoDatabase
 
 
-class MongoNotSet(Exception):
-    """Raised when required Mongo env vars are missing (non-test mode)."""
-    pass
+POLL_INTERVAL = float(os.environ.get("ENRICHMENT_POLL_INTERVAL", 1.0))
+EXTRACTOR_SVC = os.environ.get("EXTRACTOR_SVC")
+USE_TEST = EXTRACTOR_SVC == "test.service"
 
-
-print("Enrichment service has started")
-USE_TEST = os.environ.get("ENRICHMENT_SVC") == "test.service"
+print("[*] Enrichment service has started")
 if USE_TEST:
-    print("[Test Service] Started in test mode")
+    print("[*] [Test Service] Started in test mode")
 
 
-def fetch_metadata(doc: dict) -> dict:
-    """If the METADATA_SVC is not None then grab the additional data.
-    """
-
-    metadata_url = os.environ.get("METADATA_SVC", None)
-
-    if metadata_url is not None:
-        print(f"[→] Loading metadata from {metadata_url}")
-
-        try:
-            result = requests.post(metadata_url, json={"selector_type":"source_address", 
-                                                       "selector_value": doc["source_address"],
-                                                       "limit": 1})
-            
-            print(f"[✓] Metadata loaded for next enrichment request. {str(result.json())}")
-            metadata = result.json()
-            return metadata["cards"][0]
-
-        except Exception as e:
-            print(f"[✗] Failed to gather metadata {e}...running enrichment without metadata.")
-            return {}
-
-
-def perform_recon(raw_log: str, metadata: dict) -> dict:
-    """
-    Call the enrichment endpoint with the raw log.
-    Honors test mode when ENRICHMENT_SVC == 'test.service'.
-    """
-    url = os.environ.get("ENRICHMENT_SVC")
-
-    if url == "test.service":
-        print("[Test Service] Using mock enrichment")
-        return {"pass": True}
-
-    payload = {"card": metadata, "input": raw_log}
-    print(f"[→] Sending {str(payload)} to {url}")
-    try:
-        response = requests.post(url, json=payload, timeout=1000)
-        print(f"[→] Response {response.text}")
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
-        raise RuntimeError(f"Enrichment service failed: {e}")
-
-
-def get_mongo() -> HerringboneMongoDatabase | None:
-    """
-    Construct the DB helper from env. Returns None in test mode.
-    The helper safely handles credentials, IPv6 hosts, and host:port strings.
-    """
-    if USE_TEST:
-        return None
-
-    mongo_host = os.environ.get("MONGO_HOST")
-    db_name = os.environ.get("DB_NAME")
-    coll_name = os.environ.get("COLLECTION_NAME")
-    mongo_user = os.environ.get("MONGO_USER", "")
-    mongo_pass = os.environ.get("MONGO_PASS", "")
-    mongo_port = int(os.environ.get("MONGO_PORT", 27017))
-    replica_set = os.environ.get("MONGO_REPLICA_SET") or None
-
-    if not mongo_host or not db_name or not coll_name:
-        raise MongoNotSet("MONGO_HOST, DB_NAME, and COLLECTION_NAME must be set.")
-
+def get_mongo():
+    print("[*] Initializing MongoDB connection")
     return HerringboneMongoDatabase(
-        user=mongo_user,
-        password=mongo_pass,
-        database=db_name,
-        collection=coll_name,
-        host=mongo_host,
-        port=mongo_port,
-        replica_set=replica_set,
+        user=os.environ.get("MONGO_USER", ""),
+        password=os.environ.get("MONGO_PASS", ""),
+        database=os.environ.get("DB_NAME", "herringbone"),
+        host=os.environ.get("MONGO_HOST", "localhost"),
+        port=int(os.environ.get("MONGO_PORT", 27017)),
+        auth_source=os.environ.get("AUTH_DB", "herringbone"),
     )
 
 
-def fetch_one_pending(mongo: HerringboneMongoDatabase) -> dict | None:
-    """
-    Fetch a single document pending recon: recon == False and recon_data == None.
-    Uses the module's connection lifecycle.
-    """
-    client, db, coll = mongo.open_mongo_connection()
-    try:
-        return coll.find_one({"recon": False, "recon_data": None})
-    finally:
-        mongo.close_mongo_connection()
+def sanitize_card(card: dict) -> dict:
+	return {
+		k: (v.isoformat() if isinstance(v, datetime) else v)
+		for k, v in card.items()
+		if k != "_id"
+	}
 
 
-def set_enriched(
-    mongo: HerringboneMongoDatabase,
-    _id,
-    enrichment_result: dict,
-) -> None:
-    """
-    Mark a doc as enriched using the module's update helper.
-    """
-    mongo.update_log(
-        {"_id": _id},
-        {
-            "recon": True,
-            "recon_data": enrichment_result,
-            "status": "Recon finished.",
-            "last_processed": datetime.utcnow()
-        },
-        clean_codec=False,
-    )
+def selector_matches(selector: dict, event: dict) -> bool:
+    stype = selector.get("type")
+    value = selector.get("value")
+
+    if stype == "source_address":
+        return event.get("source", {}).get("address") == value
+
+    if stype == "raw":
+        return value in event.get("raw", "")
+
+    return False
 
 
-def set_failed(mongo: HerringboneMongoDatabase, _id) -> None:
-    """
-    Mark a doc as failed (recon False) using the module's update helper.
-    """
-    mongo.update_log(
-        {"_id": _id},
-        {"recon": False,
-         "status": "Recon failed."},
-        clean_codec=False,
-    )
+def call_extractor(card: dict, raw_log: str) -> dict:
+    if not EXTRACTOR_SVC:
+        raise RuntimeError("EXTRACTOR_SVC is not set")
 
-def set_pending(mongo: HerringboneMongoDatabase, _id) -> None:
-    """
-    Mark a doc with pending status using the module's update helper.
-    """
-    mongo.update_log(
-        {"_id": _id},
-        {"status": "Recon in process."},
-        clean_codec=False,
-    )
+    print(f"[*] Calling extractor for card '{card.get('name')}'")
+
+    payload = {
+        "card": sanitize_card(card),
+        "input": raw_log,
+    }
+
+    resp = requests.post(EXTRACTOR_SVC, json=payload, timeout=30)
+    resp.raise_for_status()
+
+    print("[✓] Extractor call succeeded")
+    return resp.json()
 
 
 def main():
-    mongo = get_mongo()  # None in test mode
+    mongo = get_mongo()
+    print("[✓] Connected to MongoDB")
 
     while True:
-        # Build a test doc or fetch from Mongo
-        if USE_TEST:
-            print("[Test Mode] Using test log")
-            doc = {
-                "timestamp": "00:00:00",
-                "raw_log": "Test log message",
-                "source": "github-actions",
-                "recon": False,
-                "recon_data": None,
-            }
-        else:
-            try:
-                doc = fetch_one_pending(mongo)
-            except Exception as e:
-                print(f"[✗] Mongo fetch failed: {e}")
-                time.sleep(1)
-                continue
+        print("[*] Polling for unparsed event_state")
 
-        if not doc:
-            time.sleep(1)
+        state = mongo.find_one(
+            "event_state",
+            {"parsed": False},
+        )
+
+        if not state:
+            print("[x] No unparsed event_state found")
+            time.sleep(POLL_INTERVAL)
             continue
 
-        try:
-            set_pending(mongo, doc["_id"])
-            metadata = fetch_metadata(doc)
-            enrichment_result = perform_recon(doc["raw_log"], metadata)
-            if not USE_TEST:
-                print("[→] Updating enriched log in MongoDB")
-                set_enriched(mongo, doc["_id"], enrichment_result)
-                print(f"[✓] Enriched log {doc['_id']}")
-        except Exception as e:
-            if not USE_TEST and "_id" in doc:
-                print("[→] Marking log as not enriched in MongoDB")
-                try:
-                    # ✅ FIX: store string, not exception object
-                    set_enriched(mongo, doc["_id"], {"enrichment": str(e)})
-                except Exception as e2:
-                    print(f"[✗] Failed to update failure state for {doc['_id']}: {e2}")
-            print(f"[✗] Failed to enrich log {doc.get('_id', 'test_doc')}: {e}")
+        print(f"[*] Found event_state for event {state.get('event_id')}")
+
+        event = mongo.find_one(
+            "events",
+            {"_id": state["event_id"]},
+        )
+
+        if not event:
+            print("[x] Event not found, marking state as parsed")
+            mongo.upsert_event_state(
+                state["event_id"],
+                {"parsed": True},
+            )
+            continue
+
+        print(f"[*] Processing event {event.get('_id')}")
+        print(f"[*] Event keys: {list(event.keys())}")
+
+        cards = mongo.find("parse_cards", {})
+        print("[*] Loaded parse cards")
+
+        for card in cards:
+            print(f"[*] Evaluating card '{card.get('name')}'")
+
+            if not selector_matches(card.get("selector", {}), event):
+                print("[x] Selector did not match, skipping card")
+                continue
+
+            print("[*] Selector matched, running extractor")
+
+            try:
+                result = call_extractor(card, event.get("raw", ""))
+
+                mongo.insert_parse_result(
+                    {
+                        "event_id": event["_id"],
+                        "card": card.get("name"),
+                        "results": result,
+                        "created_at": datetime.utcnow(),
+                    }
+                )
+
+                print("[✓] Parse result inserted")
+
+            except Exception as e:
+                print("[x] Extractor failed:", e)
+
+                mongo.insert_parse_result(
+                    {
+                        "event_id": event["_id"],
+                        "card": card.get("name"),
+                        "error": str(e),
+                        "created_at": datetime.utcnow(),
+                    }
+                )
+
+        print("[*] Marking event as parsed")
+
+        mongo.upsert_event_state(
+            event["_id"],
+            {
+                "parsed": True,
+            },
+        )
+
+        print("[✓] Event marked as parsed")
+        time.sleep(POLL_INTERVAL)
 
 
 if __name__ == "__main__":
