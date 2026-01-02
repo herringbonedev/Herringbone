@@ -44,7 +44,7 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-      COLLECTION_NAME: "cards"
+      COLLECTION_NAME: "parse_cards"
 
     depends_on:
       - mongodb
