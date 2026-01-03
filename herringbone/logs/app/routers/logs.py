@@ -209,6 +209,31 @@ def dashboard_recent_detections(n: int = Query(10, ge=1, le=50)):
         for d in detections
     ])
 
+@router.get("/dashboard/recent-incidents")
+def recent_incidents(n: int = Query(10, ge=1, le=50)):
+    mongo = get_mongo()
+
+    try:
+        incidents = mongo.find_sorted(
+            collection="incidents",
+            filter_query={},
+            sort=[("created_at", -1)],
+            limit=n,
+        )
+    except Exception as e:
+        return JSONResponse(status_code=500, content=str(e))
+
+    results = []
+    for i in incidents:
+        results.append({
+            "incident_id": str(i.get("_id")),
+            "title": i.get("title"),
+            "status": i.get("status"),
+            "priority": i.get("priority"),
+            "created_at": i.get("created_at"),
+        })
+
+    return JSONResponse(content=encode(results))
 
 @router.get("/livez")
 def livez():
