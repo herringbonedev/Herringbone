@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "7011:7011
+      - "7011:7011"
 
     env_file:
       - .env
@@ -44,7 +44,7 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-      COLLECTION_NAME: "rules"
+      COLLECTION_NAME: "incidents"
 
     depends_on:
       - mongodb

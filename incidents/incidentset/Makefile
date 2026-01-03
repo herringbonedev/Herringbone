@@ -13,7 +13,7 @@ logs:
 	docker compose -f docker/docker-compose.yml logs -f incidents-incidentset
 
 shell:
-	docker compose -f docker/docker-compose.yml exec incidents-incidentset bash
+	docker compose -f docker/docker-compose.yml exec incidents-incidentset sh
 
 test:
 	docker compose -f docker/docker-compose.yml exec incidents-incidentset pytest -q
