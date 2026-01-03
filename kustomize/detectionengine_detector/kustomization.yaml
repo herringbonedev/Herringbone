@@ -5,5 +5,5 @@ resources:
   - deployment.yaml
 images:
   - name: quay.io/herringbone/detectionengine-detector
-    newTag: latest-d053458d-67
-    digest: sha256:83bfd887b22f83491df86a987702c46ee1980e8d6cb3db6d1af2484b72475dbe
+    newTag: latest-84f6ff00-68
+    digest: sha256:8aa6279ce19dc1f7819af88b72f3c50063cf843ec433e4912e32a00d25b8d620
