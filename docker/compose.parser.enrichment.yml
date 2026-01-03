@@ -8,7 +8,8 @@ services:
       - herringbone
 
     environment:
-      MONGO_HOST: mongodb:27017
+      MONGO_HOST: ${MONGO_HOST}
+      MONGO_PORT: ${MONGO_PORT}
       MONGO_USER: ${MONGO_USER}
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}

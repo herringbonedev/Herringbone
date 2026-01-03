@@ -25,7 +25,7 @@ services:
 
   detectionengine-matcher:
     container_name: detectionengine-matcher
-    image: docker-detectionengine-matcher:latest
+    image: quay.io/herringbone/detectionengine-matcher:latest-5919d02b-2
     restart: unless-stopped
     pull_policy: never
 

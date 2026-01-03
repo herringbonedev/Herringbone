@@ -1,8 +1,17 @@
 from datetime import datetime
+from time import time
 from fetcher import fetch_one_undetected
 from rules import load_rules
 from analyzer import analyze_log_with_rules
 from updater import apply_result, set_failed
+
+
+_metrics = {
+	"processed": 0,
+	"detected": 0,
+	"failed": 0,
+	"last_log": 0.0,
+}
 
 
 def _sanitize(event: dict) -> dict:
@@ -16,11 +25,33 @@ def _sanitize(event: dict) -> dict:
 	return out
 
 
+def _maybe_log(interval: float = 5.0):
+	now = time()
+	if now - _metrics["last_log"] < interval:
+		return
+
+	rate = _metrics["processed"] / max(interval, 1)
+
+	print(
+		f"[detector] heartbeat "
+		f"processed={_metrics['processed']} "
+		f"detected={_metrics['detected']} "
+		f"failed={_metrics['failed']} "
+		f"rate={rate:.1f}/s"
+	)
+
+	_metrics["processed"] = 0
+	_metrics["detected"] = 0
+	_metrics["failed"] = 0
+	_metrics["last_log"] = now
+
+
 def process_one():
 	rules = load_rules()
 	doc = fetch_one_undetected()
 
 	if not doc:
+		_maybe_log()
 		return {"status": False}
 
 	event = doc["event"]
@@ -30,7 +61,20 @@ def process_one():
 	try:
 		analysis = analyze_log_with_rules(to_send, rules)
 		apply_result(event_id, analysis)
-		return {"status": True, "event_id": str(event_id)}
+
+		_metrics["processed"] += 1
+		if analysis.get("detection"):
+			_metrics["detected"] += 1
+
+		_maybe_log()
+		return {"status": True}
+
 	except Exception as e:
+		_metrics["processed"] += 1
+		_metrics["failed"] += 1
+
+		print(f"[ERROR] detector processing failed: {e}")
 		set_failed(event_id, str(e))
-		return {"status": False, "event_id": str(event_id)}
+
+		_maybe_log()
+		return {"status": False}

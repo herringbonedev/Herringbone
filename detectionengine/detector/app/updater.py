@@ -26,7 +26,7 @@ def _max_severity(analysis: dict):
 
 def set_failed(event_id, reason: str):
 	now = datetime.utcnow()
-	status_db = _db(os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_status"))
+	status_db = _db(os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state"))
 	client, db, coll = status_db.open_mongo_connection()
 
 	try:
@@ -52,7 +52,7 @@ def apply_result(event_id, analysis: dict):
 	severity = _max_severity(analysis)
 	detected = bool(analysis.get("detection"))
 
-	status_db = _db(os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_status"))
+	status_db = _db(os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state"))
 	client, db, coll = status_db.open_mongo_connection()
 
 	try:
