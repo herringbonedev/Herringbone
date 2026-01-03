@@ -11,10 +11,11 @@ services:
       - "7005:7005"
 
     environment:
-      MONGO_HOST: mongodb:27017
-      DB_NAME: herringbone
+      MONGO_HOST: ${MONGO_HOST}
+      MONGO_PORT: ${MONGO_PORT}
       MONGO_USER: ${MONGO_USER}
       MONGO_PASS: ${MONGO_PASS}
+      DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: "parse_cards"
 

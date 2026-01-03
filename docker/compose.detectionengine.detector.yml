@@ -1,22 +1,22 @@
 services:
   detectionengine-detector:
     container_name: detectionengine-detector
-    image: quay.io/herringbone/detectionengine-detector:latest-d053458d-67
+    image: docker-detectionengine-detector:latest
     restart: unless-stopped
 
     networks:
       - herringbone
 
     environment:
-      MONGO_HOST: mongodb
-      MONGO_PORT: 27017
+      MONGO_HOST: ${MONGO_HOST}
+      MONGO_PORT: ${MONGO_PORT}
       MONGO_USER: ${MONGO_USER}
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
 
       EVENTS_COLLECTION_NAME: "events"
-      EVENT_STATUS_COLLECTION_NAME: "event_status"
+      EVENT_STATUS_COLLECTION_NAME: "event_state"
       RULES_COLLECTION_NAME: "rules"
       DETECTIONS_COLLECTION_NAME: "detections"
 

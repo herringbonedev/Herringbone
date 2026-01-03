@@ -15,7 +15,7 @@ def _db(collection: str) -> HerringboneMongoDatabase:
 
 
 def fetch_one_undetected() -> dict | None:
-	status_db = _db(os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_status"))
+	status_db = _db(os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state"))
 	client, db, status_coll = status_db.open_mongo_connection()
 
 	try:
