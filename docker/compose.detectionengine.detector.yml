@@ -15,12 +15,12 @@ services:
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
 
-      LOGS_COLLECTION_NAME: "logs"
+      EVENTS_COLLECTION_NAME: "events"
+      EVENT_STATUS_COLLECTION_NAME: "event_status"
       RULES_COLLECTION_NAME: "rules"
       DETECTIONS_COLLECTION_NAME: "detections"
 
       MATCHER_API: "http://detectionengine-matcher:7003/detectionengine/matcher/find_match"
-      WAIT_FOR_RECON_TO_FINISH: "false"
 
     read_only: true
     tmpfs:

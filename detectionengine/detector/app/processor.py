@@ -5,30 +5,32 @@ from analyzer import analyze_log_with_rules
 from updater import apply_result, set_failed
 
 
+def _sanitize(event: dict) -> dict:
+	out = {}
+	for k, v in event.items():
+		if k == "_id":
+			continue
+		if isinstance(v, datetime):
+			continue
+		out[k] = v
+	return out
+
+
 def process_one():
-    """Runs one detection cycle."""
-    rules = load_rules()
-    doc = fetch_one_undetected()
+	rules = load_rules()
+	doc = fetch_one_undetected()
 
-    if not doc or "_id" not in doc:
-        return {"status": False, "msg": "no_logs"}
+	if not doc:
+		return {"status": False}
 
-    log_id = doc["_id"]
+	event = doc["event"]
+	event_id = event["_id"]
+	to_send = _sanitize(event)
 
-    to_send = {}
-    for key, value in doc.items():
-        if key in ("_id", "last_update", "last_processed", "updated_at"):
-            continue
-        if isinstance(value, datetime):
-            continue
-        to_send[key] = value
-
-    try:
-        analysis = analyze_log_with_rules(to_send, rules)
-        print(f"[✓] Analysis results: {str(analysis)}")
-        apply_result(log_id, analysis)
-        return {"status": True, "log_id": str(log_id), "analysis": analysis}
-    except Exception as e:
-        print(f"[✗] Analysis failed {str(e)}")
-        set_failed(log_id, str(e))
-        return {"status": False, "log_id": str(log_id), "error": str(e)}
+	try:
+		analysis = analyze_log_with_rules(to_send, rules)
+		apply_result(event_id, analysis)
+		return {"status": True, "event_id": str(event_id)}
+	except Exception as e:
+		set_failed(event_id, str(e))
+		return {"status": False, "event_id": str(event_id)}
