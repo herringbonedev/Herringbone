@@ -3,21 +3,15 @@ import time
 
 
 def main():
-    """
-    Detector daemon loop.
-    Runs as fast as possible, no artificial sleeps.
-    """
+	while True:
+		try:
+			processed = process_one()
+			if not processed.get("status"):
+				time.sleep(0.05)
+		except Exception as e:
+			print(f"[✗] Detector failed {str(e)}")
+			time.sleep(0.05)
 
-    while True:
-        try:
-            processed = process_one()
-
-            if not processed.get("status"):
-                time.sleep(0.05)
-
-        except Exception as e:
-            print(f"[✗] Detector failed {str(e)}")
-            time.sleep(0.05)
 
 if __name__ == "__main__":
-    main()
+	main()

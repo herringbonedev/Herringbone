@@ -16,7 +16,7 @@ services:
       COLLECTION_NAME: logs
 
       METADATA_SVC: http://parser-cardset:7005/parser/cardset/pull_cards
-      ENRICHMENT_SVC: http://parser-extractor:7006/parser/extractor/parse
+      EXTRACTOR_SVC: http://parser-extractor:7006/parser/extractor/parse
 
     depends_on:
       - mongodb

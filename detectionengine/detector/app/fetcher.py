@@ -1,41 +1,45 @@
-from modules.database.mongo_db import HerringboneMongoDatabase
 import os
+from modules.database.mongo_db import HerringboneMongoDatabase
 
 
-def get_logs_db() -> HerringboneMongoDatabase:
-    """Return a DB instance configured for the logs collection."""
-    return HerringboneMongoDatabase(
-        user=os.environ.get("MONGO_USER", ""),
-        password=os.environ.get("MONGO_PASS", ""),
-        database=os.environ.get("DB_NAME", ""),
-        collection=os.environ.get("LOGS_COLLECTION_NAME", "logs"),
-        host=os.environ.get("MONGO_HOST", "localhost"),
-        port=int(os.environ.get("MONGO_PORT", 27017)),
-        replica_set=os.environ.get("MONGO_REPLICA_SET") or None,
-    )
+def _db(collection: str) -> HerringboneMongoDatabase:
+	return HerringboneMongoDatabase(
+		user=os.environ.get("MONGO_USER", ""),
+		password=os.environ.get("MONGO_PASS", ""),
+		database=os.environ.get("DB_NAME", ""),
+		collection=collection,
+		host=os.environ.get("MONGO_HOST", "localhost"),
+		port=int(os.environ.get("MONGO_PORT", 27017)),
+		replica_set=os.environ.get("MONGO_REPLICA_SET") or None,
+	)
 
 
-def fetch_one_undetected(wait_recon: bool = False) -> dict | None:
-    """
-    Get a single log document that hasn't been detected yet.
-    If wait_recon=True then require recon=True as well.
-    """
-    logs_db = get_logs_db()
-    client, db, coll = logs_db.open_mongo_connection()
+def fetch_one_undetected() -> dict | None:
+	status_db = _db(os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_status"))
+	client, db, status_coll = status_db.open_mongo_connection()
 
-    try:
-        query = {
-            "$or": [
-                {"detection_results.detected": {"$exists": False}},
-                {"detection_results.detected": False},
-            ]
-        }
+	try:
+		status = status_coll.find_one(
+			{
+				"parsed": True,
+				"detected": False,
+			},
+			sort=[("_id", -1)],
+		)
 
-        if wait_recon:
-            query["recon"] = True
+		if not status or "event_id" not in status:
+			return None
 
-        doc = coll.find_one(query, sort=[("_id", -1)])
-        return doc
+		events_db = _db(os.environ.get("EVENTS_COLLECTION_NAME", "events"))
+		e_client, e_db, events_coll = events_db.open_mongo_connection()
 
-    finally:
-        logs_db.close_mongo_connection()
+		try:
+			event = events_coll.find_one({"_id": status["event_id"]})
+			if not event:
+				return None
+			return {"event": event, "status": status}
+		finally:
+			events_db.close_mongo_connection()
+
+	finally:
+		status_db.close_mongo_connection()
