@@ -118,12 +118,11 @@ async def delete_rule(id: str = Query(None), mongo=Depends(get_mongo)):
 
 @router.post("/update_rule")
 async def update_rule(payload: RuleUpdate, mongo=Depends(get_mongo)):
-    """
-    Updates a rule by _id using $set.
-    """
     data = payload.model_dump(by_alias=True)
-    rule_id = data["_id"]
 
+    rule_id = data.pop("_id", None)
+    if not rule_id:
+        raise HTTPException(status_code=400, detail="Missing rule _id")
 
     validation = validator(data)
     if not validation["valid"]:
@@ -137,10 +136,11 @@ async def update_rule(payload: RuleUpdate, mongo=Depends(get_mongo)):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid ObjectId")
 
-    update_data = {k: v for k, v in data.items() if k != "_id"}
-
     try:
-        result = mongo.coll.update_one({"_id": oid}, {"$set": update_data})
+        result = mongo.coll.update_one(
+            {"_id": oid},
+            {"$set": data},
+        )
     except Exception:
         raise HTTPException(status_code=500, detail={"updated": False})
 
