@@ -1,6 +1,6 @@
 services:
   operations-center:
-    image: quay.io/herringbone/operations-center:latest-9813c94c-14
+    image: quay.io/herringbone/operations-center:latest-e6b06abf-15
     container_name: operations-center
     restart: unless-stopped
 
