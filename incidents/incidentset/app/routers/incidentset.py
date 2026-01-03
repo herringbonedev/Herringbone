@@ -117,14 +117,37 @@ async def delete_incident(id: str = Query(None), mongo=Depends(get_mongo)):
 
 
 @router.post("/update_incident")
-async def update_incident(payload: IncidentUpdate, mongo=Depends(get_mongo)):
-    data = payload.model_dump(by_alias=True)
-
-    incident_id = data.pop("_id", None)
-    if not incident_id:
+async def update_incident(payload: dict, mongo=Depends(get_mongo)):
+    if "_id" not in payload:
         raise HTTPException(status_code=400, detail="Missing incident _id")
 
-    validation = validator(data)
+    raw_id = payload.pop("_id")
+
+    if isinstance(raw_id, dict) and "$oid" in raw_id:
+        incident_id = raw_id["$oid"]
+    else:
+        incident_id = raw_id
+
+    try:
+        oid = ObjectId(incident_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ObjectId")
+
+    # Only allow mutable fields
+    update_fields = {}
+    for key in ("owner", "status", "priority"):
+        if key in payload:
+            update_fields[key] = payload[key]
+
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No updatable fields provided")
+
+    # Validate only the mutable fields
+    validation = validator({
+        "title": "placeholder",
+        "status": update_fields.get("status", "open"),
+        "priority": update_fields.get("priority", "low"),
+    })
     if not validation["valid"]:
         raise HTTPException(
             status_code=400,
@@ -132,19 +155,39 @@ async def update_incident(payload: IncidentUpdate, mongo=Depends(get_mongo)):
         )
 
     try:
-        oid = ObjectId(incident_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid ObjectId")
-
-    try:
         result = mongo.coll.update_one(
             {"_id": oid},
-            {"$set": data},
+            {"$set": update_fields},
         )
     except Exception:
         raise HTTPException(status_code=500, detail={"updated": False})
 
     return {"updated": result.modified_count > 0}
+
+
+@router.get("/get_incident")
+async def get_incident(id: str = Query(None), mongo=Depends(get_mongo)):
+    """
+    Returns a single incident by MongoDB ObjectId passed as a query parameter 'id'.
+    """
+    if not id:
+        raise HTTPException(status_code=400, detail="id is required")
+
+    try:
+        oid = ObjectId(id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ObjectId")
+
+    try:
+        doc = mongo.coll.find_one({"_id": oid})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Incident not found")
+
+        return JSONResponse(content=json.loads(dumps(doc)))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/livez")
