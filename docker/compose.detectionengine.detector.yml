@@ -16,7 +16,7 @@ services:
       AUTH_DB: ${AUTH_DB}
 
       EVENTS_COLLECTION_NAME: "events"
-      EVENT_STATUS_COLLECTION_NAME: "event_status"
+      EVENT_STATUS_COLLECTION_NAME: "event_state"
       RULES_COLLECTION_NAME: "rules"
       DETECTIONS_COLLECTION_NAME: "detections"
 
