@@ -1,14 +1,14 @@
 services:
-  detectionengine-ruleset:
-    container_name: detectionengine-ruleset
-    image: quay.io/herringbone/detectionengine-ruleset:latest-d37c34ca-33
+  incidents-incidentset:
+    container_name: incidents-incidentset
+    image: quay.io/herringbone/incidents-incidentset:latest-be2a14b5-3
     restart: unless-stopped
 
     networks:
       - herringbone
 
     ports:
-      - "7002:7002"
+      - "7011:7011"
 
     environment:
       MONGO_HOST: ${MONGO_HOST}
@@ -17,7 +17,7 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-      COLLECTION_NAME: "rules"
+      COLLECTION_NAME: "incidents"
 
     read_only: true
     tmpfs:

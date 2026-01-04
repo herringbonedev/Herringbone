@@ -1,7 +1,7 @@
 services:
   herringbone-logs:
     container_name: herringbone-logs
-    image: quay.io/herringbone/herringbone-logs:latest-07fdc142-21
+    image: quay.io/herringbone/herringbone-logs:latest-d37c34ca-22
     restart: unless-stopped
 
     depends_on:
