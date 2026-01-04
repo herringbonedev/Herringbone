@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: incidents-incidentset
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: incidents-incidentset
+  template:
+    metadata:
+      labels:
+        app: incidents-incidentset
+    spec:
+      containers:
+        - name: incidents-incidentset
+          image: quay.io/herringbone/incidents-incidentset
+          ports:
+            - containerPort: 7011
+              name: tcp-port
+              protocol: TCP
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "150m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          env:
+            - name: MONGO_HOST
+              value: mongodb-headless.mongodb.svc.cluster.local:27017
+            - name: DB_NAME
+              value: herringbone
+            - name: COLLECTION_NAME
+              value: incidents
+            - name: MONGO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: username
+            - name: MONGO_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: password
+          livenessProbe:
+            httpGet:
+              path: /incidents/incidentset/livez
+              port: 7011
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /incidents/incidentset/readyz
+              port: 7011
+            initialDelaySeconds: 10
+            periodSeconds: 10
