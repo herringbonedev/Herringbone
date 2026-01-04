@@ -5,7 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'incidents/incidentset/**'
-      - '.github/workflows/incident-incidentset.yml'
+      - '.github/workflows/incidents-incidentset.yml'
 
 permissions:
   contents: write
@@ -17,9 +17,9 @@ jobs:
     uses: ./.github/workflows/build-test-push.yml
     secrets: inherit
     with:
-      service_name: incident-incidentset
-      service_path: incident/incidentset
-      dockerfile: incident/incidentset/docker/Dockerfile
+      service_name: incidents-incidentset
+      service_path: incidents/incidentset
+      dockerfile: incidents/incidentset/docker/Dockerfile
       kustomization_path: kustomize/incident_incidentset/kustomization.yaml
-      image_repo: quay.io/herringbone/incident-incidentset
+      image_repo: quay.io/herringbone/incidents-incidentset
 
