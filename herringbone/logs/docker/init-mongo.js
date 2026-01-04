@@ -62,7 +62,10 @@ db.event_state.insertOne({
   }
 })
 
+const detectionId = ObjectId()
+
 db.detections.insertOne({
+  _id: detectionId,
   event_id: eventId,
   detection: true,
   severity: 75,
@@ -70,4 +73,22 @@ db.detections.insertOne({
     detection: true
   },
   inserted_at: new Date()
+})
+
+db.incidents.insertOne({
+  title: "Suspicious login activity",
+  description: "Failed login detected for privileged account",
+  status: "open",
+  priority: "high",
+  detections: [detectionId.toString()],
+  events: [eventId.toString()],
+  owner: null,
+  notes: [
+    {
+      message: "Incident created from detection",
+      created_at: new Date()
+    }
+  ],
+  created_at: new Date(),
+  updated_at: new Date()
 })

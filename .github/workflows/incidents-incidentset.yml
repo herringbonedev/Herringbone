@@ -1,0 +1,25 @@
+name: (IncidentSet) Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'incidents/incidentset/**'
+      - '.github/workflows/incident-incidentset.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-test-push.yml
+    secrets: inherit
+    with:
+      service_name: incident-incidentset
+      service_path: incident/incidentset
+      dockerfile: incident/incidentset/docker/Dockerfile
+      kustomization_path: kustomize/incident_incidentset/kustomization.yaml
+      image_repo: quay.io/herringbone/incident-incidentset
+

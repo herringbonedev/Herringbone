@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from datetime import datetime, timedelta
 from bson import ObjectId
 import os
 
@@ -209,6 +210,62 @@ def dashboard_recent_detections(n: int = Query(10, ge=1, le=50)):
         for d in detections
     ])
 
+@router.get("/dashboard/recent-incidents")
+def recent_incidents(n: int = Query(10, ge=1, le=50)):
+    mongo = get_mongo()
+
+    incidents = mongo.find_sorted(
+        collection="incidents",
+        filter_query={},
+        sort=[("created_at", -1)],
+        limit=n,
+    )
+
+    results = []
+    for i in incidents:
+        results.append({
+            "incident_id": str(i.get("_id")),
+            "title": i.get("title"),
+            "status": i.get("status"),
+            "priority": i.get("priority"),
+            "owner": i.get("owner"),
+            "created_at": i.get("created_at"),
+        })
+
+    return JSONResponse(content=encode(results))
+
+@router.get("/dashboard/incidents-throughput")
+def incidents_throughput(days: int = Query(7, ge=1, le=30)):
+    mongo = get_mongo()
+
+    since = datetime.utcnow() - timedelta(days=days)
+
+    incidents = mongo.find(
+        collection="incidents",
+        filter_query={"created_at": {"$gte": since}},
+    )
+
+    buckets = {}
+
+    for i in incidents:
+        created = i.get("created_at")
+        if not created:
+            continue
+
+        day = created.strftime("%Y-%m-%d")
+        buckets.setdefault(day, {"open": 0, "resolved": 0})
+
+        if i.get("status") == "resolved":
+            buckets[day]["resolved"] += 1
+        else:
+            buckets[day]["open"] += 1
+
+    result = [
+        {"ts": day, **counts}
+        for day, counts in sorted(buckets.items())
+    ]
+
+    return JSONResponse(content=encode(result))
 
 @router.get("/livez")
 def livez():
