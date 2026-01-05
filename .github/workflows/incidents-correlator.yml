@@ -1,0 +1,25 @@
+name: (Orchestrator) Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'incidents/orchestrator/**'
+      - '.github/workflows/incidents-orchestrator.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-test-push.yml
+    secrets: inherit
+    with:
+      service_name: incidents-orchestrator
+      service_path: incidents/orchestrator
+      dockerfile: incidents/orchestrator/docker/Dockerfile
+      kustomization_path: kustomize/incidents_orchestrator/kustomization.yaml
+      image_repo: quay.io/herringbone/incidents-orchestrator
+

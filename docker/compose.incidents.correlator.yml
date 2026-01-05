@@ -1,18 +1,14 @@
 services:
-  herringbone-logs:
-    container_name: herringbone-logs
-    image: quay.io/herringbone/herringbone-logs:latest-1e71d7a9-24
+  incidents-correlator:
+    container_name: incidents-correlator
+    image: quay.io/herringbone/incidents-correlator:latest-be2a14b5-3
     restart: unless-stopped
-
-    depends_on:
-      mongodb:
-        condition: service_healthy
 
     networks:
       - herringbone
 
     ports:
-      - "7010:7010"
+      - "7012:7012"
 
     environment:
       MONGO_HOST: ${MONGO_HOST}
@@ -21,7 +17,7 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-      COLLECTION_NAME: events
+      COLLECTION_NAME: "incidents"
 
     read_only: true
     tmpfs:
@@ -32,3 +28,4 @@ services:
 networks:
   herringbone:
     external: true
+    name: herringbone_net
