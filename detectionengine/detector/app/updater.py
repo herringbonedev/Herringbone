@@ -1,6 +1,9 @@
 import os
+import requests
 from datetime import datetime
 from modules.database.mongo_db import HerringboneMongoDatabase
+
+ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", None)
 
 
 def _db(collection: str) -> HerringboneMongoDatabase:
@@ -22,6 +25,15 @@ def _max_severity(analysis: dict):
 		if d.get("matched") and d.get("severity") is not None
 	]
 	return max(vals) if vals else None
+
+
+def notify_orchestrator(payload):
+	try:
+		resp = requests.post(ORCHESTRATOR_URL, json=payload, timeout=2)
+		resp.raise_for_status()
+		print("[✓] Detection forwarded to orchestrator")
+	except Exception as e:
+		print(f"[✗] Failed to notify orchestrator: {e}")
 
 
 def set_failed(event_id, reason: str):
@@ -47,7 +59,7 @@ def set_failed(event_id, reason: str):
 		status_db.close_mongo_connection()
 
 
-def apply_result(event_id, analysis: dict):
+def apply_result(event_id, analysis: dict, rule_id: str):
 	now = datetime.utcnow()
 	severity = _max_severity(analysis)
 	detected = bool(analysis.get("detection"))
@@ -69,8 +81,20 @@ def apply_result(event_id, analysis: dict):
 			update["$set"]["severity"] = severity
 
 		coll.update_one({"event_id": event_id}, update, upsert=True)
+
 	finally:
 		status_db.close_mongo_connection()
+
+	if detected and ORCHESTRATOR_URL:
+		print("[*] Forwarding detection to orchestrator")
+		notify_orchestrator({
+			"detection_id": str(event_id),
+			"rule_id": rule_id,
+			"event_ids": [str(event_id)],
+			"severity": severity,
+			"priority": "high" if (severity or 0) >= 75 else "medium",
+			"timestamp": now.isoformat(),
+		})
 
 	det_coll = os.environ.get("DETECTIONS_COLLECTION_NAME")
 	if det_coll:
@@ -85,3 +109,4 @@ def apply_result(event_id, analysis: dict):
 			},
 			clean_codec=False,
 		)
+		print("[✓] Detection written to detections collection")
