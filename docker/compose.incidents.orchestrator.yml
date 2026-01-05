@@ -1,7 +1,7 @@
 services:
   incidents-orchestrator:
     container_name: incidents-orchestrator
-    image: quay.io/herringbone/incidents-orchestrator:latest-67bf7b0e-11
+    image: quay.io/herringbone/incidents-orchestrator:latest-897d4a50-1
 
     restart: unless-stopped
 
