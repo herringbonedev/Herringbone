@@ -20,13 +20,13 @@ INCIDENTSET_API = os.environ.get(
 
 @router.post("/process_detection")
 async def process_detection(payload: dict):
-    print(f"[*] Received detection payload.")
+    print("[*] Received detection payload")
     print(f"[*] Payload: {payload}")
 
     if "rule_id" not in payload:
         print("[✗] Missing rule_id in detection payload")
         raise HTTPException(status_code=400, detail="Missing rule_id")
-    
+
     print(f"[*] Calling correlator at {CORRELATOR_URL}")
     try:
         corr_resp = requests.post(CORRELATOR_URL, json=payload, timeout=5)
@@ -49,7 +49,6 @@ async def process_detection(payload: dict):
 
         update_payload = {
             "_id": incident_id,
-            "last_updated": payload.get("timestamp"),
         }
 
         print(f"[*] Attaching detection to incident {incident_id}")
@@ -79,11 +78,9 @@ async def process_detection(payload: dict):
                 "description",
                 "Incident created automatically from detection",
             ),
-            "rule_id": payload["rule_id"],
             "status": "open",
             "priority": payload.get("priority", "medium"),
-            "created_at": payload.get("timestamp"),
-            "last_updated": payload.get("timestamp"),
+            "owner": None,
             "events": payload.get("event_ids", []),
             "detections": [payload.get("detection_id")],
         }
@@ -101,7 +98,7 @@ async def process_detection(payload: dict):
             print("[✓] Incident created successfully")
         except Exception as e:
             print(f"[✗] Incident creation failed: {e}")
-            raise HTTPException(status_code=502, detail=f"Incident create failed: {e}")
+            raise HTTPException(status_code=502, detail="Incident create failed")
 
         return {
             "result": "created",
