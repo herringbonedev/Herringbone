@@ -28,6 +28,10 @@ def _max_severity(analysis: dict):
 
 
 def notify_orchestrator(payload):
+	if not ORCHESTRATOR_URL:
+		print("[✗] ORCHESTRATOR_URL not set, skipping notification")
+		return
+
 	try:
 		resp = requests.post(ORCHESTRATOR_URL, json=payload, timeout=2)
 		resp.raise_for_status()
@@ -85,8 +89,8 @@ def apply_result(event_id, analysis: dict, rule_id: str):
 	finally:
 		status_db.close_mongo_connection()
 
-	if detected and ORCHESTRATOR_URL:
-		print("[*] Forwarding detection to orchestrator")
+	if detected:
+		print("[*] Detection evaluated as TRUE")
 		notify_orchestrator({
 			"detection_id": str(event_id),
 			"rule_id": rule_id,

@@ -1,7 +1,7 @@
 services:
   detectionengine-detector:
     container_name: detectionengine-detector
-    image:  quay.io/herringbone/detectionengine-detector:latest-fe295390-69
+    image:  quay.io/herringbone/detectionengine-detector:latest-76419cf7-70
     restart: unless-stopped
 
     networks:
@@ -21,6 +21,7 @@ services:
       DETECTIONS_COLLECTION_NAME: "detections"
 
       MATCHER_API: "http://detectionengine-matcher:7003/detectionengine/matcher/find_match"
+      ORCHESTRATOR_URL: "http://incidents-orchestrator:7013/incidents/orchestrator/process_detection"
 
     read_only: true
     tmpfs:

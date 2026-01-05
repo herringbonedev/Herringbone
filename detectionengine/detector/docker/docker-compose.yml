@@ -57,6 +57,8 @@ services:
       DETECTIONS_COLLECTION_NAME: "detections"
 
       MATCHER_API: ${MATCHER_API}
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL}
+
 
     depends_on:
       - mongodb
