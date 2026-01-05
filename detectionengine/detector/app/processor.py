@@ -33,7 +33,7 @@ def _maybe_log(interval: float = 5.0):
 	rate = _metrics["processed"] / max(interval, 1)
 
 	print(
-		f"[detector] heartbeat "
+		f"[*] detector heartbeat "
 		f"processed={_metrics['processed']} "
 		f"detected={_metrics['detected']} "
 		f"failed={_metrics['failed']} "
@@ -61,11 +61,18 @@ def process_one():
 	try:
 		analysis = analyze_log_with_rules(to_send, rules)
 
+		print(f"[*] analysis result detection={analysis.get('detection')}")
+
 		rule_id = None
 		for d in analysis.get("details", []):
 			if d.get("matched"):
 				rule_id = d.get("rule_id") or d.get("rule_name")
 				break
+
+		print(f"[*] extracted rule_id={rule_id}")
+		
+		if analysis.get("detection") and not rule_id:
+			raise Exception("detection true but no rule_id found")
 
 		apply_result(
 			event_id,
@@ -84,7 +91,7 @@ def process_one():
 		_metrics["processed"] += 1
 		_metrics["failed"] += 1
 
-		print(f"[ERROR] detector processing failed: {e}")
+		print(f"[✗] detector processing failed: {e}")
 		set_failed(event_id, str(e))
 
 		_maybe_log()
