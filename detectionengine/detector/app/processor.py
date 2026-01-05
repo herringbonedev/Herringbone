@@ -60,7 +60,11 @@ def process_one():
 
 	try:
 		analysis = analyze_log_with_rules(to_send, rules)
-		apply_result(event_id, analysis)
+		apply_result(
+			event_id,
+			analysis,
+			rule.get("_id") or rule.get("id"),
+		)
 
 		_metrics["processed"] += 1
 		if analysis.get("detection"):
