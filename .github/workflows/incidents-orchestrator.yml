@@ -1,0 +1,25 @@
+name: (Correlator) Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'incidents/correlator/**'
+      - '.github/workflows/incidents-correlator.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-test-push.yml
+    secrets: inherit
+    with:
+      service_name: incidents-correlator
+      service_path: incidents/correlator
+      dockerfile: incidents/correlator/docker/Dockerfile
+      kustomization_path: kustomize/incidents_correlator/kustomization.yaml
+      image_repo: quay.io/herringbone/incidents-correlator
+
