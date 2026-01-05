@@ -1,7 +1,7 @@
 services:
   incidents-orchestrator:
     container_name: incidents-orchestrator
-    image: quay.io/herringbone/incidents-orchestrator:latest-897d4a50-1
+    image: quay.io/herringbone/incidents-orchestrator:latest-c5915e40-2
 
     restart: unless-stopped
 
@@ -10,6 +10,10 @@ services:
 
     ports:
       - "7013:7013"
+
+    environment:
+      CORRELATOR_URL: "http://incidents-correlator:7012/incidents/correlator/correlate"
+      INCIDENTSET_API: "http://incidents-incidentset:7011/incidents/incidentset"
 
     read_only: true
     tmpfs:
