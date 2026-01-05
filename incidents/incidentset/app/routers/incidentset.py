@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from datetime import datetime
 from bson import ObjectId
 from bson.json_util import dumps
 from modules.database.mongo_db import HerringboneMongoDatabase
@@ -62,10 +63,6 @@ def get_mongo():
 
 @router.post("/insert_incident")
 async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
-    """
-    Inserts a new incident.
-    Uses Pydantic for basic shape and IncidentSchema for custom validation.
-    """
     data = payload.dict()
 
     validation = validator(data)
@@ -74,6 +71,10 @@ async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
             status_code=400,
             detail={"error": "Invalid JSON", "details": validation["error"]},
         )
+
+    now = datetime.utcnow()
+    data["created_at"] = now
+    data["updated_at"] = now
 
     try:
         mongo.insert_log(data)
