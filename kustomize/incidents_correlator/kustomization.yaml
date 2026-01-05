@@ -5,6 +5,6 @@ resources:
   - deployment.yaml
   - service.yaml
 images:
-  - name: 
-    newTag: 
-    digest: 
+  - name:
+    newTag: latest-897d4a50-1
+    digest: sha256:b63f20e479f79ad562448b6a885730ea030b68b2580932d0e30a1ae9679e430a
