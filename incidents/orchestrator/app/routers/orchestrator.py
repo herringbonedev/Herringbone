@@ -27,6 +27,12 @@ async def process_detection(payload: dict):
         print("[✗] Missing rule_id in detection payload")
         raise HTTPException(status_code=400, detail="Missing rule_id")
 
+    rule_id = payload.get("rule_id")
+    rule_name = payload.get("rule_name", rule_id)
+
+    print(f"[*] rule_id: {rule_id}")
+    print(f"[*] rule_name: {rule_name}")
+
     print(f"[*] Calling correlator at {CORRELATOR_URL}")
     try:
         corr_resp = requests.post(CORRELATOR_URL, json=payload, timeout=5)
@@ -83,6 +89,8 @@ async def process_detection(payload: dict):
             "owner": None,
             "events": payload.get("event_ids", []),
             "detections": [payload.get("detection_id")],
+            "rule_id": rule_id,
+            "rule_name": rule_name,
         }
 
         print("[*] Creating new incident")
