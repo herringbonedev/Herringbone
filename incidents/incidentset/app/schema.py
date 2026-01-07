@@ -1,6 +1,5 @@
 from jsonschema import validate, ValidationError
 
-
 class IncidentSchema:
     """Validates JSON data for an incident entry."""
 
@@ -12,15 +11,10 @@ class IncidentSchema:
                 "status",
                 "priority",
             ],
-            "additionalProperties": False,
+            "additionalProperties": True,
             "properties": {
-                "title": {
-                    "type": "string",
-                    "minLength": 1,
-                },
-                "description": {
-                    "type": "string",
-                },
+                "title": {"type": "string", "minLength": 1},
+                "description": {"type": "string"},
                 "status": {
                     "type": "string",
                     "enum": ["open", "investigating", "resolved"],
@@ -29,46 +23,17 @@ class IncidentSchema:
                     "type": "string",
                     "enum": ["low", "medium", "high", "critical"],
                 },
-                "detections": {
-                    "type": "array",
-                    "items": {
-                        "type": "string",
-                        "minLength": 1,
-                    },
-                    "default": [],
-                },
-                "events": {
-                    "type": "array",
-                    "items": {
-                        "type": "string",
-                        "minLength": 1,
-                    },
-                    "default": [],
-                },
-                "owner": {
-                    "type": ["string", "null"],
-                },
-                "notes": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "required": ["message"],
-                        "additionalProperties": False,
-                        "properties": {
-                            "message": {
-                                "type": "string",
-                                "minLength": 1,
-                            },
-                            "author": {
-                                "type": ["string", "null"],
-                            },
-                            "created_at": {
-                                "type": "string",
-                            },
-                        },
-                    },
-                    "default": [],
-                },
+
+                "rule_id": {"type": "string"},
+                "rule_name": {"type": "string"},
+                "created_at": {"type": "string"},
+                "last_updated": {"type": "string"},
+                "state": {"type": "object"},
+
+                "detections": {"type": "array", "items": {"type": "string"}},
+                "events": {"type": "array", "items": {"type": "string"}},
+                "owner": {"type": ["string", "null"]},
+                "notes": {"type": "array"},
             },
         }
 

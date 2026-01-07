@@ -60,10 +60,21 @@ def get_mongo():
         raise HTTPException(status_code=500, detail="Mongo connection not initialized")
     return db
 
-
 @router.post("/insert_incident")
 async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
     data = payload.dict()
+
+    now = datetime.utcnow().isoformat()
+    data.setdefault("rule_id", payload.dict().get("rule_id"))
+    data.setdefault("rule_name", payload.dict().get("rule_name"))
+
+    data["created_at"] = now
+    data["last_updated"] = now
+    data["status"] = data.get("status", "open")
+
+    data["state"] = {
+        "last_updated": now
+    }
 
     validation = validator(data)
     if not validation["valid"]:
@@ -72,14 +83,10 @@ async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
             detail={"error": "Invalid JSON", "details": validation["error"]},
         )
 
-    now = datetime.utcnow()
-    data["created_at"] = now
-    data["updated_at"] = now
-
     try:
         mongo.insert_log(data)
-    except Exception:
-        raise HTTPException(status_code=500, detail={"inserted": False})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     return {"inserted": True}
 
