@@ -1,7 +1,7 @@
 services:
   detectionengine-matcher:
     container_name: detectionengine-matcher
-    image: quay.io/herringbone/detectionengine-matcher:latest-5919d02b-2
+    image: quay.io/herringbone/detectionengine-matcher:latest-9c49fc0e-6
 
     restart: unless-stopped
 
