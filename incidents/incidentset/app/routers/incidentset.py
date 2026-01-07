@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -18,35 +18,19 @@ validator = IncidentSchema()
 
 
 class IncidentBase(BaseModel):
-    """
-    Base model for an incident.
-    Allows arbitrary extra fields so the incident schema can evolve.
-    """
     class Config:
         extra = "allow"
 
 
 class IncidentCreate(IncidentBase):
-    """
-    Payload for creating a new incident.
-    Inherits all fields from IncidentBase.
-    """
     pass
 
 
 class IncidentUpdate(IncidentBase):
-    """
-    Update payload for incidents.
-    Accepts '_id' from the client but stores it as 'id'.
-    """
     id: str = Field(..., alias="_id", serialization_alias="_id")
 
 
 def get_mongo():
-    """
-    Returns an initialized HerringboneMongoDatabase instance.
-    Ensures the Mongo collection is available before each request.
-    """
     db = HerringboneMongoDatabase(
         user=os.environ.get("MONGO_USER", ""),
         password=os.environ.get("MONGO_PASS", ""),
@@ -60,11 +44,17 @@ def get_mongo():
         raise HTTPException(status_code=500, detail="Mongo connection not initialized")
     return db
 
+
 @router.post("/insert_incident")
 async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
+    print("[*] insert_incident called")
+    print("[*] raw payload:")
+    print(json.dumps(payload.dict(), indent=2, default=str))
+
     data = payload.dict()
 
     now = datetime.utcnow().isoformat()
+
     data.setdefault("rule_id", payload.dict().get("rule_id"))
     data.setdefault("rule_name", payload.dict().get("rule_name"))
 
@@ -76,8 +66,15 @@ async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
         "last_updated": now
     }
 
+    print("[*] incident after enrichment:")
+    print(json.dumps(data, indent=2, default=str))
+
     validation = validator(data)
+    print("[*] validation result:")
+    print(validation)
+
     if not validation["valid"]:
+        print("[✗] validation failed")
         raise HTTPException(
             status_code=400,
             detail={"error": "Invalid JSON", "details": validation["error"]},
@@ -85,7 +82,10 @@ async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
 
     try:
         mongo.insert_log(data)
+        print("[✓] incident inserted")
     except Exception as e:
+        print("[✗] mongo insert failed")
+        print(str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"inserted": True}
@@ -93,32 +93,37 @@ async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
 
 @router.get("/get_incidents")
 async def get_incidents(mongo=Depends(get_mongo)):
-    """
-    Returns all incidents from MongoDB as raw JSON.
-    """
+    print("[*] get_incidents called")
     try:
         docs = list(mongo.coll.find({}))
+        print(f"[*] returning {len(docs)} incidents")
         return JSONResponse(content=json.loads(dumps(docs)))
     except Exception as e:
+        print("[✗] get_incidents failed")
+        print(str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/delete_incident")
 async def delete_incident(id: str = Query(None), mongo=Depends(get_mongo)):
-    """
-    Deletes an incident by MongoDB ObjectId passed as a query parameter 'id'.
-    """
+    print(f"[*] delete_incident called id={id}")
+
     if not id:
+        print("[✗] missing id")
         raise HTTPException(status_code=400, detail="id is required")
 
     try:
         oid = ObjectId(id)
     except Exception:
+        print("[✗] invalid ObjectId")
         raise HTTPException(status_code=400, detail="Invalid ObjectId")
 
     try:
         result = mongo.coll.delete_one({"_id": oid})
-    except Exception:
+        print(f"[*] deleted_count={result.deleted_count}")
+    except Exception as e:
+        print("[✗] delete failed")
+        print(str(e))
         raise HTTPException(status_code=500, detail={"deleted": False})
 
     return {"deleted": result.deleted_count > 0}
@@ -126,7 +131,11 @@ async def delete_incident(id: str = Query(None), mongo=Depends(get_mongo)):
 
 @router.post("/update_incident")
 async def update_incident(payload: dict, mongo=Depends(get_mongo)):
+    print("[*] update_incident called")
+    print(json.dumps(payload, indent=2, default=str))
+
     if "_id" not in payload:
+        print("[✗] missing _id")
         raise HTTPException(status_code=400, detail="Missing incident _id")
 
     raw_id = payload.pop("_id")
@@ -139,24 +148,32 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
     try:
         oid = ObjectId(incident_id)
     except Exception:
+        print("[✗] invalid ObjectId")
         raise HTTPException(status_code=400, detail="Invalid ObjectId")
 
-    # Only allow mutable fields
     update_fields = {}
     for key in ("owner", "status", "priority"):
         if key in payload:
             update_fields[key] = payload[key]
 
+    print("[*] update_fields:")
+    print(update_fields)
+
     if not update_fields:
+        print("[✗] no updatable fields")
         raise HTTPException(status_code=400, detail="No updatable fields provided")
 
-    # Validate only the mutable fields
     validation = validator({
         "title": "placeholder",
         "status": update_fields.get("status", "open"),
         "priority": update_fields.get("priority", "low"),
     })
+
+    print("[*] validation result:")
+    print(validation)
+
     if not validation["valid"]:
+        print("[✗] validation failed")
         raise HTTPException(
             status_code=400,
             detail={"error": "Invalid JSON", "details": validation["error"]},
@@ -167,7 +184,10 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
             {"_id": oid},
             {"$set": update_fields},
         )
-    except Exception:
+        print(f"[*] modified_count={result.modified_count}")
+    except Exception as e:
+        print("[✗] update failed")
+        print(str(e))
         raise HTTPException(status_code=500, detail={"updated": False})
 
     return {"updated": result.modified_count > 0}
@@ -175,43 +195,41 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
 
 @router.get("/get_incident")
 async def get_incident(id: str = Query(None), mongo=Depends(get_mongo)):
-    """
-    Returns a single incident by MongoDB ObjectId passed as a query parameter 'id'.
-    """
+    print(f"[*] get_incident called id={id}")
+
     if not id:
+        print("[✗] missing id")
         raise HTTPException(status_code=400, detail="id is required")
 
     try:
         oid = ObjectId(id)
     except Exception:
+        print("[✗] invalid ObjectId")
         raise HTTPException(status_code=400, detail="Invalid ObjectId")
 
     try:
         doc = mongo.coll.find_one({"_id": oid})
         if not doc:
+            print("[✗] incident not found")
             raise HTTPException(status_code=404, detail="Incident not found")
 
+        print("[✓] incident found")
         return JSONResponse(content=json.loads(dumps(doc)))
     except HTTPException:
         raise
     except Exception as e:
+        print("[✗] get_incident failed")
+        print(str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/livez")
 async def livez():
-    """
-    Liveness probe endpoint.
-    """
     return "OK"
 
 
 @router.get("/readyz")
 async def readyz():
-    """
-    Readiness probe endpoint.
-    Ensures MongoDB is reachable.
-    """
     try:
         _ = get_mongo()
         return {"ready": True}
