@@ -1,68 +1,88 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import JSONResponse
-from bson import ObjectId
-from bson.json_util import dumps
-from datetime import datetime, timedelta
-from modules.database.mongo_db import HerringboneMongoDatabase
-import os
-import json
-
-router = APIRouter(
-    prefix="/incidents/correlator",
-    tags=["correlator"],
-)
-
-
-def get_mongo():
-    """
-    Returns an initialized HerringboneMongoDatabase instance.
-    Uses the incidents collection for correlation lookups.
-    """
-    db = HerringboneMongoDatabase(
-        user=os.environ.get("MONGO_USER", ""),
-        password=os.environ.get("MONGO_PASS", ""),
-        database=os.environ.get("DB_NAME", "herringbone"),
-        collection=os.environ.get("COLLECTION_NAME", "incidents"),
-        host=os.environ.get("MONGO_HOST", "localhost"),
-        auth_source=os.environ.get("AUTH_DB", "herringbone"),
-    )
-    db.open_mongo_connection()
-    if db.coll is None:
-        raise HTTPException(status_code=500, detail="Mongo connection not initialized")
-    return db
-
-
-@router.post("/correlate")
-async def correlate(payload: dict, mongo=Depends(get_mongo)):
+@router.post("/process_detection")
+async def process_detection(payload: dict):
+    print("[*] Received detection payload")
+    print(f"[*] Payload: {payload}")
 
     if "rule_id" not in payload:
-        raise HTTPException(status_code=400, detail="Missing rule_id in detection")
+        print("[✗] Missing rule_id in detection payload")
+        raise HTTPException(status_code=400, detail="Missing rule_id")
 
-    rule_id = payload["rule_id"]
-
-    now = datetime.utcnow()
-    window_start = now - timedelta(minutes=30)
-
+    print(f"[*] Calling correlator at {CORRELATOR_URL}")
     try:
-        candidate = mongo.coll.find_one(
-            {
-                "status": {"$in": ["open", "investigating"]},
-                "rule_id": rule_id,
-                "last_updated": {"$gte": window_start},
-            },
-            sort=[("last_updated", -1)],
-        )
+        corr_resp = requests.post(CORRELATOR_URL, json=payload, timeout=5)
+        corr_resp.raise_for_status()
+        decision = corr_resp.json()
+        print("[✓] Correlator responded successfully")
+        print(f"[*] Correlation decision payload: {decision}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[✗] Correlator request failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Correlator error: {e}")
 
-    if candidate:
-        return {
-            "action": "attach",
-            "incident_id": str(candidate["_id"]),
-            "reason": "matching_rule_id_within_window",
+    action = decision.get("action")
+    print(f"[*] Correlation decision resolved to: {action}")
+
+    if action == "attach":
+        incident_id = decision.get("incident_id")
+        if not incident_id:
+            print("[✗] Correlator returned attach without incident_id")
+            raise HTTPException(status_code=500, detail="Missing incident_id from correlator")
+
+        update_payload = {
+            "_id": incident_id,
         }
 
-    return {
-        "action": "create",
-        "reason": "no_matching_open_incident",
-    }
+        print(f"[*] Attaching detection to incident {incident_id}")
+        print(f"[*] Update payload: {update_payload}")
+
+        try:
+            resp = requests.post(
+                f"{INCIDENTSET_API}/update_incident",
+                json=update_payload,
+                timeout=5,
+            )
+            resp.raise_for_status()
+            print("[✓] Incident updated successfully")
+        except Exception as e:
+            print(f"[✗] Incident update failed: {e}")
+            raise HTTPException(status_code=502, detail=f"Incident update failed: {e}")
+
+        return {
+            "result": "attached",
+            "incident_id": incident_id,
+        }
+
+    if action == "create":
+        create_payload = {
+            "title": payload.get("title", "Detected Security Activity"),
+            "description": payload.get(
+                "description",
+                "Incident created automatically from detection",
+            ),
+            "status": "open",
+            "priority": payload.get("priority", "medium"),
+            "owner": None,
+            "events": payload.get("event_ids", []),
+            "detections": [payload.get("detection_id")],
+        }
+
+        print("[*] Creating new incident")
+        print(f"[*] Create payload: {create_payload}")
+
+        try:
+            resp = requests.post(
+                f"{INCIDENTSET_API}/insert_incident",
+                json=create_payload,
+                timeout=5,
+            )
+            resp.raise_for_status()
+            print("[✓] Incident created successfully")
+        except Exception as e:
+            print(f"[✗] Incident creation failed: {e}")
+            raise HTTPException(status_code=502, detail="Incident create failed")
+
+        return {
+            "result": "created",
+        }
+
+    print(f"[✗] Unknown correlation action received: {action}")
+    raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
