@@ -1,7 +1,7 @@
 services:
   incidents-incidentset:
     container_name: incidents-incidentset
-    image: quay.io/herringbone/incidents-incidentset:latest-5a14ed8d-10
+    image: quay.io/herringbone/incidents-incidentset:latest-f3ecb058-11
     restart: unless-stopped
 
     networks:
