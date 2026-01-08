@@ -81,10 +81,13 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
 
     raw_id = payload.pop("_id", None)
     if not raw_id:
-        print("[✗] missing _id")
         raise HTTPException(status_code=400, detail="Missing _id")
 
-    oid = ObjectId(raw_id if isinstance(raw_id, str) else raw_id.get("$oid"))
+    try:
+        oid = ObjectId(raw_id if isinstance(raw_id, str) else raw_id.get("$oid"))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid _id")
+
     now = datetime.utcnow()
 
     set_fields = {
@@ -94,11 +97,14 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
 
     push_fields = {}
 
-    if payload.get("events"):
+    if isinstance(payload.get("events"), list):
         push_fields["events"] = {"$each": payload["events"]}
 
-    if payload.get("detections"):
+    if isinstance(payload.get("detections"), list):
         push_fields["detections"] = {"$each": payload["detections"]}
+
+    if isinstance(payload.get("notes"), list):
+        push_fields["notes"] = {"$each": payload["notes"]}
 
     update_doc = {"$set": set_fields}
     if push_fields:
@@ -119,6 +125,7 @@ async def get_incidents(mongo=Depends(get_mongo)):
     docs = list(mongo.coll.find({}))
     print(f"[*] returning {len(docs)} incidents")
     return JSONResponse(content=json.loads(dumps(docs)))
+
 
 @router.get("/get_incident/{incident_id}")
 async def get_incident(incident_id: str, mongo=Depends(get_mongo)):
