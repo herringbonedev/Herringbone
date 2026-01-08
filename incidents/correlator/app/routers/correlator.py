@@ -36,7 +36,7 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
 
     rule_id = str(payload["rule_id"])
     correlate_on = payload.get("correlate_on") or []
-    event = payload.get("event") or {}
+    event = payload.get("event")
 
     now = datetime.utcnow()
     window_start = now - timedelta(minutes=30)
@@ -45,42 +45,70 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
     if ObjectId.is_valid(rule_id):
         rule_clauses.append({"rule_id": ObjectId(rule_id)})
 
-    correlation_identity = {}
-    correlation_filters = []
-
-    for field in correlate_on:
-        parts = field.split(".")
-        value = event
-        for p in parts:
-            if not isinstance(value, dict) or p not in value:
-                value = None
-                break
-            value = value[p]
-
-        if value is None:
-            print("[*] Correlation field missing:", field)
+    if correlate_on:
+        if not isinstance(event, dict):
             return {
                 "action": "create",
                 "correlation_identity": {},
             }
 
-        if isinstance(value, list):
-            value = sorted(set(value))
-            correlation_filters.append({field: {"$all": value}})
-        else:
-            correlation_filters.append({field: value})
+        correlation_filters = []
+        correlation_identity = {}
 
-        correlation_identity[field] = value
+        for field in correlate_on:
+            parts = field.split(".")
+            value = event
+            for p in parts:
+                if not isinstance(value, dict) or p not in value:
+                    value = None
+                    break
+                value = value[p]
+
+            if value is None:
+                return {
+                    "action": "create",
+                    "correlation_identity": {},
+                }
+
+            if isinstance(value, list):
+                value = sorted(set(value))
+                correlation_filters.append({field: {"$all": value}})
+            else:
+                correlation_filters.append({field: value})
+
+            correlation_identity[field] = value
+
+        query = {
+            "status": {"$in": ["open", "investigating"]},
+            "state.last_updated": {"$gte": window_start},
+            "$or": rule_clauses,
+            "$and": correlation_filters,
+        }
+
+        print("[*] Correlation query")
+        print(json.dumps(query, indent=2, default=str))
+
+        candidate = mongo.coll.find_one(
+            query,
+            sort=[("state.last_updated", -1)],
+        )
+
+        if candidate:
+            return {
+                "action": "attach",
+                "incident_id": str(candidate["_id"]),
+            }
+
+        return {
+            "action": "create",
+            "correlation_identity": correlation_identity,
+        }
 
     query = {
         "status": {"$in": ["open", "investigating"]},
         "state.last_updated": {"$gte": window_start},
         "$or": rule_clauses,
-        "$and": correlation_filters,
     }
-
-    print("[*] Correlation query")
-    print(json.dumps(query, indent=2, default=str))
 
     candidate = mongo.coll.find_one(
         query,
@@ -88,14 +116,11 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
     )
 
     if candidate:
-        print("[✓] Correlation identity match")
         return {
             "action": "attach",
             "incident_id": str(candidate["_id"]),
         }
 
-    print("[*] No correlation identity match")
     return {
         "action": "create",
-        "correlation_identity": correlation_identity,
     }
