@@ -53,7 +53,7 @@ async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
 
     data = payload.dict()
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.utcnow()
 
     data.setdefault("rule_id", payload.dict().get("rule_id"))
     data.setdefault("rule_name", payload.dict().get("rule_name"))
