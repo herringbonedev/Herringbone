@@ -97,14 +97,11 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
 
     push_fields = {}
 
-    if isinstance(payload.get("events"), list):
-        push_fields["events"] = {"$each": payload["events"]}
-
-    if isinstance(payload.get("detections"), list):
-        push_fields["detections"] = {"$each": payload["detections"]}
-
-    if isinstance(payload.get("notes"), list):
-        push_fields["notes"] = {"$each": payload["notes"]}
+    for key, value in payload.items():
+        if key in ("events", "detections", "notes") and isinstance(value, list):
+            push_fields[key] = {"$each": value}
+        else:
+            set_fields[key] = value
 
     update_doc = {"$set": set_fields}
     if push_fields:
