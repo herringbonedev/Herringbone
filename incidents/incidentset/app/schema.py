@@ -33,7 +33,19 @@ class IncidentSchema:
                 "detections": {"type": "array", "items": {"type": "string"}},
                 "events": {"type": "array", "items": {"type": "string"}},
                 "owner": {"type": ["string", "null"]},
-                "notes": {"type": "array"},
+                "notes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["author", "timestamp", "message"],
+                        "properties": {
+                            "author": {"type": "string"},
+                            "timestamp": {},
+                            "message": {"type": "string"},
+                        },
+                        "additionalProperties": False,
+                    },
+                },
             },
         }
 
