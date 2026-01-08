@@ -41,18 +41,19 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
     now = datetime.utcnow()
     window_start = now - timedelta(minutes=30)
 
-    query = {
-        "status": {"$in": ["open", "investigating"]},
-        "state.last_updated": {"$gte": window_start},
-    }
-
     rule_clauses = [{"rule_id": rule_id}]
     if ObjectId.is_valid(rule_id):
         rule_clauses.append({"rule_id": ObjectId(rule_id)})
 
-    query["$and"] = [
-        {"$or": rule_clauses}
-    ]
+    base_query = {
+        "status": {"$in": ["open", "investigating"]},
+        "state.last_updated": {"$gte": window_start},
+        "$or": rule_clauses,
+    }
+
+    correlation_query = {"$and": [base_query]}
+
+    correlation_identity = {}
 
     if correlate_on:
         for field in correlate_on:
@@ -65,18 +66,43 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
                 value = value[p]
 
             if isinstance(value, list) and value:
-                query["$and"].append({field: {"$in": value}})
+                correlation_query["$and"].append({field: {"$in": value}})
+                correlation_identity[field] = value
             elif value is not None:
-                query["$and"].append({field: value})
+                correlation_query["$and"].append({field: value})
+                correlation_identity[field] = value
 
     print("[*] Correlation query")
-    print(json.dumps(query, indent=2, default=str))
+    print(json.dumps(correlation_query, indent=2, default=str))
 
-    candidate = mongo.coll.find_one(query, sort=[("state.last_updated", -1)])
+    candidate = mongo.coll.find_one(
+        correlation_query,
+        sort=[("state.last_updated", -1)],
+    )
 
     if candidate:
-        print("[✓] Matching incident found")
-        return {"action": "attach", "incident_id": str(candidate["_id"])}
+        print("[✓] Correlation match found")
+        return {
+            "action": "attach",
+            "incident_id": str(candidate["_id"]),
+        }
 
-    print("[✗] No matching incident")
-    return {"action": "create"}
+    print("[*] No correlation match")
+
+    rule_only = mongo.coll.find_one(
+        base_query,
+        sort=[("state.last_updated", -1)],
+    )
+
+    if rule_only:
+        print("[✓] Rule match exists but correlation differs")
+        return {
+            "action": "create",
+            "correlation_identity": correlation_identity,
+        }
+
+    print("[*] No rule match exists")
+    return {
+        "action": "create",
+        "correlation_identity": correlation_identity,
+    }
