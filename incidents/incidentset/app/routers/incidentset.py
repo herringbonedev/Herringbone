@@ -119,3 +119,21 @@ async def get_incidents(mongo=Depends(get_mongo)):
     docs = list(mongo.coll.find({}))
     print(f"[*] returning {len(docs)} incidents")
     return JSONResponse(content=json.loads(dumps(docs)))
+
+@router.get("/get_incident/{incident_id}")
+async def get_incident(incident_id: str, mongo=Depends(get_mongo)):
+    print("[*] get_incident called")
+    print(f"[*] incident_id={incident_id}")
+
+    try:
+        oid = ObjectId(incident_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid incident id")
+
+    doc = mongo.coll.find_one({"_id": oid})
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    return JSONResponse(content=json.loads(dumps(doc)))
+
