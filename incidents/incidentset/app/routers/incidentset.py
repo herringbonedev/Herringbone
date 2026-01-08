@@ -159,9 +159,9 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
     print("[*] update_fields:")
     print(update_fields)
 
-    if not update_fields:
-        print("[✗] no updatable fields")
-        raise HTTPException(status_code=400, detail="No updatable fields provided")
+    now = datetime.utcnow()
+    update_fields["last_updated"] = now
+    update_fields["state.last_updated"] = now
 
     validation = validator({
         "title": "placeholder",
