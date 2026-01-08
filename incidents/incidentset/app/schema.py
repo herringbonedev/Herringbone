@@ -26,8 +26,8 @@ class IncidentSchema:
 
                 "rule_id": {"type": "string"},
                 "rule_name": {"type": "string"},
-                "created_at": {"type": "string"},
-                "last_updated": {"type": "string"},
+                "created_at": {},
+                "last_updated": {},
                 "state": {"type": "object"},
 
                 "detections": {"type": "array", "items": {"type": "string"}},
