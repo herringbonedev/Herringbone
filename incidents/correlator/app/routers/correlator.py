@@ -32,22 +32,42 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
     print(json.dumps(payload, indent=2, default=str))
 
     if "rule_id" not in payload:
-        print("[✗] Missing rule_id")
         raise HTTPException(status_code=400, detail="Missing rule_id")
 
     rule_id = str(payload["rule_id"])
+    correlate_on = payload.get("correlate_on") or []
+    event = payload.get("event") or {}
+
     now = datetime.utcnow()
     window_start = now - timedelta(minutes=30)
 
-    clauses = [{"rule_id": rule_id}]
-    if ObjectId.is_valid(rule_id):
-        clauses.append({"rule_id": ObjectId(rule_id)})
-
     query = {
         "status": {"$in": ["open", "investigating"]},
-        "$or": clauses,
         "state.last_updated": {"$gte": window_start},
     }
+
+    rule_clauses = [{"rule_id": rule_id}]
+    if ObjectId.is_valid(rule_id):
+        rule_clauses.append({"rule_id": ObjectId(rule_id)})
+
+    query["$and"] = [
+        {"$or": rule_clauses}
+    ]
+
+    if correlate_on:
+        for field in correlate_on:
+            parts = field.split(".")
+            value = event
+            for p in parts:
+                if not isinstance(value, dict) or p not in value:
+                    value = None
+                    break
+                value = value[p]
+
+            if isinstance(value, list) and value:
+                query["$and"].append({field: {"$in": value}})
+            elif value is not None:
+                query["$and"].append({field: value})
 
     print("[*] Correlation query")
     print(json.dumps(query, indent=2, default=str))
@@ -56,7 +76,6 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
 
     if candidate:
         print("[✓] Matching incident found")
-        print(json.dumps(candidate, indent=2, default=str))
         return {"action": "attach", "incident_id": str(candidate["_id"])}
 
     print("[✗] No matching incident")
