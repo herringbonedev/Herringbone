@@ -44,9 +44,13 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
     rule_clauses = [{"rule_id": rule_id}]
     if ObjectId.is_valid(rule_id):
         rule_clauses.append({"rule_id": ObjectId(rule_id)})
-
+    
     if correlate_on:
+        print("[*] Hard correlation enabled")
+        print("[*] correlate_on =", correlate_on)
+
         if not isinstance(event, dict):
+            print("[✗] No event payload present — forcing create")
             return {
                 "action": "create",
                 "correlation_identity": {},
@@ -58,6 +62,7 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
         for field in correlate_on:
             parts = field.split(".")
             value = event
+
             for p in parts:
                 if not isinstance(value, dict) or p not in value:
                     value = None
@@ -65,6 +70,7 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
                 value = value[p]
 
             if value is None:
+                print(f"[✗] Missing correlate_on field: {field}")
                 return {
                     "action": "create",
                     "correlation_identity": {},
@@ -94,15 +100,19 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
         )
 
         if candidate:
+            print("[✓] Correlation identity match")
             return {
                 "action": "attach",
                 "incident_id": str(candidate["_id"]),
             }
 
+        print("[*] No correlation identity match — creating new incident")
         return {
             "action": "create",
             "correlation_identity": correlation_identity,
         }
+    
+    print("[*] No correlate_on defined — rule-only correlation")
 
     query = {
         "status": {"$in": ["open", "investigating"]},
@@ -110,17 +120,22 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
         "$or": rule_clauses,
     }
 
+    print("[*] Rule-only query")
+    print(json.dumps(query, indent=2, default=str))
+
     candidate = mongo.coll.find_one(
         query,
         sort=[("state.last_updated", -1)],
     )
 
     if candidate:
+        print("[✓] Rule match found — attaching")
         return {
             "action": "attach",
             "incident_id": str(candidate["_id"]),
         }
 
+    print("[*] No rule match — creating new incident")
     return {
         "action": "create",
     }
