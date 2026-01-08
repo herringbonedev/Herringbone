@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/incidents-incidentset
-    newTag: latest-c0a99a91-9
-    digest: sha256:29b3271cc80a0ee7e279e6a81442d5395669e1f487945b125af6a70f8a75da70
+    newTag: latest-5a14ed8d-10
+    digest: sha256:0f32cda48c545c380938f99d2a774bfec3fbca24ed3aa61672e4efca43d6a8be
