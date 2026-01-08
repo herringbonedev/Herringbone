@@ -21,7 +21,7 @@ INCIDENTSET_API = os.environ.get(
 @router.post("/process_detection")
 async def process_detection(payload: dict):
     print("[*] Received detection payload")
-    print(f"[*] Payload: {payload}")
+    print(payload)
 
     if "rule_id" not in payload:
         print("[✗] Missing rule_id in detection payload")
@@ -35,30 +35,33 @@ async def process_detection(payload: dict):
 
     print(f"[*] Calling correlator at {CORRELATOR_URL}")
     try:
-        corr_resp = requests.post(CORRELATOR_URL, json=payload, timeout=5)
-        corr_resp.raise_for_status()
-        decision = corr_resp.json()
-        print("[✓] Correlator responded successfully")
-        print(f"[*] Correlation decision payload: {decision}")
+        resp = requests.post(CORRELATOR_URL, json=payload, timeout=5)
+        resp.raise_for_status()
+        decision = resp.json()
+        print("[✓] Correlator response:")
+        print(decision)
     except Exception as e:
-        print(f"[✗] Correlator request failed: {e}")
-        raise HTTPException(status_code=502, detail=f"Correlator error: {e}")
+        print("[✗] Correlator failed")
+        print(str(e))
+        raise HTTPException(status_code=502, detail=str(e))
 
     action = decision.get("action")
-    print(f"[*] Correlation decision resolved to: {action}")
+    print(f"[*] Correlator action: {action}")
 
     if action == "attach":
         incident_id = decision.get("incident_id")
         if not incident_id:
-            print("[✗] Correlator returned attach without incident_id")
-            raise HTTPException(status_code=500, detail="Missing incident_id from correlator")
+            print("[✗] Missing incident_id on attach")
+            raise HTTPException(status_code=500, detail="Missing incident_id")
 
         update_payload = {
             "_id": incident_id,
+            "events": payload.get("event_ids", []),
+            "detections": [payload.get("detection_id")],
         }
 
-        print(f"[*] Attaching detection to incident {incident_id}")
-        print(f"[*] Update payload: {update_payload}")
+        print("[*] Attaching detection")
+        print(update_payload)
 
         try:
             resp = requests.post(
@@ -67,15 +70,13 @@ async def process_detection(payload: dict):
                 timeout=5,
             )
             resp.raise_for_status()
-            print("[✓] Incident updated successfully")
+            print("[✓] Incident updated")
         except Exception as e:
-            print(f"[✗] Incident update failed: {e}")
-            raise HTTPException(status_code=502, detail=f"Incident update failed: {e}")
+            print("[✗] Incident update failed")
+            print(str(e))
+            raise HTTPException(status_code=502, detail=str(e))
 
-        return {
-            "result": "attached",
-            "incident_id": incident_id,
-        }
+        return {"result": "attached", "incident_id": incident_id}
 
     if action == "create":
         create_payload = {
@@ -93,8 +94,8 @@ async def process_detection(payload: dict):
             "rule_name": rule_name,
         }
 
-        print("[*] Creating new incident")
-        print(f"[*] Create payload: {create_payload}")
+        print("[*] Creating incident")
+        print(create_payload)
 
         try:
             resp = requests.post(
@@ -103,14 +104,13 @@ async def process_detection(payload: dict):
                 timeout=5,
             )
             resp.raise_for_status()
-            print("[✓] Incident created successfully")
+            print("[✓] Incident created")
         except Exception as e:
-            print(f"[✗] Incident creation failed: {e}")
-            raise HTTPException(status_code=502, detail="Incident create failed")
+            print("[✗] Incident create failed")
+            print(str(e))
+            raise HTTPException(status_code=502, detail=str(e))
 
-        return {
-            "result": "created",
-        }
+        return {"result": "created"}
 
-    print(f"[✗] Unknown correlation action received: {action}")
-    raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
+    print("[✗] Unknown action")
+    raise HTTPException(status_code=400, detail=f"Unknown action {action}")
