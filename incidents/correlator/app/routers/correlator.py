@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from modules.database.mongo_db import HerringboneMongoDatabase
 import os
 import json
+import requests
 
 router = APIRouter(
     prefix="/incidents/correlator",
@@ -26,6 +27,50 @@ def get_mongo():
     return db
 
 
+EVENTS_API_BASE = os.environ.get(
+    "EVENTS_API_BASE",
+    "http://localhost:7010/herringbone/logs/events",
+)
+
+
+def fetch_event(event_id: str):
+    try:
+        r = requests.get(f"{EVENTS_API_BASE}/{event_id}", timeout=5)
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except Exception:
+        return None
+
+
+def extract_correlate_values(event: dict, correlate_on: list[str]):
+    correlation_identity = {}
+    correlation_filters = []
+
+    for field in correlate_on:
+        parts = field.split(".")
+        value = event
+
+        for p in parts:
+            if not isinstance(value, dict) or p not in value:
+                value = None
+                break
+            value = value[p]
+
+        if value is None:
+            raise ValueError(field)
+
+        if isinstance(value, list):
+            value = sorted(set(value))
+            correlation_filters.append({field: {"$all": value}})
+        else:
+            correlation_filters.append({field: value})
+
+        correlation_identity[field] = value
+
+    return correlation_identity, correlation_filters
+
+
 @router.post("/correlate")
 async def correlate(payload: dict, mongo=Depends(get_mongo)):
     print("[*] Correlator invoked")
@@ -36,7 +81,7 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
 
     rule_id = str(payload["rule_id"])
     correlate_on = payload.get("correlate_on") or []
-    event = payload.get("event")
+    event_id = payload.get("event_id")
 
     now = datetime.utcnow()
     window_start = now - timedelta(minutes=30)
@@ -44,45 +89,34 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
     rule_clauses = [{"rule_id": rule_id}]
     if ObjectId.is_valid(rule_id):
         rule_clauses.append({"rule_id": ObjectId(rule_id)})
-    
+
     if correlate_on:
         print("[*] Hard correlation enabled")
         print("[*] correlate_on =", correlate_on)
 
-        if not isinstance(event, dict):
-            print("[✗] No event payload present — forcing create")
+        if not event_id:
             return {
                 "action": "create",
                 "correlation_identity": {},
             }
 
-        correlation_filters = []
-        correlation_identity = {}
+        event = fetch_event(event_id)
+        if not isinstance(event, dict):
+            return {
+                "action": "create",
+                "correlation_identity": {},
+            }
 
-        for field in correlate_on:
-            parts = field.split(".")
-            value = event
-
-            for p in parts:
-                if not isinstance(value, dict) or p not in value:
-                    value = None
-                    break
-                value = value[p]
-
-            if value is None:
-                print(f"[✗] Missing correlate_on field: {field}")
-                return {
-                    "action": "create",
-                    "correlation_identity": {},
-                }
-
-            if isinstance(value, list):
-                value = sorted(set(value))
-                correlation_filters.append({field: {"$all": value}})
-            else:
-                correlation_filters.append({field: value})
-
-            correlation_identity[field] = value
+        try:
+            correlation_identity, correlation_filters = extract_correlate_values(
+                event, correlate_on
+            )
+        except ValueError as e:
+            print(f"[✗] Missing correlate_on field: {str(e)}")
+            return {
+                "action": "create",
+                "correlation_identity": {},
+            }
 
         query = {
             "status": {"$in": ["open", "investigating"]},
@@ -111,7 +145,7 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
             "action": "create",
             "correlation_identity": correlation_identity,
         }
-    
+
     print("[*] No correlate_on defined — rule-only correlation")
 
     query = {
