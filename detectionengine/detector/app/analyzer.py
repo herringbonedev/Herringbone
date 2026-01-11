@@ -34,6 +34,7 @@ def analyze_log_with_rules(log_data: dict, rules: list[dict]) -> dict:
 				"matched": matched,
 				"matcher_details": match.get("details"),
 				"matcher_rule": rule_entry.get("rule"),
+				"correlate_on": rule_entry.get("correlate_on")
 			}
 		)
 

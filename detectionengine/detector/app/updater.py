@@ -71,6 +71,12 @@ def apply_result(event_id, analysis: dict, rule_id: str):
 	status_db = _db(os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state"))
 	client, db, coll = status_db.open_mongo_connection()
 
+	correlate_values = []
+
+	for d in analysis.get("details", []):
+		if d.get("matched") and d.get("correlate_on"):
+			correlate_values.append(d.get("correlate_on"))
+	
 	try:
 		update = {
 			"$set": {
@@ -78,6 +84,7 @@ def apply_result(event_id, analysis: dict, rule_id: str):
 				"detection": detected,
 				"analysis": analysis,
 				"last_stage": "detector",
+				"correlate_on": correlate_values,
 				"last_updated": now,
 			}
 		}
@@ -96,6 +103,7 @@ def apply_result(event_id, analysis: dict, rule_id: str):
 			"rule_id": rule_id,
 			"event_ids": [str(event_id)],
 			"severity": severity,
+			"correlate_on": correlate_values,
 			"priority": "high" if (severity or 0) >= 75 else "medium",
 			"timestamp": now.isoformat(),
 		})
