@@ -68,7 +68,7 @@ def extract_correlate_values(event: dict, correlate_on: list[str]):
             correlation_filters.append({field: value})
 
         correlation_identity[field] = value
-        print(f"[*] correlation_identity: {str(correlation_identity)}\ correlation_filters: {str(correlation_filters)}")
+        print(f"[*] correlation_identity: {correlation_identity} | correlation_filters: {correlation_filters}")
 
     return correlation_identity, correlation_filters
 
@@ -83,7 +83,8 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
 
     rule_id = str(payload["rule_id"])
     correlate_on = payload.get("correlate_on") or []
-    event_id = payload.get("event_id")
+    event_ids = payload.get("event_ids") or []
+    event_id = event_ids[0] if event_ids else None
 
     now = datetime.utcnow()
     window_start = now - timedelta(minutes=30)
@@ -95,6 +96,9 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
     if correlate_on:
         print("[*] Hard correlation enabled")
         print("[*] correlate_on =", correlate_on)
+
+        event_ids = payload.get("event_ids") or []
+        event_id = event_ids[0] if event_ids else None
 
         if not event_id:
             print(f"[*] Aborting hard correlation because event_id={str(event_id)}")
