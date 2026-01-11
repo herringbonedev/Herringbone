@@ -29,13 +29,14 @@ def get_mongo():
 
 EVENTS_API_BASE = os.environ.get(
     "EVENTS_API_BASE",
-    "http://localhost:7010/herringbone/logs/events",
+    "http://127.0.0.1:7010/herringbone/logs/events/",
 )
 
 
 def fetch_event(event_id: str):
     try:
         r = requests.get(f"{EVENTS_API_BASE}/{event_id}", timeout=5)
+        print(r.content)
         if r.status_code != 200:
             return None
         print(f"[*] Fetched event\n {str(r.json)}")
