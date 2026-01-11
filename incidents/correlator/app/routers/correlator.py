@@ -38,6 +38,7 @@ def fetch_event(event_id: str):
         r = requests.get(f"{EVENTS_API_BASE}/{event_id}", timeout=5)
         if r.status_code != 200:
             return None
+        print(f"[*] Fetched event\n {str(r.json)}")
         return r.json()
     except Exception:
         return None
@@ -67,6 +68,7 @@ def extract_correlate_values(event: dict, correlate_on: list[str]):
             correlation_filters.append({field: value})
 
         correlation_identity[field] = value
+        print(f"[*] correlation_identity: {str(correlation_identity)}\ correlation_filters: {str(correlation_filters)}")
 
     return correlation_identity, correlation_filters
 
@@ -95,6 +97,7 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
         print("[*] correlate_on =", correlate_on)
 
         if not event_id:
+            print(f"[*] Aborting hard correlation because event_id={str(event_id)}")
             return {
                 "action": "create",
                 "correlation_identity": {},
@@ -102,6 +105,7 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
 
         event = fetch_event(event_id)
         if not isinstance(event, dict):
+            print(f"[*] Aborting hard correlation because event is of type {str(type(event))} and not dict")
             return {
                 "action": "create",
                 "correlation_identity": {},
