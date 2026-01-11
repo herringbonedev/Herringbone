@@ -41,7 +41,8 @@ def fetch_event(event_id: str):
             return None
         print(f"[*] Fetched event\n {str(r.json)}")
         return r.json()
-    except Exception:
+    except Exception as e:
+        print(e)
         return None
 
 
