@@ -75,7 +75,7 @@ def apply_result(event_id, analysis: dict, rule_id: str):
 
 	for d in analysis.get("details", []):
 		if d.get("matched") and d.get("correlate_on"):
-			correlate_values.append(d.get("correlate_on"))
+			correlate_values.extend(d.get("correlate_on"))
 	
 	try:
 		update = {
