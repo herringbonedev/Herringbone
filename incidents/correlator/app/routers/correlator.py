@@ -65,9 +65,13 @@ def extract_correlate_values(event: dict, correlate_on: list[str]):
 
         if isinstance(value, list):
             value = sorted(set(value))
-            correlation_filters.append({field: {"$all": value}})
+            correlation_filters.append(
+                {f"correlation_identity.{field}": {"$all": value}}
+            )
         else:
-            correlation_filters.append({field: value})
+            correlation_filters.append(
+                {f"correlation_identity.{field}": value}
+            )
 
         correlation_identity[field] = value
         print(f"[*] correlation_identity: {correlation_identity} | correlation_filters: {correlation_filters}")

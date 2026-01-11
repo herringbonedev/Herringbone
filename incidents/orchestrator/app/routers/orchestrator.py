@@ -80,10 +80,10 @@ async def process_detection(payload: dict):
 
     if action == "create":
         create_payload = {
-            "title": payload.get("title", "Incident from "+ rule_name),
+            "title": payload.get("title", "Incident from " + rule_name),
             "description": payload.get(
                 "description",
-                "Incident created automatically from detection"+ rule_name,
+                "Incident created automatically from detection " + rule_name,
             ),
             "status": "open",
             "priority": payload.get("priority", "medium"),
@@ -92,6 +92,7 @@ async def process_detection(payload: dict):
             "detections": [payload.get("detection_id")],
             "rule_id": rule_id,
             "rule_name": rule_name,
+            "correlation_identity": decision.get("correlation_identity", {}),
         }
 
         print("[*] Creating incident")
