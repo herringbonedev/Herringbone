@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/incidents-correlator
-    newTag: latest-4c468a07-17
-    digest: sha256:7cfdbe6b0a71e9b4e826ce0c5957acdc3143d2789fc5b981c5a187b44ce37f03
+    newTag: latest-6692f5d6-18
+    digest: sha256:848b7c5a61ab1313156548863861a3abf50da4b84644604660736699f00971d7
