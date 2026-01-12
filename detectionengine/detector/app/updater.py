@@ -27,17 +27,6 @@ def _max_severity(analysis: dict):
 	return max(vals) if vals else None
 
 
-def _extract_json_path(obj: dict, path: str):
-	cur = obj
-	for part in path.split("."):
-		if not isinstance(cur, dict):
-			return None
-		cur = cur.get(part)
-		if cur is None:
-			return None
-	return cur
-
-
 def notify_orchestrator(payload):
 	if not ORCHESTRATOR_URL:
 		print("[✗] ORCHESTRATOR_URL not set, skipping notification")
@@ -74,7 +63,7 @@ def set_failed(event_id, reason: str):
 		status_db.close_mongo_connection()
 
 
-def apply_result(event_id, event: dict, analysis: dict, rule_id: str):
+def apply_result(event_id, analysis: dict, rule_id: str):
 	now = datetime.utcnow()
 	severity = _max_severity(analysis)
 	detected = bool(analysis.get("detection"))
@@ -85,20 +74,8 @@ def apply_result(event_id, event: dict, analysis: dict, rule_id: str):
 	correlate_values = []
 
 	for d in analysis.get("details", []):
-		if not d.get("matched"):
-			continue
-		
-		paths = d.get("correlate_on") or []
-		for path in paths:
-			val = _extract_json_path(event, path)
-
-			if val is None:
-				continue
-
-			if isinstance(val, list):
-				correlate_values.extend(val)
-			else:
-				correlate_values.append(val)
+		if d.get("matched") and d.get("correlate_on"):
+			correlate_values.extend(d.get("correlate_on"))
 	
 	try:
 		update = {
