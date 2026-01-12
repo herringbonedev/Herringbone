@@ -76,6 +76,7 @@ def process_one():
 
 		apply_result(
 			event_id,
+			event,
 			analysis,
 			rule_id,
 		)
