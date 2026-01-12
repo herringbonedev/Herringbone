@@ -50,31 +50,17 @@ def extract_correlate_values(event: dict, correlate_on: list[str]):
     correlation_identity = {}
     correlation_filters = []
 
-    for field in correlate_on:
-        parts = field.split(".")
-        value = event
-
-        for p in parts:
-            if not isinstance(value, dict) or p not in value:
-                value = None
-                break
-            value = value[p]
-
+    for value in correlate_on:
         if value is None:
-            raise ValueError(field)
+            continue
 
         if isinstance(value, list):
-            value = sorted(set(value))
-            correlation_filters.append(
-                {f"correlation_identity.{field}": {"$all": value}}
-            )
+            v = sorted(set(value))
+            correlation_filters.append({"correlation_identity.value": {"$all": v}})
+            correlation_identity["value"] = v
         else:
-            correlation_filters.append(
-                {f"correlation_identity.{field}": value}
-            )
-
-        correlation_identity[field] = value
-        print(f"[*] correlation_identity: {correlation_identity} | correlation_filters: {correlation_filters}")
+            correlation_filters.append({"correlation_identity.value": value})
+            correlation_identity["value"] = value
 
     return correlation_identity, correlation_filters
 
