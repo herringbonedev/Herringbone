@@ -36,13 +36,10 @@ EVENTS_API_BASE = os.environ.get(
 def fetch_event(event_id: str):
     try:
         r = requests.get(f"{EVENTS_API_BASE}/{event_id}", timeout=5)
-        print(r.content)
         if r.status_code != 200:
             return None
-        print(f"[*] Fetched event\n {str(r.json)}")
         return r.json()
-    except Exception as e:
-        print(e)
+    except Exception:
         return None
 
 
@@ -50,17 +47,38 @@ def extract_correlate_values(event: dict, correlate_on: list[str]):
     correlation_identity = {}
     correlation_filters = []
 
-    for value in correlate_on:
+    for path in correlate_on:
+        if not path:
+            continue
+
+        value = event
+        for part in path.split("."):
+            if not isinstance(value, dict) or part not in value:
+                value = None
+                break
+            value = value[part]
+
         if value is None:
             continue
 
+        parts = path.split(".")
+
+        target = correlation_identity
+        for p in parts[:-1]:
+            target = target.setdefault(p, {})
+
+        target[parts[-1]] = value
+
+        mongo_field = "correlation_identity." + ".".join(parts)
+
         if isinstance(value, list):
             v = sorted(set(value))
-            correlation_filters.append({"correlation_identity.value": {"$all": v}})
-            correlation_identity["value"] = v
+            correlation_filters.append({mongo_field: {"$all": v}})
         else:
-            correlation_filters.append({"correlation_identity.value": value})
-            correlation_identity["value"] = value
+            correlation_filters.append({mongo_field: value})
+
+    print("[*] correlation_identity =", correlation_identity)
+    print("[*] correlation_filters =", correlation_filters)
 
     return correlation_identity, correlation_filters
 
@@ -89,34 +107,19 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
         print("[*] Hard correlation enabled")
         print("[*] correlate_on =", correlate_on)
 
-        event_ids = payload.get("event_ids") or []
-        event_id = event_ids[0] if event_ids else None
-
         if not event_id:
-            print(f"[*] Aborting hard correlation because event_id={str(event_id)}")
-            return {
-                "action": "create",
-                "correlation_identity": {},
-            }
+            return {"action": "create", "correlation_identity": {}}
 
         event = fetch_event(event_id)
         if not isinstance(event, dict):
-            print(f"[*] Aborting hard correlation because event is of type {str(type(event))} and not dict")
-            return {
-                "action": "create",
-                "correlation_identity": {},
-            }
+            return {"action": "create", "correlation_identity": {}}
 
-        try:
-            correlation_identity, correlation_filters = extract_correlate_values(
-                event, correlate_on
-            )
-        except ValueError as e:
-            print(f"[✗] Missing correlate_on field: {str(e)}")
-            return {
-                "action": "create",
-                "correlation_identity": {},
-            }
+        correlation_identity, correlation_filters = extract_correlate_values(
+            event, correlate_on
+        )
+
+        if not correlation_filters:
+            return {"action": "create", "correlation_identity": {}}
 
         query = {
             "status": {"$in": ["open", "investigating"]},
@@ -154,22 +157,15 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
         "$or": rule_clauses,
     }
 
-    print("[*] Rule-only query")
-    print(json.dumps(query, indent=2, default=str))
-
     candidate = mongo.coll.find_one(
         query,
         sort=[("state.last_updated", -1)],
     )
 
     if candidate:
-        print("[✓] Rule match found — attaching")
         return {
             "action": "attach",
             "incident_id": str(candidate["_id"]),
         }
 
-    print("[*] No rule match — creating new incident")
-    return {
-        "action": "create",
-    }
+    return {"action": "create"}
