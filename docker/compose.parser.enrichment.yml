@@ -1,7 +1,7 @@
 services:
   parser-enrichment:
     container_name: parser-enrichment
-    image: quay.io/herringbone/parser-enrichment@sha256:b977aecf2f6ffb8062af11996c20d62bbe053b9d08d4610c5fdc31acea66f4f0
+    image: quay.io/herringbone/parser-enrichment:2ba2bd13@sha256:82e057dbd9ecd5d4920c47fd70a88cd7a41926d46c862a7a6706a0d4e957be69
     restart: unless-stopped
     networks:
       - herringbone
