@@ -4,7 +4,7 @@ services:
   herringbone-search: quay.io/herringbone/herringbone-search:sha-7eaaf77a
   detectionengine-detector:
   detectionengine-matcher:
-  detectionengine-ruleset:
+  detectionengine-ruleset: quay.io/herringbone/detectionengine-ruleset@sha256:1cd31f018aebcb07daced49070c58bff5300288d6c0ef780bcce8dd909c8175b
   parser-cardset:
   parser-enrichment:
   parser-extractor:

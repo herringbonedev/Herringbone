@@ -1,15 +1,12 @@
 services:
   detectionengine-ruleset:
     container_name: detectionengine-ruleset
-    image: quay.io/herringbone/detectionengine-ruleset:latest-29c98910-34
+    image: quay.io/herringbone/detectionengine-ruleset@sha256:1cd31f018aebcb07daced49070c58bff5300288d6c0ef780bcce8dd909c8175b
     restart: unless-stopped
-
     networks:
       - herringbone
-
     ports:
       - "7002:7002"
-
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -18,13 +15,11 @@ services:
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: "rules"
-
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
 networks:
   herringbone:
     external: true
