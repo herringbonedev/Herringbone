@@ -1,22 +1,17 @@
 services:
   detectionengine-matcher:
     container_name: detectionengine-matcher
-    image: quay.io/herringbone/detectionengine-matcher:latest-9c49fc0e-6
-
+    image: quay.io/herringbone/detectionengine-matcher@sha256:afc180e47a6751c9ddab7efb2f64c3f3815a6f3dd41811bfb1df6d486883aa57
     restart: unless-stopped
-
     networks:
       - herringbone
-
     ports:
       - "7003:7003"
-
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
 networks:
   herringbone:
     external: true
