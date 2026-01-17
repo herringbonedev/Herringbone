@@ -1,12 +1,10 @@
 services:
   parser-enrichment:
     container_name: parser-enrichment
-    image: quay.io/herringbone/parser-enrichment:latest-ac0f5534-10
+    image: quay.io/herringbone/parser-enrichment@sha256:b977aecf2f6ffb8062af11996c20d62bbe053b9d08d4610c5fdc31acea66f4f0
     restart: unless-stopped
-
     networks:
       - herringbone
-
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -15,9 +13,7 @@ services:
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: logs
-
       METADATA_SVC: http://parser-cardset:7005/parser/cardset/pull_cards
       EXTRACTOR_SVC: http://parser-extractor:7006/parser/extractor/parse
-
     depends_on:
       - mongodb
