@@ -1,4 +1,4 @@
-name: Microservice Build Test & Push
+name: Microservice Build, Test, Push, and Sign
 
 on:
   workflow_call:
@@ -130,6 +130,26 @@ jobs:
             fi
           done
 
+      # -----------------------------
+      # Update platform release manifest
+      # -----------------------------
+      - name: Update platform release manifest
+        run: |
+          set -euo pipefail
+
+          export SERVICE="${{ inputs.service_name }}"
+          export IMAGE="$IMAGE_REPO:${{ steps.vars.outputs.tag }}"
+
+          mkdir -p platform
+
+          if [ ! -f platform/release.yaml ]; then
+            echo "services: {}" > platform/release.yaml
+          fi
+
+          yq eval -i '
+            .services[env(SERVICE)] = env(IMAGE)
+          ' platform/release.yaml
+
       - name: Detect changes
         id: bump
         run: |
@@ -158,6 +178,7 @@ jobs:
             Updated:
               - ${{ inputs.kustomization_path }}
               - docker/compose.*.yml
+              - platform/release.yaml
           branch: auto/update/${{ inputs.service_name }}-digest
           delete-branch: true
           signoff: true
