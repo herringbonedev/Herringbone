@@ -7,7 +7,6 @@ ALLOWED_COLLECTIONS = {
     "events",
     "event_state",
     "incidents",
-    "incident_events",
     "detections",
     "parse_results",
     "enrichment_results",
