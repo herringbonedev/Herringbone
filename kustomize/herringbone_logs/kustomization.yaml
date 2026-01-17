@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/herringbone-logs
-    newTag: sha-f8720709 # Image Updater will modify this
-    digest: sha256:6698adb3c72094b0a3d18fecc49c6350bdce2c5e4dc9356e53f6cfcbb144ccc1
+    newTag: 2ba2bd13 # Image Updater will modify this
+    digest: sha256:e00027a4a2598a886b2ba6976eedcbf247dd91b5272ec68f5cd9b77e696b6158
