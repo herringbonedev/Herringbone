@@ -10,6 +10,6 @@ services:
   parser-extractor:
   incidents-correlator:
   incidents-incidentset:
-  incidents-orchestrator:
+  incidents-orchestrator: quay.io/herringbone/incidents-orchestrator@sha256:42bced6833862a1c26619aa574a6ff26a3cbca4df349b241631565435a8408fb
   logingestion-receiver:
   operations-center:
