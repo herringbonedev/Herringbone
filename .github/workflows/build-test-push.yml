@@ -96,9 +96,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          TAG="${{ steps.vars.outputs.tag }}"
-          DIGEST="${{ steps.digest.outputs.digest }}"
-          IMAGE="$IMAGE_REPO"
+          export TAG="${{ steps.vars.outputs.tag }}"
+          export DIGEST="${{ steps.digest.outputs.digest }}"
+          export IMAGE="$IMAGE_REPO"
 
           yq eval -i '
             (.images[] | select(.name == env(IMAGE))).newTag = env(TAG)
@@ -115,8 +115,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          TAG="${{ steps.vars.outputs.tag }}"
-          IMAGE="$IMAGE_REPO"
+          export TAG="${{ steps.vars.outputs.tag }}"
+          export IMAGE="$IMAGE_REPO"
 
           echo "[*] Updating docker compose files for $IMAGE:$TAG"
 
