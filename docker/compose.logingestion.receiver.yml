@@ -1,19 +1,15 @@
 services:
   logingestion-receiver:
     container_name: logingestion-receiver
-    image: quay.io/herringbone/receiver:latest-c72bf032-49
+    image: quay.io/herringbone/receiver:b50ece0f@sha256:59cc86fb5d14d8cf515db2d0f2a665331f46b41735e914e11ba44c25d91e36b7
     restart: unless-stopped
-
     depends_on:
       - mongodb
-
     networks:
       - herringbone
-
     ports:
       - "7004:7004"
       - "7004:7004/udp"
-
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -23,16 +19,13 @@ services:
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: "events"
       RECEIVER_TYPE: ${RECEIVER_TYPE}
-
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
 networks:
   herringbone:
     external: true
