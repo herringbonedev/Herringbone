@@ -1,12 +1,10 @@
 services:
   detectionengine-detector:
     container_name: detectionengine-detector
-    image:  quay.io/herringbone/detectionengine-detector:latest-4e8828fa-79
+    image: quay.io/herringbone/detectionengine-detector@sha256:ae8e13779a5da61e93716101670901ac10ebd2c9723b1e775b7e290371971931
     restart: unless-stopped
-
     networks:
       - herringbone
-
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -14,21 +12,17 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-
       EVENTS_COLLECTION_NAME: "events"
       EVENT_STATUS_COLLECTION_NAME: "event_state"
       RULES_COLLECTION_NAME: "rules"
       DETECTIONS_COLLECTION_NAME: "detections"
-
       MATCHER_API: "http://detectionengine-matcher:7003/detectionengine/matcher/find_match"
       ORCHESTRATOR_URL: "http://incidents-orchestrator:7013/incidents/orchestrator/process_detection"
-
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
 networks:
   herringbone:
     external: true
