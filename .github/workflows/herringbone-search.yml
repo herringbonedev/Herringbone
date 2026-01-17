@@ -1,0 +1,24 @@
+name: (Search) Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'herringbone/search/**'
+      - '.github/workflows/herringbone-search.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-test-push.yml
+    secrets: inherit
+    with:
+      service_name: herringbone-search
+      service_path: herringbone/search
+      dockerfile: herringbone/search/docker/Dockerfile
+      kustomization_path: kustomize/herringbone_search/kustomization.yaml
+      image_repo: quay.io/herringbone/herringbone-search

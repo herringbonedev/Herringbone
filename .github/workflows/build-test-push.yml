@@ -4,27 +4,18 @@ on:
   workflow_call:
     inputs:
       service_name:
-        description: "Short name of the microservice (e.g., receiver, detector, ruleset)"
         required: true
         type: string
-
       service_path:
-        description: "Directory of the microservice source code"
         required: true
         type: string
-
       dockerfile:
-        description: "Path to the Dockerfile for the service"
         required: true
         type: string
-
       kustomization_path:
-        description: "Path to the kustomization.yaml for updating tag & digest"
         required: true
         type: string
-
       image_repo:
-        description: "Full image repo (e.g., quay.io/herringbone/receiver)"
         required: true
         type: string
 
@@ -32,6 +23,7 @@ permissions:
   contents: write
   pull-requests: write
   checks: write
+  id-token: write
 
 concurrency:
   group: microservice-build-${{ inputs.service_name }}-${{ github.ref }}
@@ -48,12 +40,10 @@ jobs:
       DOCKERFILE: ${{ inputs.dockerfile }}
       KUSTOMIZE_PATH: ${{ inputs.kustomization_path }}
       IMAGE_REPO: ${{ inputs.image_repo }}
-      TEST_PORT: ${{ inputs.smoke_test_port }}
-      TEST_ENV: ${{ inputs.smoke_test_env }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -67,50 +57,78 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Set image tag
+        id: vars
+        run: |
+          SHORT_SHA=${GITHUB_SHA::8}
+          TAG="sha-${SHORT_SHA}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
       - name: Build Docker image
-        env:
-          SHORT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          TAG="latest-${SHORT_SHA::8}-${GITHUB_RUN_NUMBER}"
-
-          echo "[*] Building image: $IMAGE_REPO:$TAG"
-
           docker build \
-            -t $IMAGE_REPO:$TAG \
+            -t $IMAGE_REPO:${{ steps.vars.outputs.tag }} \
             -f $DOCKERFILE \
             $SERVICE_PATH
 
       - name: Push image
-        env:
-          SHORT_SHA: ${{ github.sha }}
         run: |
-          set -euo pipefail
-          TAG="latest-${SHORT_SHA::8}-${GITHUB_RUN_NUMBER}"
-
-          docker push $IMAGE_REPO:$TAG
+          docker push $IMAGE_REPO:${{ steps.vars.outputs.tag }}
 
       - name: Get image digest
         id: digest
-        env:
-          SHORT_SHA: ${{ github.sha }}
         run: |
-          set -euo pipefail
-          TAG="latest-${SHORT_SHA::8}-${GITHUB_RUN_NUMBER}"
-
-          DIGEST=$(skopeo inspect docker://$IMAGE_REPO:$TAG | jq -r '.Digest')
+          DIGEST=$(skopeo inspect docker://$IMAGE_REPO:${{ steps.vars.outputs.tag }} | jq -r '.Digest')
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image (keyless)
+        run: |
+          cosign sign --yes $IMAGE_REPO:${{ steps.vars.outputs.tag }}
+
+      # -----------------------------
+      # Update kustomize
+      # -----------------------------
       - name: Update kustomization.yaml
         run: |
           set -euo pipefail
-          SHORT_SHA=${GITHUB_SHA::8}
-          TAG="latest-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
 
-          echo "[*] Updating kustomization: ${{ inputs.kustomization_path }} with tag $TAG and digest ${{ steps.digest.outputs.digest }}"
+          TAG="${{ steps.vars.outputs.tag }}"
+          DIGEST="${{ steps.digest.outputs.digest }}"
+          IMAGE="$IMAGE_REPO"
 
-          yq eval -i ".images[0].newTag = \"$TAG\"" ${{ inputs.kustomization_path }}
-          yq eval -i ".images[0].digest = \"${{ steps.digest.outputs.digest }}\"" ${{ inputs.kustomization_path }}
+          yq eval -i '
+            (.images[] | select(.name == env(IMAGE))).newTag = env(TAG)
+          ' "$KUSTOMIZE_PATH"
+
+          yq eval -i '
+            (.images[] | select(.name == env(IMAGE))).digest = env(DIGEST)
+          ' "$KUSTOMIZE_PATH"
+
+      # -----------------------------
+      # Update docker compose files
+      # -----------------------------
+      - name: Update docker compose files
+        run: |
+          set -euo pipefail
+
+          TAG="${{ steps.vars.outputs.tag }}"
+          IMAGE="$IMAGE_REPO"
+
+          echo "[*] Updating docker compose files for $IMAGE:$TAG"
+
+          for file in docker/compose.*.yml; do
+            if grep -q "$IMAGE:" "$file"; then
+              echo "  - Updating $file"
+
+              yq eval -i '
+                (.services[].image | select(. == env(IMAGE) + ":*")) = env(IMAGE) + ":" + env(TAG)
+              ' "$file"
+            fi
+          done
 
       - name: Detect changes
         id: bump
@@ -123,7 +141,6 @@ jobs:
 
       - name: Create PR
         if: steps.bump.outputs.changed == 'true'
-        id: cpr
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -131,7 +148,16 @@ jobs:
           title: "chore(${{ inputs.service_name }}): bump ${{ inputs.service_name }} image"
           body: |
             Automated update for ${{ inputs.service_name }}.
-            - Updated tag & digest in ${{ inputs.kustomization_path }}
+
+            Image:
+              ${{ inputs.image_repo }}:${{ steps.vars.outputs.tag }}
+
+            Digest:
+              ${{ steps.digest.outputs.digest }}
+
+            Updated:
+              - ${{ inputs.kustomization_path }}
+              - docker/compose.*.yml
           branch: auto/update/${{ inputs.service_name }}-digest
           delete-branch: true
           signoff: true
@@ -139,16 +165,6 @@ jobs:
             automation
             digest
 
-      - name: Log PR result
-        if: steps.bump.outputs.changed == 'true'
-        run: |
-          echo "operation=${{ steps.cpr.outputs.pull-request-operation }}"
-          echo "pr=${{ steps.cpr.outputs.pull-request-number }}"
-
-      - name: No changes
-        if: steps.bump.outputs.changed != 'true'
-        run: echo "No changes; skipping PR."
-
       - name: Cleanup
         if: always()
-        run: docker rm -f test_container || true
+        run: docker system prune -af || true
