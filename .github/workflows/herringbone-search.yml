@@ -8,9 +8,9 @@ on:
       - '.github/workflows/herringbone-search.yml'
 
 permissions:
+  id-token: write
   contents: write
   pull-requests: write
-  checks: write
 
 jobs:
   build:
