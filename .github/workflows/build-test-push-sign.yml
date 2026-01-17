@@ -61,11 +61,10 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Set image tag
+      - name: Set image tag (short SHA)
         id: vars
         run: |
-          SHORT_SHA=${GITHUB_SHA::8}
-          TAG="sha-${SHORT_SHA}"
+          TAG="${GITHUB_SHA::8}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Build image
@@ -89,11 +88,12 @@ jobs:
           cosign sign --yes $IMAGE_REPO:${{ steps.vars.outputs.tag }}
 
       # -----------------------------
-      # Update kustomize
+      # Update kustomize (tag + digest)
       # -----------------------------
       - name: Update kustomization.yaml
         run: |
           set -euo pipefail
+
           export IMAGE="$IMAGE_REPO"
           export TAG="${{ steps.vars.outputs.tag }}"
           export DIGEST="${{ steps.digest.outputs.digest }}"
@@ -107,12 +107,14 @@ jobs:
           ' "$KUSTOMIZE_PATH"
 
       # -----------------------------
-      # Update docker compose (digest pinned)
+      # Update docker compose (tag + digest)
       # -----------------------------
       - name: Update docker compose files
         run: |
           set -euo pipefail
+
           export IMAGE_REPO="$IMAGE_REPO"
+          export TAG="${{ steps.vars.outputs.tag }}"
           export DIGEST="${{ steps.digest.outputs.digest }}"
 
           MATCHED=false
@@ -125,7 +127,7 @@ jobs:
                 (.services[]
                   | select(has("image") and (.image | contains(env(IMAGE_REPO))))
                   .image
-                ) = env(IMAGE_REPO) + "@" + env(DIGEST)
+                ) = env(IMAGE_REPO) + ":" + env(TAG) + "@" + env(DIGEST)
               ' "$file"
 
               MATCHED=true
@@ -139,13 +141,18 @@ jobs:
           fi
 
       # -----------------------------
-      # Update platform manifest (digest pinned)
+      # Update platform release manifest (tag + digest)
       # -----------------------------
       - name: Update platform release manifest
         run: |
           set -euo pipefail
+
           export SERVICE="${{ inputs.service_name }}"
-          export IMAGE="$IMAGE_REPO@${{ steps.digest.outputs.digest }}"
+          export IMAGE_REPO="$IMAGE_REPO"
+          export TAG="${{ steps.vars.outputs.tag }}"
+          export DIGEST="${{ steps.digest.outputs.digest }}"
+
+          export FULL_IMAGE="${IMAGE_REPO}:${TAG}@${DIGEST}"
 
           mkdir -p platform
           if [ ! -f platform/release.yaml ]; then
@@ -153,7 +160,7 @@ jobs:
           fi
 
           yq eval -i '
-            .services[env(SERVICE)] = env(IMAGE)
+            .services[env(SERVICE)] = env(FULL_IMAGE)
           ' platform/release.yaml
 
       - name: Detect changes
@@ -170,13 +177,13 @@ jobs:
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(${{ inputs.service_name }}): bump image to ${{ steps.digest.outputs.digest }}"
+          commit-message: "chore(${{ inputs.service_name }}): bump image"
           title: "chore(${{ inputs.service_name }}): bump ${{ inputs.service_name }} image"
           body: |
             Automated update for ${{ inputs.service_name }}
 
             Image:
-              ${{ inputs.image_repo }}@${{ steps.digest.outputs.digest }}
+              ${{ inputs.image_repo }}:${{ steps.vars.outputs.tag }}@${{ steps.digest.outputs.digest }}
 
             Updated:
               - ${{ inputs.kustomization_path }}
