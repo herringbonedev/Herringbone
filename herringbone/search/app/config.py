@@ -1,4 +1,7 @@
 MAX_LIMIT = 500
+MAX_SCHEMA_SAMPLE = 50
+MAX_SCHEMA_DEPTH = 4
+MAX_ENUM_VALUES = 25
 
 ALLOWED_COLLECTIONS = {
     "events",
@@ -29,4 +32,6 @@ ALLOWED_OPERATORS = {
     "$in",
     "$nin",
     "$regex",
+    "$and",
+    "$or"
 }

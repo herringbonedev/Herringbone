@@ -1,27 +1,56 @@
+from typing import Any
 from fastapi import HTTPException
 from config import ALLOWED_OPERATORS
 
-def validate_query_obj(obj, depth=0):
-    if depth > 8:
+def _is_plain_field_key(k: str) -> bool:
+    if not isinstance(k, str):
+        return False
+    if k.startswith("$"):
+        return False
+    if "$" in k:
+        return False
+    return True
+
+def validate_query_obj(obj: Any, depth: int = 0) -> None:
+    if depth > 12:
         raise HTTPException(400, "Query too deep")
 
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if not isinstance(k, str):
-                raise HTTPException(400, "Invalid query key")
-            if k.startswith("$") and k not in ALLOWED_OPERATORS:
-                raise HTTPException(400, f"Operator not allowed: {k}")
-            validate_query_obj(v, depth + 1)
-        return
-
     if isinstance(obj, list):
-        if len(obj) > 100:
-            raise HTTPException(400, "Query list too large")
-        for v in obj:
+        for item in obj:
+            validate_query_obj(item, depth + 1)
+        return
+
+    if not isinstance(obj, dict):
+        return
+
+    for k, v in obj.items():
+        if k.startswith("$"):
+            if k not in ALLOWED_OPERATORS:
+                raise HTTPException(400, f"Operator not allowed: {k}")
+
+            if k in ("$and", "$or", "$nor"):
+                if not isinstance(v, list) or not v:
+                    raise HTTPException(400, f"{k} must be a non-empty list")
+                for item in v:
+                    if not isinstance(item, dict):
+                        raise HTTPException(400, f"{k} items must be objects")
+                    validate_query_obj(item, depth + 1)
+                continue
+
+            if k == "$regex":
+                if not isinstance(v, str):
+                    raise HTTPException(400, "$regex must be a string")
+                continue
+
+            if k in ("$in", "$nin"):
+                if not isinstance(v, list):
+                    raise HTTPException(400, f"{k} must be a list")
+                continue
+
             validate_query_obj(v, depth + 1)
-        return
+            continue
 
-    if isinstance(obj, (str, int, float, bool)) or obj is None:
-        return
+        if not _is_plain_field_key(k):
+            raise HTTPException(400, "Invalid query key")
 
-    raise HTTPException(400, "Invalid query value type")
+        validate_query_obj(v, depth + 1)
