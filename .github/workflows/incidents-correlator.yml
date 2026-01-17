@@ -23,4 +23,3 @@ jobs:
       dockerfile: incidents/orchestrator/docker/Dockerfile
       kustomization_path: kustomize/incidents_orchestrator/kustomization.yaml
       image_repo: quay.io/herringbone/incidents-orchestrator
-

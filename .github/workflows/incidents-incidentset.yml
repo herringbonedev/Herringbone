@@ -23,4 +23,3 @@ jobs:
       dockerfile: incidents/incidentset/docker/Dockerfile
       kustomization_path: kustomize/incidents_incidentset/kustomization.yaml
       image_repo: quay.io/herringbone/incidents-incidentset
-

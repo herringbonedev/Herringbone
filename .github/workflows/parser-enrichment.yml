@@ -23,4 +23,3 @@ jobs:
       dockerfile: parser/enrichment/docker/Dockerfile
       kustomization_path: kustomize/parser_enrichment/kustomization.yaml
       image_repo: quay.io/herringbone/parser-enrichment
-

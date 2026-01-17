@@ -23,4 +23,3 @@ jobs:
       dockerfile: incidents/correlator/docker/Dockerfile
       kustomization_path: kustomize/incidents_correlator/kustomization.yaml
       image_repo: quay.io/herringbone/incidents-correlator
-
