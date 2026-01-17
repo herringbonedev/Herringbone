@@ -3,7 +3,7 @@ services:
   herringbone-logs:
   herringbone-search: quay.io/herringbone/herringbone-search:sha-7eaaf77a
   detectionengine-detector:
-  detectionengine-matcher:
+  detectionengine-matcher: quay.io/herringbone/detectionengine-matcher@sha256:afc180e47a6751c9ddab7efb2f64c3f3815a6f3dd41811bfb1df6d486883aa57
   detectionengine-ruleset:
   parser-cardset:
   parser-enrichment:
