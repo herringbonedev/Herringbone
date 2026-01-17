@@ -1,19 +1,15 @@
 services:
   herringbone-logs:
     container_name: herringbone-logs
-    image: quay.io/herringbone/herringbone-logs:latest-897d4a50-25
+    image: quay.io/herringbone/herringbone-logs@sha256:6698adb3c72094b0a3d18fecc49c6350bdce2c5e4dc9356e53f6cfcbb144ccc1
     restart: unless-stopped
-
     depends_on:
       mongodb:
         condition: service_healthy
-
     networks:
       - herringbone
-
     ports:
       - "7010:7010"
-
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -22,13 +18,11 @@ services:
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: events
-
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
 networks:
   herringbone:
     external: true
