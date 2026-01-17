@@ -1,20 +1,15 @@
 version: v0.1.0-alpha.1
-
 services:
-  herringbone-logs: 
-  herringbone-search: 
-
-  detectionengine-detector: 
-  detectionengine-matcher: 
-  detectionengine-ruleset: 
-
-  parser-cardset: 
-  parser-enrichment: 
-  parser-extractor: 
-
-  incidents-correlator: 
-  incidents-incidentset: 
-  incidents-orchestrator: 
-
-  logingestion-receiver: 
+  herringbone-logs:
+  herringbone-search: quay.io/herringbone/herringbone-search:sha-7eaaf77a
+  detectionengine-detector:
+  detectionengine-matcher:
+  detectionengine-ruleset:
+  parser-cardset:
+  parser-enrichment:
+  parser-extractor:
+  incidents-correlator:
+  incidents-incidentset:
+  incidents-orchestrator:
+  logingestion-receiver:
   operations-center:
