@@ -5,7 +5,7 @@ services:
   detectionengine-detector:
   detectionengine-matcher:
   detectionengine-ruleset:
-  parser-cardset:
+  parser-cardset: quay.io/herringbone/parser-cardset@sha256:a09cb5c96888168a537ebae5404aa020633ed8a9633baa5165da7a88ad62a6f4
   parser-enrichment:
   parser-extractor:
   incidents-correlator:
