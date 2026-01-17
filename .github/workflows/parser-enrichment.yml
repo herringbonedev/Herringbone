@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build:
-    uses: ./.github/workflows/build-test-push.yml
+    uses: ./.github/workflows/build-test-push-sign.yml
     secrets: inherit
     with:
       service_name: parser-enrichment
