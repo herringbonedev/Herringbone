@@ -9,7 +9,7 @@ services:
   parser-enrichment:
   parser-extractor:
   incidents-correlator:
-  incidents-incidentset:
+  incidents-incidentset: quay.io/herringbone/incidents-incidentset@sha256:f8dd6da9a61157a7adea898653d0ec5579c9f2e8bedd64e431bc4d542560f534
   incidents-orchestrator:
   logingestion-receiver:
   operations-center:

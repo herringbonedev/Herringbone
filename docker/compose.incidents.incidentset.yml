@@ -1,15 +1,12 @@
 services:
   incidents-incidentset:
     container_name: incidents-incidentset
-    image: quay.io/herringbone/incidents-incidentset:latest-b8dc4b77-14
+    image: quay.io/herringbone/incidents-incidentset@sha256:f8dd6da9a61157a7adea898653d0ec5579c9f2e8bedd64e431bc4d542560f534
     restart: unless-stopped
-
     networks:
       - herringbone
-
     ports:
       - "7011:7011"
-
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -18,13 +15,11 @@ services:
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: "incidents"
-
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
 networks:
   herringbone:
     external: true
