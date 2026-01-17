@@ -18,7 +18,7 @@ jobs:
     uses: ./.github/workflows/build-test-push-sign.yml
     secrets: inherit
     with:
-      service_name: receiver
+      service_name: logingestion-receiver
       service_path: logingestion/receiver
       dockerfile: logingestion/receiver/docker/Dockerfile
       kustomization_path: kustomize/receiver_remote/kustomization.yaml
