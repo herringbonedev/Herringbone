@@ -58,7 +58,7 @@ jobs:
             docker pull "$IMAGE"
 
             echo "Tagging $BASE:$VERSION"
-            docker tag "$REF_NO_DIGEST" "$BASE:$VERSION"
+            docker tag "$IMAGE" "$BASE:$VERSION"
 
             echo "Pushing $BASE:$VERSION"
             docker push "$BASE:$VERSION"
