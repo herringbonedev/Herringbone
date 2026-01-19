@@ -1,4 +1,4 @@
-name: (auth) Build
+name: (Auth) Build
 
 on:
   push:
