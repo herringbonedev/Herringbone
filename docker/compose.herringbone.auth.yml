@@ -1,0 +1,28 @@
+services:
+  herringbone-logs:
+    container_name: herringbone-auth
+    image: 
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - herringbone
+    ports:
+      - "7001:7001"
+    environment:
+      MONGO_HOST: ${MONGO_HOST}
+      MONGO_PORT: ${MONGO_PORT}
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASS: ${MONGO_PASS}
+      DB_NAME: ${DB_NAME}
+      AUTH_DB: ${AUTH_DB}
+      JWT_SECRET: ${JWT_SECRET}
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+networks:
+  herringbone:
+    external: true

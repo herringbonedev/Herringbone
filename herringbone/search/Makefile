@@ -9,8 +9,8 @@ down:
 rebuild:
 	docker compose -f docker/docker-compose.yml build --no-cache
 
-search:
-	docker compose -f docker/docker-compose.yml search -f herringbone-search
+logs:
+	docker compose -f docker/docker-compose.yml logs -f herringbone-search
 
 shell:
 	docker compose -f docker/docker-compose.yml exec herringbone-search bash
