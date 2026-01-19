@@ -9,6 +9,7 @@ Internal ports represent the port each container listens on, while external port
 | detectionengine | ruleset       | 7002          | 7002           |
 | detectionengine | detector      | None          | None           |
 | herringbone     | logs          | 7010          | 7010           |
+| herringbone     | search        | 7014          | 7014           |
 | logingestion    | receiver      | 7004 (TCP/UDP)| 7004 (TCP/UDP) |
 | parser          | cardset       | 7005          | 7005           |
 | parser          | extractor     | 7006          | 7006           |

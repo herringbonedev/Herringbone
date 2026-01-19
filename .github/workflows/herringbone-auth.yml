@@ -1,0 +1,25 @@
+name: (auth) Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'herringbone/auth/**'
+      - '.github/workflows/herringbone-auth.yml'
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+  checks: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-test-push-sign.yml
+    secrets: inherit
+    with:
+      service_name: herringbone-auth
+      service_path: herringbone/auth
+      dockerfile: herringbone/auth/docker/Dockerfile
+      kustomization_path: kustomize/herringbone_auth/kustomization.yaml
+      image_repo: quay.io/herringbone/herringbone-auth
