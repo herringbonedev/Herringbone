@@ -51,13 +51,14 @@ jobs:
               --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
               "$IMAGE"
 
-            BASE="${IMAGE%:*}"
+            REF_NO_DIGEST="${IMAGE%@*}"
+            BASE="${REF_NO_DIGEST%:*}"
 
             echo "Pulling $IMAGE"
             docker pull "$IMAGE"
 
             echo "Tagging $BASE:$VERSION"
-            docker tag "$IMAGE" "$BASE:$VERSION"
+            docker tag "$REF_NO_DIGEST" "$BASE:$VERSION"
 
             echo "Pushing $BASE:$VERSION"
             docker push "$BASE:$VERSION"
