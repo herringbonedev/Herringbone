@@ -47,7 +47,7 @@ jobs:
 
             echo "Verifying signature..."
             cosign verify \
-              --certificate-identity "https://github.com/herringbonedev/Herringbone/.github/workflows/build-test-push-sign.yml@refs/heads/main" \
+              --certificate-identity-regexp "^https://github.com/herringbonedev/(Herringbone|Herringbone-frontend)/.github/workflows/build-test-push-sign.yml@refs/heads/main$" \
               --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
               "$IMAGE"
 
