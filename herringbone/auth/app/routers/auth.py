@@ -5,11 +5,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from security import hash_password, verify_password, create_access_token
+from security import hash_password, verify_password, create_access_token, create_service_token
 from bson import ObjectId
 
 
 router = APIRouter(prefix="/herringbone/auth", tags=["auth"])
+
+
+SERVICE_BOOTSTRAP_SECRET = os.environ.get("SERVICE_BOOTSTRAP_SECRET")
 
 
 def get_mongo():
@@ -31,6 +34,13 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class ServiceLoginRequest(BaseModel):
+    service: str
+    secret: str
+    instance_id: str
+    version: str | None = None
 
 
 @router.post("/register")
@@ -94,6 +104,26 @@ async def login_user(payload: LoginRequest):
     }
 
 
+@router.post("/service-login")
+async def service_login(payload: ServiceLoginRequest):
+    if not SERVICE_BOOTSTRAP_SECRET:
+        raise HTTPException(status_code=500, detail="Service auth not configured")
+
+    if payload.secret != SERVICE_BOOTSTRAP_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid service secret")
+
+    token = create_service_token(
+        service=payload.service,
+        instance_id=payload.instance_id,
+        version=payload.version,
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+    }
+
+
 @router.get("/healthz")
 async def healthz():
     return {"ok": True, "service": "herringbone-auth"}
@@ -105,5 +135,5 @@ async def db_check():
     client, mongo_db = db.open_mongo_connection()
     cols = mongo_db.list_collection_names()
     db.close_mongo_connection()
-    return {"ok": True, "collections": cols}
+    return {"ok": True}
 

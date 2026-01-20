@@ -12,6 +12,8 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
+      AUTH_ENABLED: ${AUTH_ENABLED}
+      JWT_SECRET: ${JWT_SECRET}
       COLLECTION_NAME: logs
       METADATA_SVC: http://parser-cardset:7005/parser/cardset/pull_cards
       EXTRACTOR_SVC: http://parser-extractor:7006/parser/extractor/parse
