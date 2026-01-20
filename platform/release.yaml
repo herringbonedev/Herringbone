@@ -3,14 +3,14 @@ services:
   herringbone-logs: quay.io/herringbone/herringbone-logs:2ba2bd13@sha256:e00027a4a2598a886b2ba6976eedcbf247dd91b5272ec68f5cd9b77e696b6158
   herringbone-search: quay.io/herringbone/herringbone-search:sha-7eaaf77a
   herringbone-auth: quay.io/herringbone/herringbone-auth:b890c63b
-  detectionengine-detector: quay.io/herringbone/detectionengine-detector:642ff96a@sha256:910ac2619967134aa005ce297927b0779cf49eaa3ea2bc92aa194267278bd372
-  detectionengine-matcher: quay.io/herringbone/detectionengine-matcher:04e67a60@sha256:771b68576f3b8ae650f3517097ede4db5e8be55f2fb01727c90f36739aa10dc8
+  detectionengine-detector: quay.io/herringbone/detectionengine-detector:04e67a60@sha256:78408b5d40fbebad6185557b0a463e23a62d9763c945269a0867562c8a79ab0d
+  detectionengine-matcher: quay.io/herringbone/detectionengine-matcher:2ba2bd13@sha256:e36b7107df05cd1b1c9e6274fe17cea433398b5ab6ac688c943bbcd5091f7983
   detectionengine-ruleset: quay.io/herringbone/detectionengine-ruleset:c285978e@sha256:f5bcb98a37cd943cd78529251d7d52b5a72030b334fb5f29559cbba2fd564b80
-  parser-cardset: quay.io/herringbone/parser-cardset:2ba2bd13@sha256:49815046c05829f293e927ab4b93812188fa478ea82ce6610a7684dfed8ecd45
+  parser-cardset: quay.io/herringbone/parser-cardset:04e67a60@sha256:e67cdeb88a8cb2b9016afed2a841217a43f5c5ba16ad7b849775bbca238230ae
   parser-extractor: quay.io/herringbone/parser-extractor:2ba2bd13@sha256:2002bda1689df3740f5fbd798b5d8121eb376cb70702d8ed93f7fc59ab47157e
   parser-enrichment: quay.io/herringbone/parser-enrichment:2ba2bd13@sha256:82e057dbd9ecd5d4920c47fd70a88cd7a41926d46c862a7a6706a0d4e957be69
   incidents-correlator: quay.io/herringbone/incidents-correlator:2ba2bd13@sha256:460fd5fa66a2d2ec93f9bd23644f54524ae16accfa8bbf276df85125ae1f7485
   incidents-orchestrator: quay.io/herringbone/incidents-orchestrator:2ba2bd13@sha256:7b53ad9c90cbed64b3f7d7acc3dee10a6ed426bd62bad505a36df85dcddfda8b
-  incidents-incidentset: quay.io/herringbone/incidents-incidentset:c43c6de9@sha256:383290c370daa337dc1e9133266e6feda4862bbfc4b96f5f37aab089bc06e4e7
+  incidents-incidentset: quay.io/herringbone/incidents-incidentset:04e67a60@sha256:5f4d15ec6efe7c2d475fbd113c378937a17531f05a1f00861765c89b51d279bc
   logingestion-receiver: quay.io/herringbone/receiver:b50ece0f@sha256:59cc86fb5d14d8cf515db2d0f2a665331f46b41735e914e11ba44c25d91e36b7
   operations-center: quay.io/herringbone/operations-center:sha-fcd04e5f
