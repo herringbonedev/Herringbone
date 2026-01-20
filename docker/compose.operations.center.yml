@@ -12,6 +12,9 @@ services:
     ports:
       - "8080:8080"
 
+    environment:
+      VITE_AUTH_ENABLED: ${AUTH_ENABLED}
+
     read_only: true
     tmpfs:
       - /tmp

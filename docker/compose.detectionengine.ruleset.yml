@@ -1,7 +1,7 @@
 services:
   detectionengine-ruleset:
     container_name: detectionengine-ruleset
-    image: quay.io/herringbone/detectionengine-ruleset:2ba2bd13@sha256:1c170dc7f666536cde2652d9a815d907c64c5216d418158746f8a36d99423be0
+    image: docker-detectionengine-ruleset
     restart: unless-stopped
     networks:
       - herringbone
@@ -14,6 +14,7 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
+      AUTH_ENABLED: ${AUTH_ENABLED}
       JWT_SECRET: ${JWT_SECRET}
       COLLECTION_NAME: "rules"
     read_only: true
