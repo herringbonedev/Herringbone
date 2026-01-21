@@ -7,6 +7,12 @@ services:
       - herringbone
     ports:
       - "7003:7003"
+      
+    environment:
+      AUTH_ENABLED: "true"
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALG: ${JWT_ALG}
+
     read_only: true
     tmpfs:
       - /tmp
