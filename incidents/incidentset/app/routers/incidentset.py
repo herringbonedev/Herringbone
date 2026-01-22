@@ -50,6 +50,7 @@ def get_mongo():
 async def insert_incident(
     payload: IncidentCreate,
     mongo=Depends(get_mongo),
+    user=Depends(require_admin),
 ):
     print("[*] insert_incident called")
     print(json.dumps(payload.dict(), indent=2, default=str))
@@ -82,6 +83,7 @@ async def insert_incident(
 async def update_incident(
     payload: dict,
     mongo=Depends(get_mongo),
+    user=Depends(require_admin),
 ):
     print("[*] update_incident called")
     print(json.dumps(payload, indent=2, default=str))
@@ -126,6 +128,7 @@ async def update_incident(
 @router.get("/get_incidents")
 async def get_incidents(
     mongo=Depends(get_mongo),
+    user=Depends(get_current_user),
 ):
     print("[*] get_incidents called")
     docs = list(mongo.coll.find({}))
@@ -137,6 +140,7 @@ async def get_incidents(
 async def get_incident(
     incident_id: str,
     mongo=Depends(get_mongo),
+    user=Depends(get_current_user),
 ):
     print("[*] get_incident called")
     print(f"[*] incident_id={incident_id}")

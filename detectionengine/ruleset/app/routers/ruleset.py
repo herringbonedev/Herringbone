@@ -71,6 +71,7 @@ async def insert_rule(
 @router.get("/get_rules")
 async def get_rules(
     mongo=Depends(get_mongo),
+    user=Depends(get_current_user),
 ):
     try:
         docs = list(mongo.coll.find({}))
