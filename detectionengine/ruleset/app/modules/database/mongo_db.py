@@ -134,7 +134,7 @@ class HerringboneMongoDatabase:
         collection: str,
         host: str,
         port: int = 27017,
-        auth_source: str = "herringbone",
+        auth_source: str = "admin",
         replica_set: str | None = None,
     ):
         """
@@ -152,9 +152,19 @@ class HerringboneMongoDatabase:
         pass_enc = quote_plus(password) if password else ""
         auth_block = f"{user_enc}:{pass_enc}@" if (user_enc or pass_enc) else ""
 
-        qp = f"?authSource={quote_plus(auth_source)}"
+        qp_parts = []
+
+        if auth_source:
+            qp_parts.append(f"authSource={quote_plus(auth_source)}")
+
         if replica_set:
-            qp += f"&replicaSet={quote_plus(replica_set)}&readPreference=primary&directConnection=false"
+            qp_parts.append(f"replicaSet={quote_plus(replica_set)}")
+            qp_parts.append("readPreference=primary")
+            qp_parts.append("directConnection=false")
+
+        qp = ""
+        if qp_parts:
+            qp = "?" + "&".join(qp_parts)
 
         host_fmt = _fmt_host(host_only)
         self.uri = f"mongodb://{auth_block}{host_fmt}:{port_final}/{quote_plus(database)}{qp}"

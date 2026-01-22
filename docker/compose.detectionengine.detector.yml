@@ -18,11 +18,6 @@ services:
       DETECTIONS_COLLECTION_NAME: "detections"
       MATCHER_API: "http://detectionengine-matcher:7003/detectionengine/matcher/find_match"
       ORCHESTRATOR_URL: "http://incidents-orchestrator:7013/incidents/orchestrator/process_detection"
-      # ---- AUTH (service-to-service) ----
-      AUTH_ENABLED: "true"
-      AUTH_URL: "http://herringbone-auth:7001"
-      SERVICE_NAME: "detectionengine"
-      SERVICE_SECRET: ${SERVICE_SECRET}
     read_only: true
     tmpfs:
       - /tmp
