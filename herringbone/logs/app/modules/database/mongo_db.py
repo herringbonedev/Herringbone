@@ -83,7 +83,7 @@ class HerringboneMongoDatabase:
         database: str,
         host: str,
         port: int = 27017,
-        auth_source: str = "herringbone",
+        auth_source: str = "admin",
         replica_set: str | None = None,
     ):
         host_only, parsed_port = _split_host_port(host)
