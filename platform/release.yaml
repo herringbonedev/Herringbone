@@ -3,14 +3,14 @@ services:
   herringbone-logs: quay.io/herringbone/herringbone-logs:ddc69057@sha256:7fcf2839b3d6af8c60a839c885fe9d11b71e9951ee8d2d5feb8c7dbb690933b6
   herringbone-search: quay.io/herringbone/herringbone-search:6e44a69b@sha256:181c20b977867369ed718c21d5952f9a3aebc5da22f99907e1c3923bfcca32be
   herringbone-auth: quay.io/herringbone/herringbone-auth:b890c63b
-  detectionengine-detector: quay.io/herringbone/detectionengine-detector:1f67ccf9@sha256:fa2b88bdbda3c66d8694fff0f0c596574beac5418ad3f0c1116b724fe1585068
+  detectionengine-detector: quay.io/herringbone/detectionengine-detector:ddc69057@sha256:8f404def61f00ee403700cbbee07466e416eaaabc8000c86a103d422764a4f34
   detectionengine-matcher: quay.io/herringbone/detectionengine-matcher:2e3451d8@sha256:cf7d89b0369ed72af683183e8e2815a569f617f323adadd1f615895ed423713b
   detectionengine-ruleset: quay.io/herringbone/detectionengine-ruleset:1f67ccf9@sha256:2f206b1b8d4213cdece42f12b92209c47396b71e6e81bb6e0b6f33fc46fe8b9f
-  parser-cardset: quay.io/herringbone/parser-cardset:2e3451d8@sha256:5f23d21cf4540278631718864e374d18126f26725669f0ea7edb5aded7c2cba1
+  parser-cardset: quay.io/herringbone/parser-cardset:ddc69057@sha256:a098339b686febf5db6cb3f2a363637d3499e30a2dcc57c664fdb4e53ec2b962
   parser-extractor: quay.io/herringbone/parser-extractor:2ba2bd13@sha256:2002bda1689df3740f5fbd798b5d8121eb376cb70702d8ed93f7fc59ab47157e
   parser-enrichment: quay.io/herringbone/parser-enrichment:38d9dc24@sha256:c8ef4e2dc6e725304cc5e347c12ec02c0e21a2f4cfbea69919201cca663f817f
-  incidents-correlator: quay.io/herringbone/incidents-correlator:2e3451d8@sha256:6dd425f06f63283dc4ca5dd9d083a9d72b0e019262c435b361044490a1e5fa9d
+  incidents-correlator: quay.io/herringbone/incidents-correlator:ddc69057@sha256:819ad4ec7182014f0520abaec21feb2cb818abdc9db6f6b3bc779b9210559150
   incidents-orchestrator: quay.io/herringbone/incidents-orchestrator:2ba2bd13@sha256:7b53ad9c90cbed64b3f7d7acc3dee10a6ed426bd62bad505a36df85dcddfda8b
   incidents-incidentset: quay.io/herringbone/incidents-incidentset:2e3451d8@sha256:48b0ac820a9148cf9d885f39b3fd4efa9b579487eeec10568cd8979a47d07763
-  logingestion-receiver: quay.io/herringbone/receiver:b50ece0f@sha256:59cc86fb5d14d8cf515db2d0f2a665331f46b41735e914e11ba44c25d91e36b7
+  logingestion-receiver: quay.io/herringbone/receiver:ddc69057@sha256:5eeb9383b26e9295c12155b3175d3ab77922a52614922c0b37fdedcd4644ed8a
   operations-center: quay.io/herringbone/operations-center:sha-fcd04e5f
