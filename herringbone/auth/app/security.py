@@ -28,21 +28,3 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
         "exp": int((now + timedelta(minutes=JWT_EXPIRE_MINUTES)).timestamp()),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
-
-
-def create_service_token(service: str, instance_id: str, version: str | None) -> str:
-    now = datetime.now(timezone.utc)
-
-    payload = {
-        "sub": f"service:{service}",
-        "email": f"{service}@service",
-        "role": "admin",
-        "service": service,
-        "instance_id": instance_id,
-        "version": version,
-        "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=JWT_EXPIRE_MINUTES)).timestamp()),
-        "typ": "service",
-    }
-
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)

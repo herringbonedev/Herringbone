@@ -33,10 +33,7 @@ class RuleMatchResponse(BaseModel):
     log_data: Dict[str, Any]
 
 @router.post("/find_match", response_model=RuleMatchResponse)
-async def find_match(
-    payload: RuleMatchRequest,
-    user=Depends(get_current_user),
-):
+async def find_match(payload: RuleMatchRequest):
     """
     Uses a rule and log entry to find any matches.
     """
