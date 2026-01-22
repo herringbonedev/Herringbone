@@ -18,19 +18,35 @@ validator = RuleSchema()
 
 
 class RuleBase(BaseModel):
+    """
+    Base model for a rule.
+    Allows arbitrary extra fields so the rule schema can evolve.
+    """
     class Config:
         extra = "allow"
 
 
 class RuleCreate(RuleBase):
+    """
+    Payload for creating a new rule.
+    Inherits all fields from RuleBase.
+    """
     pass
 
 
 class RuleUpdate(RuleBase):
+    """
+    Update payload for rules.
+    Accepts '_id' from the client but stores it as 'id'.
+    """
     id: str = Field(..., alias="_id", serialization_alias="_id")
 
 
 def get_mongo():
+    """
+    Returns an initialized HerringboneMongoDatabase instance.
+    Ensures the Mongo collection is available before each request.
+    """
     db = HerringboneMongoDatabase(
         user=os.environ.get("MONGO_USER", ""),
         password=os.environ.get("MONGO_PASS", ""),
@@ -46,11 +62,11 @@ def get_mongo():
 
 
 @router.post("/insert_rule")
-async def insert_rule(
-    payload: RuleCreate,
-    mongo=Depends(get_mongo),
-    user=Depends(require_admin),
-):
+async def insert_rule(payload: RuleCreate, mongo=Depends(get_mongo), user=Depends(require_admin)):
+    """
+    Inserts a new detection rule.
+    Uses Pydantic for basic shape and RuleSchema for custom validation.
+    """
     data = payload.dict()
 
     validation = validator(data)
@@ -69,10 +85,10 @@ async def insert_rule(
 
 
 @router.get("/get_rules")
-async def get_rules(
-    mongo=Depends(get_mongo),
-    user=Depends(get_current_user),
-):
+async def get_rules(mongo=Depends(get_mongo, user=Depends(get_current_user))):
+    """
+    Returns all rules from MongoDB as raw JSON.
+    """
     try:
         docs = list(mongo.coll.find({}))
         return JSONResponse(content=json.loads(dumps(docs)))
@@ -81,11 +97,10 @@ async def get_rules(
 
 
 @router.get("/delete_rule")
-async def delete_rule(
-    id: str = Query(None),
-    mongo=Depends(get_mongo),
-    user=Depends(require_admin),
-):
+async def delete_rule(id: str = Query(None), mongo=Depends(get_mongo), user=Depends(require_admin)):
+    """
+    Deletes a rule by MongoDB ObjectId passed as a query parameter 'id'.
+    """
     if not id:
         raise HTTPException(status_code=400, detail="id is required")
 
@@ -103,11 +118,7 @@ async def delete_rule(
 
 
 @router.post("/update_rule")
-async def update_rule(
-    payload: RuleUpdate,
-    mongo=Depends(get_mongo),
-    user=Depends(require_admin),
-):
+async def update_rule(payload: RuleUpdate, mongo=Depends(get_mongo), user=Depends(require_admin)):
     data = payload.model_dump(by_alias=True)
 
     rule_id = data.pop("_id", None)
@@ -139,11 +150,18 @@ async def update_rule(
 
 @router.get("/livez")
 async def livez():
+    """
+    Liveness probe endpoint.
+    """
     return "OK"
 
 
 @router.get("/readyz")
 async def readyz():
+    """
+    Readiness probe endpoint.
+    Ensures MongoDB is reachable.
+    """
     try:
         _ = get_mongo()
         return {"ready": True}

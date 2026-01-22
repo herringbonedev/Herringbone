@@ -5,7 +5,6 @@ from datetime import datetime
 from bson import ObjectId
 from bson.json_util import dumps
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.deps import get_current_user, require_admin
 from schema import IncidentSchema
 import os
 import json
@@ -47,11 +46,7 @@ def get_mongo():
 
 
 @router.post("/insert_incident")
-async def insert_incident(
-    payload: IncidentCreate,
-    mongo=Depends(get_mongo),
-    user=Depends(require_admin),
-):
+async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
     print("[*] insert_incident called")
     print(json.dumps(payload.dict(), indent=2, default=str))
 
@@ -80,11 +75,7 @@ async def insert_incident(
 
 
 @router.post("/update_incident")
-async def update_incident(
-    payload: dict,
-    mongo=Depends(get_mongo),
-    user=Depends(require_admin),
-):
+async def update_incident(payload: dict, mongo=Depends(get_mongo)):
     print("[*] update_incident called")
     print(json.dumps(payload, indent=2, default=str))
 
@@ -126,10 +117,7 @@ async def update_incident(
 
 
 @router.get("/get_incidents")
-async def get_incidents(
-    mongo=Depends(get_mongo),
-    user=Depends(get_current_user),
-):
+async def get_incidents(mongo=Depends(get_mongo)):
     print("[*] get_incidents called")
     docs = list(mongo.coll.find({}))
     print(f"[*] returning {len(docs)} incidents")
@@ -137,11 +125,7 @@ async def get_incidents(
 
 
 @router.get("/get_incident/{incident_id}")
-async def get_incident(
-    incident_id: str,
-    mongo=Depends(get_mongo),
-    user=Depends(get_current_user),
-):
+async def get_incident(incident_id: str, mongo=Depends(get_mongo)):
     print("[*] get_incident called")
     print(f"[*] incident_id={incident_id}")
 

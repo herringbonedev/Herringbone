@@ -14,8 +14,6 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-      AUTH_ENABLED: ${AUTH_ENABLED}
-      JWT_SECRET: ${JWT_SECRET}
       COLLECTION_NAME: "parse_cards"
     read_only: true
     tmpfs:

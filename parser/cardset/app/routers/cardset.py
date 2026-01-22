@@ -9,7 +9,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from schema import CardSchema
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.deps import get_current_user, require_admin
 
 router = APIRouter(
     prefix="/parser/cardset",
@@ -69,10 +68,7 @@ def get_mongo_handler() -> HerringboneMongoDatabase:
 
 
 @router.post("/insert_card", response_model=InsertCardResponse)
-async def insert_card(
-    card: CardModel,
-    user=Depends(require_admin),
-):
+async def insert_card(card: CardModel):
     print("]*] Attempting to insert a new card...")
 
     try:
@@ -112,10 +108,7 @@ async def insert_card(
 
 
 @router.post("/pull_cards", response_model=PullCardsResponse)
-async def pull_cards(
-    body: PullCardsRequest,
-    user=Depends(get_current_user),
-):
+async def pull_cards(body: PullCardsRequest):
     print(f"[*] Incoming pull card request: {str(body)}")
     try:
         mongo = get_mongo_handler()
@@ -148,7 +141,7 @@ async def pull_cards(
     
 
 @router.get("/pull_all_cards")
-async def pull_all_cards(user=Depends(get_current_user)):
+async def pull_all_cards():
     try:
         mongo = get_mongo_handler()
         mongo.open_mongo_connection()
@@ -176,10 +169,7 @@ async def pull_all_cards(user=Depends(get_current_user)):
 
 
 @router.post("/delete_cards", response_model=DeleteCardsResponse)
-async def delete_cards(
-    body: DeleteCardsRequest,
-    user=Depends(require_admin)
-):
+async def delete_cards(body: DeleteCardsRequest):
     try:
         mongo = get_mongo_handler()
         mongo.open_mongo_connection()
@@ -208,10 +198,7 @@ async def delete_cards(
 
 
 @router.post("/update_card", response_model=UpdateCardResponse)
-async def update_card(
-    new_card: CardModel,
-    user=Depends(require_admin),
-):
+async def update_card(new_card: CardModel):
     try:
         mongo = get_mongo_handler()
         mongo.open_mongo_connection()

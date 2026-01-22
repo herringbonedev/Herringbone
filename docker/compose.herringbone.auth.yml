@@ -1,5 +1,5 @@
 services:
-  herringbone-auth:
+  herringbone-logs:
     container_name: herringbone-auth
     image: quay.io/herringbone/herringbone-auth:04e67a60@sha256:351c3cb512c1f0027d295c544cae74fab56136755324b8098738f374b5e4377a
     restart: unless-stopped
