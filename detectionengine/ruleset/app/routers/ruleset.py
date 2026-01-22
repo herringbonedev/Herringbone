@@ -62,7 +62,7 @@ def get_mongo():
 
 
 @router.post("/insert_rule")
-async def insert_rule(payload: RuleCreate, mongo=Depends(get_mongo), user=Depends(require_admin)):
+async def insert_rule(payload: RuleCreate, mongo=Depends(get_mongo)):
     """
     Inserts a new detection rule.
     Uses Pydantic for basic shape and RuleSchema for custom validation.
@@ -85,7 +85,7 @@ async def insert_rule(payload: RuleCreate, mongo=Depends(get_mongo), user=Depend
 
 
 @router.get("/get_rules")
-async def get_rules(mongo=Depends(get_mongo, user=Depends(get_current_user))):
+async def get_rules(mongo=Depends(get_mongo)):
     """
     Returns all rules from MongoDB as raw JSON.
     """
@@ -97,7 +97,7 @@ async def get_rules(mongo=Depends(get_mongo, user=Depends(get_current_user))):
 
 
 @router.get("/delete_rule")
-async def delete_rule(id: str = Query(None), mongo=Depends(get_mongo), user=Depends(require_admin)):
+async def delete_rule(id: str = Query(None), mongo=Depends(get_mongo)):
     """
     Deletes a rule by MongoDB ObjectId passed as a query parameter 'id'.
     """
@@ -118,7 +118,7 @@ async def delete_rule(id: str = Query(None), mongo=Depends(get_mongo), user=Depe
 
 
 @router.post("/update_rule")
-async def update_rule(payload: RuleUpdate, mongo=Depends(get_mongo), user=Depends(require_admin)):
+async def update_rule(payload: RuleUpdate, mongo=Depends(get_mongo)):
     data = payload.model_dump(by_alias=True)
 
     rule_id = data.pop("_id", None)
