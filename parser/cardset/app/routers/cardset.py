@@ -95,7 +95,7 @@ async def insert_card(card: CardModel):
 
     try:
         print("Inserting into MongoDB...")
-        mongo.insert_log(payload)
+        mongo.insert_one("cards", payload)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Insert failed: {e}")
     finally:
@@ -223,7 +223,12 @@ async def update_card(new_card: CardModel):
     payload.pop("deleted_at", None)
 
     try:
-        res = mongo.update_log(filter_query, payload, clean_codec=False)
+        res = mongo.upsert_one(
+            "cards",
+            filter_query,
+            payload,
+            clean_codec=False,
+        )
         return JSONResponse(
             content={
                 "ok": True,

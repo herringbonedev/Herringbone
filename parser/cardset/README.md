@@ -109,16 +109,6 @@ Run the service directly using Uvicorn:
 uvicorn cardset:app --host 0.0.0.0 --port 7002 --reload
 ```
 
-Ensure your MongoDB is accessible, and your `modules/database/mongo_db.py` defines:
-```python
-class HerringboneMongoDatabase:
-    def open_mongo_connection(self): ...
-    def insert_log(self, data): ...
-    def find_cards_by_selector(self, type, value, limit=None): ...
-    def update_log(self, query, new_data, clean_codec=False): ...
-    def delete_cards_by_selector(self, type, value): ...
-```
-
 ---
 
 ## 🧭 Example Responses

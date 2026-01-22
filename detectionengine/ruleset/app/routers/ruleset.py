@@ -76,7 +76,7 @@ async def insert_rule(payload: RuleCreate, mongo=Depends(get_mongo)):
         )
 
     try:
-        mongo.insert_log(data)
+        mongo.insert_one("rules", data)
     except Exception:
         raise HTTPException(status_code=500, detail={"inserted": False})
 
