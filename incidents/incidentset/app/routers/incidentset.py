@@ -69,7 +69,7 @@ async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
         print("[✗] validation failed")
         raise HTTPException(status_code=400, detail=validation)
 
-    mongo.insert_log(data)
+    mongo.insert_one("incidents", data)
     print("[✓] incident inserted")
     return {"inserted": True}
 

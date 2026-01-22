@@ -111,7 +111,7 @@ def apply_result(event_id, analysis: dict, rule_id: str):
 	det_coll = os.environ.get("DETECTIONS_COLLECTION_NAME")
 	if det_coll:
 		det_db = _db(det_coll)
-		det_db.insert_log(
+		det_db.insert_one("rules",
 			{
 				"event_id": event_id,
 				"detection": detected,
