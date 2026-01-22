@@ -114,7 +114,6 @@ async def insert_card(
 @router.post("/pull_cards", response_model=PullCardsResponse)
 async def pull_cards(
     body: PullCardsRequest,
-    user=Depends(get_current_user),
 ):
     print(f"[*] Incoming pull card request: {str(body)}")
     try:
@@ -148,7 +147,7 @@ async def pull_cards(
     
 
 @router.get("/pull_all_cards")
-async def pull_all_cards(user=Depends(get_current_user)):
+async def pull_all_cards():
     try:
         mongo = get_mongo_handler()
         mongo.open_mongo_connection()
