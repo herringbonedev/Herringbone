@@ -93,7 +93,8 @@ class HerringboneMongoDatabase:
         pass_enc = quote_plus(password) if password else ""
         auth = f"{user_enc}:{pass_enc}@" if user_enc or pass_enc else ""
 
-        qp = f"?authSource={quote_plus(auth_source)}"
+        # qp = f"?authSource={quote_plus(auth_source)}"
+
         if replica_set:
             qp += f"&replicaSet={quote_plus(replica_set)}"
 

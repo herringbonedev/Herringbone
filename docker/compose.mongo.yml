@@ -14,6 +14,10 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS}
 
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASS: ${MONGO_PASS}
+      MONGO_DB: herringbone
+
     command: ["mongod", "--auth", "--bind_ip_all"]
 
     stop_signal: SIGTERM

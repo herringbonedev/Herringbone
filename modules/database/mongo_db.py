@@ -114,10 +114,10 @@ class HerringboneMongoDatabase:
 
         qp_parts = []
 
-        if auth_source:
-            auth_source = auth_source.strip()
-            if auth_source:
-                qp_parts.append(f"authSource={quote_plus(auth_source)}")
+        # if auth_source:
+        #     auth_source = auth_source.strip()
+        #     if auth_source:
+        #         qp_parts.append(f"authSource={quote_plus(auth_source)}")
 
         if replica_set:
             qp_parts.append(f"replicaSet={quote_plus(replica_set)}")
