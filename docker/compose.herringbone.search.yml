@@ -1,7 +1,7 @@
 services:
   herringbone-search:
     container_name: herringbone-search
-    image: quay.io/herringbone/herringbone-search
+    image: quay.io/herringbone/herringbone-search:latest
     restart: unless-stopped
 
     depends_on:
@@ -21,7 +21,6 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-
     read_only: true
     tmpfs:
       - /tmp
