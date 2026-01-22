@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 from bson import ObjectId
 from bson.json_util import dumps
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.deps import get_current_user, require_admin
 from schema import RuleSchema
 import os
 import json
