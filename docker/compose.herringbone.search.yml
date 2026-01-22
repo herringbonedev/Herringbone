@@ -1,19 +1,15 @@
 services:
   herringbone-search:
     container_name: herringbone-search
-    image: quay.io/herringbone/herringbone-search:latest
+    image: quay.io/herringbone/herringbone-search:6e44a69b@sha256:181c20b977867369ed718c21d5952f9a3aebc5da22f99907e1c3923bfcca32be
     restart: unless-stopped
-
     depends_on:
       mongodb:
         condition: service_healthy
-
     networks:
       - herringbone
-
     ports:
       - "7014:7014"
-
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -26,7 +22,6 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
 networks:
   herringbone:
     external: true
