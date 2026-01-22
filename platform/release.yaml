@@ -3,7 +3,7 @@ services:
   herringbone-logs: quay.io/herringbone/herringbone-logs:2ba2bd13@sha256:e00027a4a2598a886b2ba6976eedcbf247dd91b5272ec68f5cd9b77e696b6158
   herringbone-search: quay.io/herringbone/herringbone-search:sha-7eaaf77a
   herringbone-auth: quay.io/herringbone/herringbone-auth:b890c63b
-  detectionengine-detector: quay.io/herringbone/detectionengine-detector:8149b3c4@sha256:721772da2cdc74b1823fae9ad2a86fd7e8247501fab05aa21aedee22271ff006
+  detectionengine-detector: quay.io/herringbone/detectionengine-detector:1f67ccf9@sha256:fa2b88bdbda3c66d8694fff0f0c596574beac5418ad3f0c1116b724fe1585068
   detectionengine-matcher: quay.io/herringbone/detectionengine-matcher:647d8135@sha256:3a7657a5fb674ea7581cb997d6ff757a05019ae4359b38947f70e95728e100ac
   detectionengine-ruleset: quay.io/herringbone/detectionengine-ruleset:f6fc7dc3@sha256:4d330bbecf46b498b6f18a8f6b5ca670bc9c0749e58af6fa3ea317089145676d
   parser-cardset: quay.io/herringbone/parser-cardset:8149b3c4@sha256:360adf51a6f6d70b31f2bf3da8df059a212fc98f3a0d051e321072aabe848a69
