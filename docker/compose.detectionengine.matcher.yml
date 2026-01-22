@@ -1,18 +1,16 @@
 services:
   detectionengine-matcher:
     container_name: detectionengine-matcher
-    image: quay.io/herringbone/detectionengine-matcher:04e67a60@sha256:771b68576f3b8ae650f3517097ede4db5e8be55f2fb01727c90f36739aa10dc8
+    image: quay.io/herringbone/detectionengine-matcher:ac9cdfc0@sha256:67be6f4edb9b5d32f75d3aa374f8a1a78d9bcee36ba153e2befa377bc1ef8704
     restart: unless-stopped
     networks:
       - herringbone
     ports:
       - "7003:7003"
-      
     environment:
       AUTH_ENABLED: "true"
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALG: ${JWT_ALG}
-
     read_only: true
     tmpfs:
       - /tmp
