@@ -1,13 +1,12 @@
 secrets:
   jwt_secret:
     file: ./jwt_secret.txt
-
 services:
   herringbone-auth:
     container_name: herringbone-auth
     secrets:
       - jwt_secret
-    image: quay.io/herringbone/herringbone-auth:71893861@sha256:0bf7a650fbf7b9cb0cc91a7e9cdf616d48420f52cd8891d81b65619c18527868
+    image: quay.io/herringbone/herringbone-auth:263db7cd@sha256:dbbe102fa5df1ba1d329764956c3d52a0747f601e8825dff6080ad3a2f362c2a
     restart: unless-stopped
     depends_on:
       mongodb:
