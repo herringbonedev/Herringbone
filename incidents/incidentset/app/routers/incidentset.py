@@ -99,7 +99,7 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
         mongo.upsert_one(
             incidents_collection(),
             {"_id": oid},
-            update_doc["$set"],
+            update_doc,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
