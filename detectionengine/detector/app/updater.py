@@ -6,119 +6,121 @@ from modules.database.mongo_db import HerringboneMongoDatabase
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", None)
 
 
-def _db(collection: str) -> HerringboneMongoDatabase:
-	return HerringboneMongoDatabase(
-		user=os.environ.get("MONGO_USER", ""),
-		password=os.environ.get("MONGO_PASS", ""),
-		database=os.environ.get("DB_NAME", ""),
-		collection=collection,
-		host=os.environ.get("MONGO_HOST", "localhost"),
-		port=int(os.environ.get("MONGO_PORT", 27017)),
-		replica_set=os.environ.get("MONGO_REPLICA_SET") or None,
-	)
+def _db() -> HerringboneMongoDatabase:
+    return HerringboneMongoDatabase(
+        user=os.environ.get("MONGO_USER", ""),
+        password=os.environ.get("MONGO_PASS", ""),
+        database=os.environ.get("DB_NAME", "herringbone"),
+        host=os.environ.get("MONGO_HOST", "localhost"),
+    )
 
 
 def _max_severity(analysis: dict):
-	vals = [
-		int(d["severity"])
-		for d in analysis.get("details", [])
-		if d.get("matched") and d.get("severity") is not None
-	]
-	return max(vals) if vals else None
+    vals = [
+        int(d["severity"])
+        for d in analysis.get("details", [])
+        if d.get("matched") and d.get("severity") is not None
+    ]
+    return max(vals) if vals else None
 
 
 def notify_orchestrator(payload):
-	if not ORCHESTRATOR_URL:
-		print("[✗] ORCHESTRATOR_URL not set, skipping notification")
-		return
+    if not ORCHESTRATOR_URL:
+        print("[✗] ORCHESTRATOR_URL not set, skipping notification")
+        return
 
-	try:
-		resp = requests.post(ORCHESTRATOR_URL, json=payload, timeout=2)
-		resp.raise_for_status()
-		print("[✓] Detection forwarded to orchestrator")
-	except Exception as e:
-		print(f"[✗] Failed to notify orchestrator: {e}")
+    try:
+        resp = requests.post(ORCHESTRATOR_URL, json=payload, timeout=2)
+        resp.raise_for_status()
+        print("[✓] Detection forwarded to orchestrator")
+    except Exception as e:
+        print(f"[✗] Failed to notify orchestrator: {e}")
 
 
 def set_failed(event_id, reason: str):
-	now = datetime.utcnow()
-	status_db = _db(os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state"))
-	client, db, coll = status_db.open_mongo_connection()
+    now = datetime.utcnow()
+    mongo = _db()
 
-	try:
-		coll.update_one(
-			{"event_id": event_id},
-			{
-				"$set": {
-					"detected": True,
-					"detection": False,
-					"last_stage": "detector",
-					"last_updated": now,
-					"error": reason,
-				}
-			},
-			upsert=True,
-		)
-	finally:
-		status_db.close_mongo_connection()
+    status_collection = os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state")
+
+    try:
+        mongo.upsert_one(
+            status_collection,
+            {"event_id": event_id},
+            {
+                "detected": True,
+                "detection": False,
+                "last_stage": "detector",
+                "last_updated": now,
+                "error": reason,
+            },
+        )
+    except Exception as e:
+        print(f"[✗] Failed to mark event failed: {e}")
 
 
 def apply_result(event_id, analysis: dict, rule_id: str):
-	now = datetime.utcnow()
-	severity = _max_severity(analysis)
-	detected = bool(analysis.get("detection"))
+    now = datetime.utcnow()
+    severity = _max_severity(analysis)
+    detected = bool(analysis.get("detection"))
 
-	status_db = _db(os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state"))
-	client, db, coll = status_db.open_mongo_connection()
+    mongo = _db()
+    status_collection = os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state")
 
-	correlate_values = []
+    correlate_values = []
 
-	for d in analysis.get("details", []):
-		if d.get("matched") and d.get("correlate_on"):
-			correlate_values.extend(d.get("correlate_on"))
-	
-	try:
-		update = {
-			"$set": {
-				"detected": True,
-				"detection": detected,
-				"analysis": analysis,
-				"last_stage": "detector",
-				"correlate_on": correlate_values,
-				"last_updated": now,
-			}
-		}
-		if severity is not None:
-			update["$set"]["severity"] = severity
+    for d in analysis.get("details", []):
+        if d.get("matched") and d.get("correlate_on"):
+            correlate_values.extend(d.get("correlate_on"))
 
-		coll.update_one({"event_id": event_id}, update, upsert=True)
+    update_fields = {
+        "detected": True,
+        "detection": detected,
+        "analysis": analysis,
+        "last_stage": "detector",
+        "correlate_on": correlate_values,
+        "last_updated": now,
+    }
 
-	finally:
-		status_db.close_mongo_connection()
+    if severity is not None:
+        update_fields["severity"] = severity
 
-	if detected:
-		print("[*] Detection evaluated as TRUE")
-		notify_orchestrator({
-			"detection_id": str(event_id),
-			"rule_id": rule_id,
-			"event_ids": [str(event_id)],
-			"severity": severity,
-			"correlate_on": correlate_values,
-			"priority": "high" if (severity or 0) >= 75 else "medium",
-			"timestamp": now.isoformat(),
-		})
+    try:
+        mongo.upsert_one(
+            status_collection,
+            {"event_id": event_id},
+            update_fields,
+        )
+    except Exception as e:
+        print(f"[✗] Failed to update status: {e}")
+        return
 
-	det_coll = os.environ.get("DETECTIONS_COLLECTION_NAME")
-	if det_coll:
-		det_db = _db(det_coll)
-		det_db.insert_one("rules",
-			{
-				"event_id": event_id,
-				"detection": detected,
-				"severity": severity,
-				"analysis": analysis,
-				"inserted_at": now,
-			},
-			clean_codec=False,
-		)
-		print("[✓] Detection written to detections collection")
+    if detected:
+        print("[*] Detection evaluated as TRUE")
+        notify_orchestrator({
+            "detection_id": str(event_id),
+            "rule_id": rule_id,
+            "event_ids": [str(event_id)],
+            "severity": severity,
+            "correlate_on": correlate_values,
+            "priority": "high" if (severity or 0) >= 75 else "medium",
+            "timestamp": now.isoformat(),
+        })
+
+    det_collection = os.environ.get("DETECTIONS_COLLECTION_NAME")
+    if det_collection:
+        try:
+            mongo.insert_one(
+                det_collection,
+                {
+                    "event_id": event_id,
+                    "detection": detected,
+                    "severity": severity,
+                    "analysis": analysis,
+                    "inserted_at": now,
+                },
+                clean_codec=False,
+            )
+            print("[✓] Detection written to detections collection")
+        except Exception as e:
+            print(f"[✗] Failed to write detection record: {e}")

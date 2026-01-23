@@ -13,18 +13,12 @@ router = APIRouter(
 
 
 def get_mongo():
-    db = HerringboneMongoDatabase(
+    return HerringboneMongoDatabase(
         user=os.environ.get("MONGO_USER", ""),
         password=os.environ.get("MONGO_PASS", ""),
         database=os.environ.get("DB_NAME", "herringbone"),
-        collection=os.environ.get("COLLECTION_NAME", "incidents"),
         host=os.environ.get("MONGO_HOST", "localhost"),
-        auth_source=os.environ.get("AUTH_DB", "herringbone"),
     )
-    db.open_mongo_connection()
-    if db.coll is None:
-        raise HTTPException(status_code=500, detail="Mongo connection not initialized")
-    return db
 
 
 EVENTS_API_BASE = os.environ.get(
@@ -62,7 +56,6 @@ def extract_correlate_values(event: dict, correlate_on: list[str]):
             continue
 
         parts = path.split(".")
-
         target = correlation_identity
         for p in parts[:-1]:
             target = target.setdefault(p, {})
@@ -76,9 +69,6 @@ def extract_correlate_values(event: dict, correlate_on: list[str]):
             correlation_filters.append({mongo_field: {"$all": v}})
         else:
             correlation_filters.append({mongo_field: value})
-
-    print("[*] correlation_identity =", correlation_identity)
-    print("[*] correlation_filters =", correlation_filters)
 
     return correlation_identity, correlation_filters
 
@@ -96,6 +86,8 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
     event_ids = payload.get("event_ids") or []
     event_id = event_ids[0] if event_ids else None
 
+    incidents_collection = os.environ.get("COLLECTION_NAME", "incidents")
+
     now = datetime.utcnow()
     window_start = now - timedelta(minutes=30)
 
@@ -103,10 +95,10 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
     if ObjectId.is_valid(rule_id):
         rule_clauses.append({"rule_id": ObjectId(rule_id)})
 
+    # -------------------------
+    # Hard correlation path
+    # -------------------------
     if correlate_on:
-        print("[*] Hard correlation enabled")
-        print("[*] correlate_on =", correlate_on)
-
         if not event_id:
             return {"action": "create", "correlation_identity": {}}
 
@@ -128,44 +120,50 @@ async def correlate(payload: dict, mongo=Depends(get_mongo)):
             "$and": correlation_filters,
         }
 
-        print("[*] Correlation query")
-        print(json.dumps(query, indent=2, default=str))
+        try:
+            candidates = mongo.find_sorted(
+                collection=incidents_collection,
+                filter_query=query,
+                sort=[("state.last_updated", -1)],
+                limit=1,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
-        candidate = mongo.coll.find_one(
-            query,
-            sort=[("state.last_updated", -1)],
-        )
-
-        if candidate:
-            print("[✓] Correlation identity match")
+        if candidates:
             return {
                 "action": "attach",
-                "incident_id": str(candidate["_id"]),
+                "incident_id": str(candidates[0]["_id"]),
             }
 
-        print("[*] No correlation identity match — creating new incident")
         return {
             "action": "create",
             "correlation_identity": correlation_identity,
         }
 
-    print("[*] No correlate_on defined — rule-only correlation")
-
+    # -------------------------
+    # Rule-only correlation
+    # -------------------------
     query = {
         "status": {"$in": ["open", "investigating"]},
         "state.last_updated": {"$gte": window_start},
         "$or": rule_clauses,
     }
 
-    candidate = mongo.coll.find_one(
-        query,
-        sort=[("state.last_updated", -1)],
-    )
+    try:
+        candidates = mongo.find_sorted(
+            collection=incidents_collection,
+            filter_query=query,
+            sort=[("state.last_updated", -1)],
+            limit=1,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    if candidate:
+    if candidates:
         return {
             "action": "attach",
-            "incident_id": str(candidate["_id"]),
+            "incident_id": str(candidates[0]["_id"]),
         }
 
     return {"action": "create"}

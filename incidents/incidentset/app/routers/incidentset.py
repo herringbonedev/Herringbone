@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -31,25 +31,20 @@ class IncidentUpdate(IncidentBase):
 
 
 def get_mongo():
-    db = HerringboneMongoDatabase(
+    return HerringboneMongoDatabase(
         user=os.environ.get("MONGO_USER", ""),
         password=os.environ.get("MONGO_PASS", ""),
         database=os.environ.get("DB_NAME", "herringbone"),
-        collection=os.environ.get("COLLECTION_NAME", "incidents"),
         host=os.environ.get("MONGO_HOST", "localhost"),
-        auth_source=os.environ.get("AUTH_DB", "herringbone"),
     )
-    db.open_mongo_connection()
-    if db.coll is None:
-        raise HTTPException(status_code=500, detail="Mongo connection not initialized")
-    return db
+
+
+def incidents_collection():
+    return os.environ.get("COLLECTION_NAME", "incidents")
 
 
 @router.post("/insert_incident")
 async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
-    print("[*] insert_incident called")
-    print(json.dumps(payload.dict(), indent=2, default=str))
-
     data = payload.dict()
     now = datetime.utcnow()
 
@@ -58,27 +53,20 @@ async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
     data["state"] = {"last_updated": now}
     data["status"] = data.get("status", "open")
 
-    print("[*] enriched incident")
-    print(json.dumps(data, indent=2, default=str))
-
     validation = validator(data)
-    print("[*] validation result")
-    print(validation)
-
     if not validation["valid"]:
-        print("[✗] validation failed")
         raise HTTPException(status_code=400, detail=validation)
 
-    mongo.insert_one("incidents", data)
-    print("[✓] incident inserted")
+    try:
+        mongo.insert_one(incidents_collection(), data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
     return {"inserted": True}
 
 
 @router.post("/update_incident")
 async def update_incident(payload: dict, mongo=Depends(get_mongo)):
-    print("[*] update_incident called")
-    print(json.dumps(payload, indent=2, default=str))
-
     raw_id = payload.pop("_id", None)
     if not raw_id:
         raise HTTPException(status_code=400, detail="Missing _id")
@@ -107,37 +95,40 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
     if push_fields:
         update_doc["$push"] = push_fields
 
-    print("[*] update document")
-    print(json.dumps(update_doc, indent=2, default=str))
+    try:
+        mongo.upsert_one(
+            incidents_collection(),
+            {"_id": oid},
+            update_doc["$set"],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    result = mongo.coll.update_one({"_id": oid}, update_doc)
-    print(f"[*] modified_count={result.modified_count}")
-
-    return {"updated": result.modified_count > 0}
+    return {"updated": True}
 
 
 @router.get("/get_incidents")
 async def get_incidents(mongo=Depends(get_mongo)):
-    print("[*] get_incidents called")
-    docs = list(mongo.coll.find({}))
-    print(f"[*] returning {len(docs)} incidents")
-    return JSONResponse(content=json.loads(dumps(docs)))
+    try:
+        docs = mongo.find(incidents_collection(), {})
+        return JSONResponse(content=json.loads(dumps(docs)))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/get_incident/{incident_id}")
 async def get_incident(incident_id: str, mongo=Depends(get_mongo)):
-    print("[*] get_incident called")
-    print(f"[*] incident_id={incident_id}")
-
     try:
         oid = ObjectId(incident_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid incident id")
 
-    doc = mongo.coll.find_one({"_id": oid})
+    try:
+        doc = mongo.find_one(incidents_collection(), {"_id": oid})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     if not doc:
         raise HTTPException(status_code=404, detail="Incident not found")
 
     return JSONResponse(content=json.loads(dumps(doc)))
-
