@@ -1,6 +1,12 @@
+secrets:
+  jwt_secret:
+    file: ./jwt_secret.txt
+
 services:
   herringbone-auth:
     container_name: herringbone-auth
+    secrets:
+      - jwt_secret
     image: quay.io/herringbone/herringbone-auth:71893861@sha256:0bf7a650fbf7b9cb0cc91a7e9cdf616d48420f52cd8891d81b65619c18527868
     restart: unless-stopped
     depends_on:
@@ -17,7 +23,6 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-      JWT_SECRET: ${JWT_SECRET}
     read_only: true
     tmpfs:
       - /tmp
