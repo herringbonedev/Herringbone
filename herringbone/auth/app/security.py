@@ -5,10 +5,23 @@ import os
 
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "herringbone")
 JWT_ALG = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24
 
+def load_jwt_secret() -> str:
+    secret_path = "/run/secrets/jwt_secret"
+
+    if os.path.exists(secret_path):
+        with open(secret_path, "r") as f:
+            return f.read().strip()
+    
+    env_secret = os.environ.get("JWT_SECRET")
+    if env_secret:
+        return env_secret
+
+    raise RuntimeError("JWT secret not configured")
+
+JWT_SECRET = load_jwt_secret()
 
 def hash_password(password: str) -> str:
     return _pwd.hash(password)
