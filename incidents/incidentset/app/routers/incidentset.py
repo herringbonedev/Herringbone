@@ -65,14 +65,23 @@ async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
     return {"inserted": True}
 
 
+import traceback
+
+import traceback
+
 @router.post("/update_incident")
 async def update_incident(payload: dict, mongo=Depends(get_mongo)):
+    print("\n========== UPDATE INCIDENT ==========")
+    print("Raw payload:")
+    print(json.dumps(payload, default=str, indent=2))
+
     raw_id = payload.pop("_id", None)
     if not raw_id:
         raise HTTPException(status_code=400, detail="Missing _id")
 
     try:
         oid = ObjectId(raw_id if isinstance(raw_id, str) else raw_id.get("$oid"))
+        print("Parsed ObjectId:", oid)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid _id")
 
@@ -95,14 +104,33 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
     if push_fields:
         update_doc["$push"] = push_fields
 
+    print("Generated Mongo update document:")
+    print(json.dumps(update_doc, default=str, indent=2))
+
     try:
-        mongo.upsert_one(
-            incidents_collection(),
+        # 🔑 OPEN CONNECTION MANUALLY
+        client, db = mongo.open_mongo_connection()
+
+        collection = db[incidents_collection()]
+
+        result = collection.update_one(
             {"_id": oid},
             update_doc,
+            upsert=True,
         )
+
+        print("Mongo result:", result.raw_result)
+
     except Exception as e:
+        print("MONGO ERROR:")
+        print(str(e))
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        mongo.close_mongo_connection()
+
+    print("========== UPDATE COMPLETE ==========\n")
 
     return {"updated": True}
 
