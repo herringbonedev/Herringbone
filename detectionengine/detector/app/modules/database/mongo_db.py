@@ -85,6 +85,13 @@ def _split_host_port_if_present(host: str) -> Tuple[str, int | None]:
 class HerringboneMongoDatabase:
     """
     Unified MongoDB access layer for Herringbone (event-centric).
+
+    Collections:
+      - events (immutable)
+      - event_state (mutable)
+      - parse_results
+      - enrichment_results
+      - detections
     """
 
     def __init__(
