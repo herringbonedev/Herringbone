@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from security import hash_password, verify_password, create_access_token
+from security import hash_password, verify_password, create_access_token, create_service_token
 from bson import ObjectId
 
 
@@ -26,6 +26,11 @@ def get_mongo():
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
+
+
+class ServiceTokenRequest(BaseModel):
+    service: str
+    scopes: list[str] = []
 
 
 class LoginRequest(BaseModel):
@@ -67,6 +72,21 @@ async def register_user(payload: RegisterRequest):
     }
 
 
+@router.post("/service-token")
+async def create_service_token_api(payload: ServiceTokenRequest):
+    # Add protection (needs token / network restriction)
+
+    token = create_service_token(
+        service_name=payload.service,
+        scopes=payload.scopes,
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+    }
+
+
 @router.post("/login")
 async def login_user(payload: LoginRequest):
     mongo = get_mongo()
@@ -91,6 +111,25 @@ async def login_user(payload: LoginRequest):
     return {
         "access_token": token,
         "token_type": "bearer",
+    }
+
+
+@router.get("/users")
+async def list_users():
+    mongo = get_mongo()
+
+    users = mongo.find(collection="users", filter_query={})
+
+    result = []
+    for u in users:
+        result.append({
+            "email": u.get("email"),
+            "role": u.get("role"),
+        })
+
+    return {
+        "count": len(result),
+        "users": result,
     }
 
 

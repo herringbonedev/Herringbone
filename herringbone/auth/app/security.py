@@ -28,3 +28,32 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
         "exp": int((now + timedelta(minutes=JWT_EXPIRE_MINUTES)).timestamp()),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+
+
+def create_service_token(service_name: str, scopes: list[str] | None = None) -> str:
+    now = datetime.now(timezone.utc)
+
+    payload = {
+        "svc": service_name,
+        "scope": scopes or [],
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=JWT_EXPIRE_MINUTES)).timestamp()),
+        "type": "service",
+    }
+
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+
+
+def verify_service_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+
+        if payload.get("type") != "service":
+            return None
+
+        if "svc" not in payload:
+            return None
+
+        return payload
+    except Exception:
+        return None
