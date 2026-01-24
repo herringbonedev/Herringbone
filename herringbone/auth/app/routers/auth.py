@@ -6,12 +6,20 @@ from pydantic import BaseModel, EmailStr, Field
 from bson import ObjectId
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.user import require_admin   # <-- ADDED
-from security import hash_password, verify_password, create_access_token, create_service_token
-
+from modules.auth.user import require_admin
+from security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_service_token,
+)
 
 router = APIRouter(prefix="/herringbone/auth", tags=["auth"])
 
+
+# =====================
+# Database helper
+# =====================
 
 def get_mongo():
     return HerringboneMongoDatabase(
@@ -24,14 +32,13 @@ def get_mongo():
     )
 
 
+# =====================
+# Models
+# =====================
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
-
-
-class ServiceTokenRequest(BaseModel):
-    service: str
-    scopes: list[str] = []
 
 
 class LoginRequest(BaseModel):
@@ -39,12 +46,25 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ServiceTokenRequest(BaseModel):
+    service: str
+    scopes: list[str] = []
+
+
+class ServiceRegisterRequest(BaseModel):
+    service_name: str
+    scopes: list[str] = []
+
+
+# =====================
+# User endpoints
+# =====================
+
 @router.post("/register")
 async def register_user(payload: RegisterRequest):
     mongo = get_mongo()
 
-    existing = mongo.find_one("users", {"email": payload.email})
-    if existing:
+    if mongo.find_one("users", {"email": payload.email}):
         raise HTTPException(status_code=400, detail="User already exists")
 
     user_count = len(mongo.find("users", {}))
@@ -59,31 +79,11 @@ async def register_user(payload: RegisterRequest):
 
     user_id = mongo.insert_one("users", user_doc)
 
-    return {"ok": True, "user_id": str(user_id), "role": role}
-
-
-@router.post("/service-token")
-async def create_service_token_api(
-    payload: ServiceTokenRequest,
-    user=Depends(require_admin),
-):
-    mongo = get_mongo()
-
-    svc = mongo.find_one(
-        "service_accounts",
-        {"service_name": payload.service, "enabled": True},
-    )
-
-    if not svc:
-        raise HTTPException(status_code=404, detail="Service not found or disabled")
-
-    token = create_service_token(
-        service_id=str(svc["_id"]),          # <-- FIXED
-        service_name=svc["service_name"],
-        scopes=payload.scopes,
-    )
-
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "ok": True,
+        "user_id": str(user_id),
+        "role": role,
+    }
 
 
 @router.post("/login")
@@ -91,7 +91,10 @@ async def login_user(payload: LoginRequest):
     mongo = get_mongo()
 
     user = mongo.find_one("users", {"email": payload.email})
-    if not user or not verify_password(payload.password, user["password_hash"]):
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_access_token(
@@ -100,7 +103,10 @@ async def login_user(payload: LoginRequest):
         role=user["role"],
     )
 
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+    }
 
 
 @router.get("/users")
@@ -110,7 +116,44 @@ async def list_users():
 
     return {
         "count": len(users),
-        "users": [{"email": u.get("email"), "role": u.get("role")} for u in users],
+        "users": [
+            {
+                "email": u.get("email"),
+                "role": u.get("role"),
+            }
+            for u in users
+        ],
+    }
+
+
+# =====================
+# Service registry
+# =====================
+
+@router.post("/services/register")
+async def register_service(
+    payload: ServiceRegisterRequest,
+    user=Depends(require_admin),
+):
+    mongo = get_mongo()
+
+    if mongo.find_one("service_accounts", {"service_name": payload.service_name}):
+        raise HTTPException(status_code=400, detail="Service already exists")
+
+    svc_doc = {
+        "service_name": payload.service_name,
+        "service_id": payload.service_name,  # can be UUID later
+        "scopes": payload.scopes,
+        "enabled": True,
+        "created_at": datetime.utcnow(),
+    }
+
+    svc_id = mongo.insert_one("service_accounts", svc_doc)
+
+    return {
+        "ok": True,
+        "service_id": str(svc_id),
+        "service_name": payload.service_name,
     }
 
 
@@ -130,8 +173,52 @@ async def list_services():
             "created_at": s.get("created_at"),
         })
 
-    return {"count": len(result), "services": result}
+    return {
+        "count": len(result),
+        "services": result,
+    }
 
+
+# =====================
+# Service tokens
+# =====================
+
+@router.post("/service-token")
+async def create_service_token_api(
+    payload: ServiceTokenRequest,
+    user=Depends(require_admin),
+):
+    mongo = get_mongo()
+
+    svc = mongo.find_one(
+        "service_accounts",
+        {
+            "service_name": payload.service,
+            "enabled": True,
+        },
+    )
+
+    if not svc:
+        raise HTTPException(
+            status_code=404,
+            detail="Service not found or disabled",
+        )
+
+    token = create_service_token(
+        service_id=str(svc["_id"]),
+        service_name=svc["service_name"],
+        scopes=payload.scopes,
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+    }
+
+
+# =====================
+# Health
+# =====================
 
 @router.get("/healthz")
 async def healthz():

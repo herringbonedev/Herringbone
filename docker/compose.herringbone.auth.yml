@@ -17,6 +17,11 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
+
+      # Auth
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_JWT_PRIVATE_KEY: ${SERVICE_JWT_PRIVATE_KEY}
+      SERVICE_JWT_PUBLIC_KEY: ${SERVICE_JWT_PUBLIC_KEY}
     read_only: true
     tmpfs:
       - /tmp
