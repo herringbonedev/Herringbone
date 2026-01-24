@@ -1,19 +1,15 @@
 services:
   herringbone-auth:
     container_name: herringbone-auth
-    image: quay.io/herringbone/herringbone-auth:5e4c0a5f@sha256:36984335fd90eecbc683c26c20c60455adf2de5ba464af941adce593a2a2f45a
+    image: quay.io/herringbone/herringbone-auth:7e8d52dc@sha256:bee9dda9dfa1d8a4895eb453097cd2b22fddeb6353087dd416340bd513b10dea
     restart: unless-stopped
-
     depends_on:
       mongodb:
         condition: service_healthy
-
     networks:
       - herringbone
-
     ports:
       - "7001:7001"
-
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -21,13 +17,11 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
 networks:
   herringbone:
     external: true
