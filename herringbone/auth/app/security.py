@@ -18,10 +18,12 @@ def load_user_jwt_secret() -> str:
     if env:
         return env
 
-    raise RuntimeError("USER_JWT_SECRET not configured (JWT_SECRET)")
+    raise RuntimeError("USER_JWT_SECRET not configured (JWT_SECRET or USER_JWT_SECRET)")
 
 
-USER_JWT_SECRET = load_user_jwt_secret()
+def get_user_jwt_secret() -> str:
+    # Lazy load to avoid startup crash if env not ready yet
+    return load_user_jwt_secret()
 
 
 def hash_password(password: str) -> str:
@@ -44,7 +46,7 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
         "exp": int((now + timedelta(minutes=USER_JWT_EXPIRE_MINUTES)).timestamp()),
     }
 
-    return jwt.encode(payload, USER_JWT_SECRET, algorithm=USER_JWT_ALG)
+    return jwt.encode(payload, get_user_jwt_secret(), algorithm=USER_JWT_ALG)
 
 
 # ============================
@@ -63,7 +65,9 @@ def load_service_private_key() -> str:
     raise RuntimeError("SERVICE_JWT_PRIVATE_KEY not configured")
 
 
-SERVICE_JWT_PRIVATE_KEY = load_service_private_key()
+def get_service_private_key() -> str:
+    # Lazy load for same reason as user secret
+    return load_service_private_key()
 
 
 def create_service_token(
@@ -84,4 +88,4 @@ def create_service_token(
         "exp": int((now + timedelta(minutes=SERVICE_JWT_EXPIRE_MINUTES)).timestamp()),
     }
 
-    return jwt.encode(payload, SERVICE_JWT_PRIVATE_KEY, algorithm=SERVICE_JWT_ALG)
+    return jwt.encode(payload, get_service_private_key(), algorithm=SERVICE_JWT_ALG)
