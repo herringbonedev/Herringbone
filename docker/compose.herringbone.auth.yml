@@ -12,7 +12,7 @@ services:
       - jwt_secret
       - service_jwt_private_key
       - service_jwt_public_key
-    image: quay.io/herringbone/herringbone-auth:923ef7f8@sha256:0e339a9e78b053682702c1ecf0f39d810012ef651ace6dab3ad2f316f75130d1
+    image: quay.io/herringbone/herringbone-auth:3cbddddd@sha256:e380b233090b8d7a51f91439b7d5adc6f280fcffde69430b98cd1ee4f0c5fb67
     restart: unless-stopped
     depends_on:
       mongodb:
