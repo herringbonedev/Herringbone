@@ -3,20 +3,15 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 
-JWT_SECRET_PATH = "/run/secrets/jwt_secret"
 JWT_ALG = os.environ.get("JWT_ALG", "HS256")
 
 
-def load_user_jwt_secret():
-    if os.path.exists(JWT_SECRET_PATH):
-        with open(JWT_SECRET_PATH, "r") as f:
-            return f.read().strip()
-
+def load_user_jwt_secret() -> str:
     env = os.environ.get("JWT_SECRET") or os.environ.get("USER_JWT_SECRET")
     if env:
         return env
 
-    raise RuntimeError("User JWT secret not configured")
+    raise RuntimeError("User JWT secret not configured (JWT_SECRET)")
 
 
 USER_JWT_SECRET = load_user_jwt_secret()

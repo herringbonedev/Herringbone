@@ -1,6 +1,10 @@
 secrets:
-  jwt_secret:
-    file: ./jwt_secret.txt
+  user_jwt_secret:
+    file: ./user_jwt_secret.txt
+  service_jwt_private_key:
+    file: ./service_jwt_private.pem
+  service_jwt_public_key:
+    file: ./service_jwt_public.pem
 
 services:
   mongodb:
@@ -29,6 +33,8 @@ services:
     container_name: herringbone-auth
     secrets:
       - jwt_secret
+      - service_jwt_private_key
+      - service_jwt_public_key
 
     build:
       context: ..

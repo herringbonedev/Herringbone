@@ -12,18 +12,14 @@ _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 USER_JWT_ALG = "HS256"
 USER_JWT_EXPIRE_MINUTES = 60 * 24
 
+
 def load_user_jwt_secret() -> str:
-    secret_path = "/run/secrets/user_jwt_secret"
+    env = os.environ.get("JWT_SECRET") or os.environ.get("USER_JWT_SECRET")
+    if env:
+        return env
 
-    if os.path.exists(secret_path):
-        with open(secret_path, "r") as f:
-            return f.read().strip()
+    raise RuntimeError("USER_JWT_SECRET not configured (JWT_SECRET)")
 
-    env_secret = os.environ.get("USER_JWT_SECRET") or os.environ.get("JWT_SECRET")
-    if env_secret:
-        return env_secret
-
-    raise RuntimeError("USER_JWT_SECRET not configured")
 
 USER_JWT_SECRET = load_user_jwt_secret()
 
@@ -58,16 +54,14 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
 SERVICE_JWT_ALG = "RS256"
 SERVICE_JWT_EXPIRE_MINUTES = 60
 
-def load_service_private_key() -> str:
-    path = "/run/secrets/service_jwt_private_key"
-    if os.path.exists(path):
-        return open(path).read()
 
+def load_service_private_key() -> str:
     env = os.environ.get("SERVICE_JWT_PRIVATE_KEY")
     if env:
         return env
 
     raise RuntimeError("SERVICE_JWT_PRIVATE_KEY not configured")
+
 
 SERVICE_JWT_PRIVATE_KEY = load_service_private_key()
 

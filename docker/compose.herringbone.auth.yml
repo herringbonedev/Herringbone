@@ -1,26 +1,19 @@
-secrets:
-  jwt_secret:
-    file: ./jwt_secret.txt
-  service_jwt_private_key:
-    file: ./service_jwt_private.pem
-  service_jwt_public_key:
-    file: ./service_jwt_public.pem
 services:
   herringbone-auth:
     container_name: herringbone-auth
-    secrets:
-      - jwt_secret
-      - service_jwt_private_key
-      - service_jwt_public_key
     image: quay.io/herringbone/herringbone-auth:5e4c0a5f@sha256:36984335fd90eecbc683c26c20c60455adf2de5ba464af941adce593a2a2f45a
     restart: unless-stopped
+
     depends_on:
       mongodb:
         condition: service_healthy
+
     networks:
       - herringbone
+
     ports:
       - "7001:7001"
+
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -28,11 +21,13 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
+
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
+
 networks:
   herringbone:
     external: true
