@@ -5,6 +5,8 @@ from jose import jwt, JWTError
 
 JWT_ALG = os.environ.get("JWT_ALG", "HS256")
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/herringbone/auth/login")
+
 
 def load_user_jwt_secret() -> str:
     env = os.environ.get("JWT_SECRET") or os.environ.get("USER_JWT_SECRET")
@@ -14,14 +16,10 @@ def load_user_jwt_secret() -> str:
     raise RuntimeError("User JWT secret not configured (JWT_SECRET)")
 
 
-USER_JWT_SECRET = load_user_jwt_secret()
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/herringbone/auth/login")
-
-
 def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     try:
-        payload = jwt.decode(token, USER_JWT_SECRET, algorithms=[JWT_ALG])
+        secret = load_user_jwt_secret()   # <-- moved here (runtime)
+        payload = jwt.decode(token, secret, algorithms=[JWT_ALG])
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -3,48 +3,45 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 
-SERVICE_PUBLIC_KEY_PATH = "/run/secrets/service_jwt_public_key"
 SERVICE_JWT_ALG = "RS256"
-
-
-def load_service_public_key():
-    if os.path.exists(SERVICE_PUBLIC_KEY_PATH):
-        with open(SERVICE_PUBLIC_KEY_PATH, "r") as f:
-            return f.read()
-
-    env = os.environ.get("SERVICE_JWT_PUBLIC_KEY")
-    if env:
-        return env
-
-    raise RuntimeError("Service JWT public key not configured")
-
-
-SERVICE_JWT_PUBLIC_KEY = load_service_public_key()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/herringbone/auth/service-token")
 
 
+def load_service_public_key() -> str:
+    env = os.environ.get("SERVICE_JWT_PUBLIC_KEY")
+    if env:
+        return env
+
+    raise RuntimeError("Service JWT public key not configured (SERVICE_JWT_PUBLIC_KEY)")
+
+
 def get_current_service(token: str = Depends(oauth2_scheme)) -> dict:
     try:
+        public_key = load_service_public_key()  # lazy load at runtime
+
         payload = jwt.decode(
             token,
-            SERVICE_JWT_PUBLIC_KEY,
+            public_key,
             algorithms=[SERVICE_JWT_ALG],
+            audience="herringbone-services",  # matches security.py
         )
+
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired service token",
         )
 
-    if payload.get("type") != "service":
+    if payload.get("typ") != "service":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token type",
         )
 
     return {
-        "service": payload.get("svc"),
+        "service_id": payload.get("sub"),
+        "service": payload.get("service"),
         "scopes": payload.get("scope", []),
     }
 
