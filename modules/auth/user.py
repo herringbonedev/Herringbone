@@ -1,22 +1,23 @@
+# modules/auth/user.py
+
 import os
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 
-JWT_SECRET = os.environ.get("JWT_SECRET")
-JWT_ALG = os.environ.get("JWT_ALG", "HS256")
+USER_JWT_SECRET = os.environ.get("JWT_SECRET")
+USER_JWT_ALG = os.environ.get("JWT_ALG", "HS256")
 
-if not JWT_SECRET:
-    raise RuntimeError("JWT_SECRET not set")
+if not USER_JWT_SECRET:
+    raise RuntimeError("USER_JWT_SECRET not set")
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/herringbone/auth/login"
 )
 
-
 def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+        payload = jwt.decode(token, USER_JWT_SECRET, algorithms=[USER_JWT_ALG])
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -29,7 +30,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         "role": payload.get("role"),
     }
 
-
 def require_role(required_role: str):
     def checker(user: dict = Depends(get_current_user)):
         if user.get("role") != required_role:
@@ -38,9 +38,7 @@ def require_role(required_role: str):
                 detail="Insufficient permissions",
             )
         return user
-
     return checker
-
 
 def require_admin(user: dict = Depends(get_current_user)):
     if user.get("role") != "admin":

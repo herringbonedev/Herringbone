@@ -1,12 +1,18 @@
 secrets:
   jwt_secret:
     file: ./jwt_secret.txt
+  service_jwt_private_key:
+    file: ./service_jwt_private.pem
+  service_jwt_public_key:
+    file: ./service_jwt_public.pem
 
 services:
   herringbone-auth:
     container_name: herringbone-auth
     secrets:
       - jwt_secret
+      - service_jwt_private_key
+      - service_jwt_public_key
     image: quay.io/herringbone/herringbone-auth:71893861@sha256:0bf7a650fbf7b9cb0cc91a7e9cdf616d48420f52cd8891d81b65619c18527868
     restart: unless-stopped
     depends_on:
