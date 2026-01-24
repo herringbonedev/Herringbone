@@ -5,23 +5,28 @@ import os
 
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-JWT_ALG = "HS256"
-JWT_EXPIRE_MINUTES = 60 * 24
+# ============================
+# User JWT (HS256)
+# ============================
 
-def load_jwt_secret() -> str:
-    secret_path = "/run/secrets/jwt_secret"
+USER_JWT_ALG = "HS256"
+USER_JWT_EXPIRE_MINUTES = 60 * 24
+
+def load_user_jwt_secret() -> str:
+    secret_path = "/run/secrets/user_jwt_secret"
 
     if os.path.exists(secret_path):
         with open(secret_path, "r") as f:
             return f.read().strip()
-    
-    env_secret = os.environ.get("JWT_SECRET")
+
+    env_secret = os.environ.get("USER_JWT_SECRET") or os.environ.get("JWT_SECRET")
     if env_secret:
         return env_secret
 
-    raise RuntimeError("JWT secret not configured")
+    raise RuntimeError("USER_JWT_SECRET not configured")
 
-JWT_SECRET = load_jwt_secret()
+USER_JWT_SECRET = load_user_jwt_secret()
+
 
 def hash_password(password: str) -> str:
     return _pwd.hash(password)
@@ -33,40 +38,56 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def create_access_token(user_id: str, email: str, role: str) -> str:
     now = datetime.now(timezone.utc)
+
     payload = {
         "sub": user_id,
         "email": email,
         "role": role,
+        "typ": "user",
         "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=JWT_EXPIRE_MINUTES)).timestamp()),
+        "exp": int((now + timedelta(minutes=USER_JWT_EXPIRE_MINUTES)).timestamp()),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+
+    return jwt.encode(payload, USER_JWT_SECRET, algorithm=USER_JWT_ALG)
 
 
-def create_service_token(service_name: str, scopes: list[str] | None = None) -> str:
+# ============================
+# Service JWT (RS256)
+# ============================
+
+SERVICE_JWT_ALG = "RS256"
+SERVICE_JWT_EXPIRE_MINUTES = 60
+
+def load_service_private_key() -> str:
+    path = "/run/secrets/service_jwt_private_key"
+    if os.path.exists(path):
+        return open(path).read()
+
+    env = os.environ.get("SERVICE_JWT_PRIVATE_KEY")
+    if env:
+        return env
+
+    raise RuntimeError("SERVICE_JWT_PRIVATE_KEY not configured")
+
+SERVICE_JWT_PRIVATE_KEY = load_service_private_key()
+
+
+def create_service_token(
+    service_id: str,
+    service_name: str,
+    scopes: list[str],
+) -> str:
     now = datetime.now(timezone.utc)
 
     payload = {
-        "svc": service_name,
-        "scope": scopes or [],
+        "iss": "herringbone-auth",
+        "sub": service_id,
+        "service": service_name,
+        "scope": scopes,
+        "typ": "service",
+        "aud": "herringbone-services",
         "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=JWT_EXPIRE_MINUTES)).timestamp()),
-        "type": "service",
+        "exp": int((now + timedelta(minutes=SERVICE_JWT_EXPIRE_MINUTES)).timestamp()),
     }
 
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
-
-
-def verify_service_token(token: str) -> dict | None:
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
-
-        if payload.get("type") != "service":
-            return None
-
-        if "svc" not in payload:
-            return None
-
-        return payload
-    except Exception:
-        return None
+    return jwt.encode(payload, SERVICE_JWT_PRIVATE_KEY, algorithm=SERVICE_JWT_ALG)

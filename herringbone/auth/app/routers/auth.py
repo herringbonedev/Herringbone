@@ -131,6 +131,29 @@ async def list_users():
         "count": len(result),
         "users": result,
     }
+    
+
+@router.get("/services")
+async def list_services():
+    mongo = get_mongo()
+
+    services = mongo.find(collection="service_accounts", filter_query={})
+
+    result = []
+    for s in services:
+        result.append({
+            "id": str(s.get("_id")),
+            "service_name": s.get("service_name"),
+            "service_id": s.get("service_id"),
+            "scopes": s.get("scopes", []),
+            "enabled": s.get("enabled", True),
+            "created_at": s.get("created_at"),
+        })
+
+    return {
+        "count": len(result),
+        "services": result,
+    }
 
 
 @router.get("/healthz")
