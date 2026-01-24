@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr, Field
 
 from modules.database.mongo_db import HerringboneMongoDatabase
@@ -73,9 +73,10 @@ async def register_user(payload: RegisterRequest):
 
 
 @router.post("/service-token")
-async def create_service_token_api(payload: ServiceTokenRequest):
-    # Add protection (needs token / network restriction)
-
+async def create_service_token_api(
+    payload: ServiceTokenRequest,
+    user=Depends(require_admin),
+):
     token = create_service_token(
         service_name=payload.service,
         scopes=payload.scopes,
