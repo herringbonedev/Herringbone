@@ -77,6 +77,7 @@ async def create_service_token_api(
     payload: ServiceTokenRequest,
     user=Depends(require_admin),
 ):
+    
     token = create_service_token(
         service_name=payload.service,
         scopes=payload.scopes,
@@ -169,4 +170,3 @@ async def db_check():
     cols = mongo_db.list_collection_names()
     db.close_mongo_connection()
     return {"ok": True, "collections": cols}
-
