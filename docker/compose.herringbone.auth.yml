@@ -1,7 +1,7 @@
 services:
   herringbone-auth:
     container_name: herringbone-auth
-    image: quay.io/herringbone/herringbone-auth:02f1c6cd@sha256:2c06afb99db10af32329390e81ef35790fd83720902283eb7dc2a3666dbf9972
+    image: quay.io/herringbone/herringbone-auth:e5cabd57@sha256:704d9762a804df69c33c6f66d53e5549b5d1e9b9109d8c0fb3325bdecede4806
     restart: unless-stopped
     depends_on:
       mongodb:
@@ -17,7 +17,6 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-
       # Auth
       JWT_SECRET: ${JWT_SECRET}
       SERVICE_JWT_PRIVATE_KEY: ${SERVICE_JWT_PRIVATE_KEY}
