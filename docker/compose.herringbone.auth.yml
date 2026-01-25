@@ -21,7 +21,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       SERVICE_JWT_PRIVATE_KEY: ${SERVICE_JWT_PRIVATE_KEY}
       SERVICE_JWT_PUBLIC_KEY: ${SERVICE_JWT_PUBLIC_KEY}
-      AUTH_ENABLED: "true"
+      AUTH_ENABLED: ${AUTH_ENABLED}
     read_only: true
     tmpfs:
       - /tmp
