@@ -25,7 +25,7 @@ def get_current_service(token: str = Depends(oauth2_scheme)) -> dict:
             token,
             SERVICE_JWT_PUBLIC_KEY,
             algorithms=[SERVICE_JWT_ALG],
-            audience=SERVICE_JWT_AUD,   # <-- IMPORTANT
+            audience=SERVICE_JWT_AUD,
         )
     except JWTError:
         raise HTTPException(

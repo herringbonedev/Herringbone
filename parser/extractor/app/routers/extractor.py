@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional, Union
 from parser import CardParser
 import json
+
+from modules.auth.service import get_current_service, require_service_scope
 
 router = APIRouter(
     prefix="/parser/extractor",
@@ -32,9 +34,12 @@ class ExtractResponse(BaseModel):
     "/parse",
     response_model=ExtractResponse,
     summary="Run regex and/or JSONPath extraction over input",
-    description="Receives a full card and an input (string or JSON) and returns {selector, results}."
+    description="Receives a full card and an input (string or JSON) and returns {selector, results}.",
 )
-async def parse(payload: ExtractRequest):
+async def parse(
+    payload: ExtractRequest,
+    service=Depends(require_service_scope("parser:extract")),
+):
     card = payload.card.model_dump()
     input_data = payload.input
     selector = card["selector"]
