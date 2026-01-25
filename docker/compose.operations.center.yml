@@ -1,6 +1,6 @@
 services:
   operations-center:
-    image: quay.io/herringbone/operations-center:sha-1ca25b74@sha256:341368d0410cb46189f776fba9703a29c87daafacab197d863a52d583fe8dd5f
+    image: quay.io/herringbone/operations-center:sha-69e021f7@4ca6ecea678264573a00472c762d591aa2b09e538b88d9d2580beccbef1bcfe9
     container_name: operations-center
     restart: unless-stopped
 
@@ -11,6 +11,9 @@ services:
 
     ports:
       - "8080:8080"
+
+    environment:
+      VITE_AUTH_ENABLED: ${AUTH_ENABLED}
 
     read_only: true
     tmpfs:
