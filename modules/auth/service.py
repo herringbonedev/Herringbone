@@ -1,4 +1,3 @@
-import os
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -6,24 +5,40 @@ from jose import jwt, JWTError
 SERVICE_JWT_ALG = "RS256"
 SERVICE_JWT_AUD = "herringbone-services"
 
+SERVICE_JWT_PUBLIC_KEY_PATH = "/run/secrets/service_jwt_public_key"
+SERVICE_TOKEN_PATH = "/run/secrets/service_token"
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/herringbone/auth/service-token")
 
+_service_public_key: str | None = None
+_service_token: str | None = None
 
-def load_service_public_key() -> str:
-    env = os.environ.get("SERVICE_JWT_PUBLIC_KEY")
-    if env:
-        return env
-    raise RuntimeError("Service JWT public key not configured (SERVICE_JWT_PUBLIC_KEY)")
+
+def _load_public_key() -> str:
+    try:
+        with open(SERVICE_JWT_PUBLIC_KEY_PATH, "r") as f:
+            key = f.read().strip()
+    except FileNotFoundError:
+        raise RuntimeError(f"Service JWT public key file not found: {SERVICE_JWT_PUBLIC_KEY_PATH}")
+
+    if not key:
+        raise RuntimeError(f"Service JWT public key file empty: {SERVICE_JWT_PUBLIC_KEY_PATH}")
+
+    return key
+
+
+def get_service_public_key() -> str:
+    global _service_public_key
+    if _service_public_key is None:
+        _service_public_key = _load_public_key()
+    return _service_public_key
 
 
 def get_current_service(token: str = Depends(oauth2_scheme)) -> dict:
-
     try:
-        public_key = load_service_public_key()
-
         payload = jwt.decode(
             token,
-            public_key,
+            get_service_public_key(),
             algorithms=[SERVICE_JWT_ALG],
             audience=SERVICE_JWT_AUD,
         )
@@ -48,7 +63,6 @@ def get_current_service(token: str = Depends(oauth2_scheme)) -> dict:
 
 def require_service_scope(required_scope: str):
     def checker(service: dict = Depends(get_current_service)):
-
         if required_scope not in service.get("scopes", []):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -57,3 +71,29 @@ def require_service_scope(required_scope: str):
         return service
 
     return checker
+
+
+def _load_service_token() -> str:
+    try:
+        with open(SERVICE_TOKEN_PATH, "r") as f:
+            token = f.read().strip()
+    except FileNotFoundError:
+        raise RuntimeError(f"Service token file not found: {SERVICE_TOKEN_PATH}")
+
+    if not token:
+        raise RuntimeError(f"Service token file empty: {SERVICE_TOKEN_PATH}")
+
+    return token
+
+
+def get_service_token() -> str:
+    global _service_token
+    if _service_token is None:
+        _service_token = _load_service_token()
+    return _service_token
+
+
+def service_auth_headers() -> dict:
+    return {
+        "Authorization": f"Bearer {get_service_token()}",
+    }

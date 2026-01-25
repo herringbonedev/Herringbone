@@ -6,10 +6,12 @@ SERVICE_JWT_ALG = "RS256"
 SERVICE_JWT_AUD = "herringbone-services"
 
 SERVICE_JWT_PUBLIC_KEY_PATH = "/run/secrets/service_jwt_public_key"
+SERVICE_TOKEN_PATH = "/run/secrets/service_token"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/herringbone/auth/service-token")
 
 _service_public_key: str | None = None
+_service_token: str | None = None
 
 
 def _load_public_key() -> str:
@@ -69,3 +71,29 @@ def require_service_scope(required_scope: str):
         return service
 
     return checker
+
+
+def _load_service_token() -> str:
+    try:
+        with open(SERVICE_TOKEN_PATH, "r") as f:
+            token = f.read().strip()
+    except FileNotFoundError:
+        raise RuntimeError(f"Service token file not found: {SERVICE_TOKEN_PATH}")
+
+    if not token:
+        raise RuntimeError(f"Service token file empty: {SERVICE_TOKEN_PATH}")
+
+    return token
+
+
+def get_service_token() -> str:
+    global _service_token
+    if _service_token is None:
+        _service_token = _load_service_token()
+    return _service_token
+
+
+def service_auth_headers() -> dict:
+    return {
+        "Authorization": f"Bearer {get_service_token()}",
+    }
