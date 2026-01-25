@@ -1,9 +1,8 @@
 services:
   parser-enrichment:
     container_name: parser-enrichment
-    image: quay.io/herringbone/parser-enrichment:c5593e91@sha256:57cdb6152c066eb4a4987986c5a235dd3fe7e7f6f111632cb9242697e7291d37
+    image: quay.io/herringbone/parser-enrichment:f096819e@sha256:024288ead24b0ef3dc7f56b46462471bf56d4073597d99437ceb5b91c12275b2
     restart: unless-stopped
-
     user: "65532:65532"
     read_only: true
     tmpfs:
@@ -12,10 +11,8 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-
     networks:
       - herringbone
-
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -26,14 +23,11 @@ services:
       COLLECTION_NAME: logs
       METADATA_SVC: http://parser-cardset:7005/parser/cardset/pull_cards
       EXTRACTOR_SVC: http://parser-extractor:7006/parser/extractor/parse
-
     secrets:
       - service_token
       - service_jwt_public_key
-
     depends_on:
       - mongodb
-
 secrets:
   service_token:
     file: ./secrets/runtime/parser_enrichment_service_token
