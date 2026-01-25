@@ -133,7 +133,10 @@ async def list_scopes():
 
     return {
         "scopes": [
-            s.get("scope")
+            {
+                "scope": s.get("scope"),
+                "tier": s.get("tier", "free"),
+            }
             for s in scopes
         ]
     }
