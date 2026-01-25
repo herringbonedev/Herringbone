@@ -126,6 +126,19 @@ async def list_users():
     }
 
 
+@router.get("/scopes")
+async def list_scopes():
+    mongo = get_mongo()
+    scopes = mongo.find("scopes", {})
+
+    return {
+        "scopes": [
+            s.get("scope")
+            for s in scopes
+        ]
+    }
+
+
 # =====================
 # Service registry
 # =====================
