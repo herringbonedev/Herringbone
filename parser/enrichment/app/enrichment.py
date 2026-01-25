@@ -4,6 +4,7 @@ import time
 import requests
 
 from modules.database.mongo_db import HerringboneMongoDatabase
+from modules.auth.service import service_auth_headers
 
 
 POLL_INTERVAL = float(os.environ.get("ENRICHMENT_POLL_INTERVAL", 1.0))
@@ -28,11 +29,11 @@ def get_mongo():
 
 
 def sanitize_card(card: dict) -> dict:
-	return {
-		k: (v.isoformat() if isinstance(v, datetime) else v)
-		for k, v in card.items()
-		if k != "_id"
-	}
+    return {
+        k: (v.isoformat() if isinstance(v, datetime) else v)
+        for k, v in card.items()
+        if k != "_id"
+    }
 
 
 def selector_matches(selector: dict, event: dict) -> bool:
@@ -59,14 +60,19 @@ def call_extractor(card: dict, raw_log: str) -> dict:
         "input": raw_log,
     }
 
-    resp = requests.post(EXTRACTOR_SVC, json=payload, timeout=30)
+    resp = requests.post(
+        EXTRACTOR_SVC,
+        json=payload,
+        headers=service_auth_headers(),
+        timeout=30,
+    )
     resp.raise_for_status()
 
     data = resp.json()
 
     print("[✓] Extractor call succeeded")
     print(data)
-    
+
     if isinstance(data, dict) and "results" in data and isinstance(data["results"], dict):
         return data["results"]
 

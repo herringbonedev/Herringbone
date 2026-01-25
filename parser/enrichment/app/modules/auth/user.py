@@ -1,25 +1,43 @@
-import os
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 
-JWT_ALG = os.environ.get("JWT_ALG", "HS256")
+JWT_ALG = "HS256"
+
+USER_JWT_SECRET_PATH = "/run/secrets/jwt_secret"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/herringbone/auth/login")
 
+_user_jwt_secret: str | None = None
 
-def load_user_jwt_secret() -> str:
-    env = os.environ.get("JWT_SECRET") or os.environ.get("USER_JWT_SECRET")
-    if env:
-        return env
-    raise RuntimeError("User JWT secret not configured (JWT_SECRET)")
+
+def _load_user_jwt_secret() -> str:
+    try:
+        with open(USER_JWT_SECRET_PATH, "r") as f:
+            secret = f.read().strip()
+    except FileNotFoundError:
+        raise RuntimeError(f"User JWT secret file not found: {USER_JWT_SECRET_PATH}")
+
+    if not secret:
+        raise RuntimeError(f"User JWT secret file empty: {USER_JWT_SECRET_PATH}")
+
+    return secret
+
+
+def get_user_jwt_secret() -> str:
+    global _user_jwt_secret
+    if _user_jwt_secret is None:
+        _user_jwt_secret = _load_user_jwt_secret()
+    return _user_jwt_secret
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
-
     try:
-        secret = load_user_jwt_secret()
-        payload = jwt.decode(token, secret, algorithms=[JWT_ALG])
+        payload = jwt.decode(
+            token,
+            get_user_jwt_secret(),
+            algorithms=[JWT_ALG],
+        )
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -41,7 +59,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 
 def require_role(required_role: str):
     def checker(user: dict = Depends(get_current_user)):
-
         if user.get("role") != required_role:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -53,7 +70,6 @@ def require_role(required_role: str):
 
 
 def require_admin(user: dict = Depends(get_current_user)):
-
     if user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
