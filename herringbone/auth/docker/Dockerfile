@@ -16,15 +16,14 @@ COPY ../app/. /app/
 
 
 # ---------- Runtime Stage ----------
-FROM cgr.dev/chainguard/python:3.11.13
+FROM gcr.io/distroless/python3-debian12
 
 WORKDIR /app
 
-# Copy Python deps + app
 COPY --from=builder /install /usr/local
 COPY --from=builder /app /app
 
-# Ensure runtime user is non-root (Chainguard default = 65532)
+# Distroless default UID is 65532 (nonroot)
 USER 65532:65532
 
 ENV PYTHONUNBUFFERED=1 \
@@ -32,5 +31,4 @@ ENV PYTHONUNBUFFERED=1 \
 
 EXPOSE 7001
 
-# No shell, direct exec only
-ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7001"]
+ENTRYPOINT ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7001"]
