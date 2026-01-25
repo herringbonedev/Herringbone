@@ -2,31 +2,65 @@ services:
   herringbone-auth:
     container_name: herringbone-auth
     image: quay.io/herringbone/herringbone-auth:88e87f7e@sha256:54a94f83acc6cc631b7fbd45e8a5671db3e555c2a43899622b7cbb72cc26160f
+
+    # Run as non-root (Chainguard standard)
+    user: "65532:65532"
+
     restart: unless-stopped
+
     depends_on:
       mongodb:
         condition: service_healthy
+
     networks:
       - herringbone
+
     ports:
       - "7001:7001"
+
     environment:
+      # Mongo
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
       MONGO_USER: ${MONGO_USER}
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-      # Auth
-      JWT_SECRET: ${JWT_SECRET}
-      SERVICE_JWT_PRIVATE_KEY: ${SERVICE_JWT_PRIVATE_KEY}
-      SERVICE_JWT_PUBLIC_KEY: ${SERVICE_JWT_PUBLIC_KEY}
+
+      # Auth flags
       AUTH_ENABLED: ${AUTH_ENABLED}
+
+      # Secrets files
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      SERVICE_JWT_PRIVATE_KEY_FILE: /run/secrets/service_jwt_private_key
+      SERVICE_JWT_PUBLIC_KEY_FILE: /run/secrets/service_jwt_public_key
+
+    secrets:
+      - jwt_secret
+      - service_jwt_private_key
+      - service_jwt_public_key
+
     read_only: true
+
     tmpfs:
       - /tmp
+
     security_opt:
       - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+
+secrets:
+  jwt_secret:
+    file: ./secrets/runtime/jwt_secret
+
+  service_jwt_private_key:
+    file: ./secrets/runtime/service_jwt_private.pem
+
+  service_jwt_public_key:
+    file: ./secrets/runtime/service_jwt_public.pem
+
 networks:
   herringbone:
     external: true
