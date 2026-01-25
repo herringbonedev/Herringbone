@@ -1,9 +1,28 @@
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from jose import jwt
-import os
 
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+USER_JWT_SECRET_PATH = "/run/secrets/jwt_secret"
+SERVICE_JWT_PRIVATE_KEY_PATH = "/run/secrets/service_jwt_private_key"
+
+_user_jwt_secret: str | None = None
+_service_private_key: str | None = None
+
+
+def _load_secret_file(path: str) -> str:
+    try:
+        with open(path, "r") as f:
+            value = f.read().strip()
+    except FileNotFoundError:
+        raise RuntimeError(f"Secret file not found: {path}")
+
+    if not value:
+        raise RuntimeError(f"Secret file empty: {path}")
+
+    return value
+
 
 # ============================
 # User JWT (HS256)
@@ -13,17 +32,11 @@ USER_JWT_ALG = "HS256"
 USER_JWT_EXPIRE_MINUTES = 60 * 24
 
 
-def load_user_jwt_secret() -> str:
-    env = os.environ.get("JWT_SECRET") or os.environ.get("USER_JWT_SECRET")
-    if env:
-        return env
-
-    raise RuntimeError("USER_JWT_SECRET not configured (JWT_SECRET or USER_JWT_SECRET)")
-
-
 def get_user_jwt_secret() -> str:
-    # Lazy load to avoid startup crash if env not ready yet
-    return load_user_jwt_secret()
+    global _user_jwt_secret
+    if _user_jwt_secret is None:
+        _user_jwt_secret = _load_secret_file(USER_JWT_SECRET_PATH)
+    return _user_jwt_secret
 
 
 def hash_password(password: str) -> str:
@@ -57,17 +70,11 @@ SERVICE_JWT_ALG = "RS256"
 SERVICE_JWT_EXPIRE_MINUTES = 60
 
 
-def load_service_private_key() -> str:
-    env = os.environ.get("SERVICE_JWT_PRIVATE_KEY")
-    if env:
-        return env
-
-    raise RuntimeError("SERVICE_JWT_PRIVATE_KEY not configured")
-
-
 def get_service_private_key() -> str:
-    # Lazy load for same reason as user secret
-    return load_service_private_key()
+    global _service_private_key
+    if _service_private_key is None:
+        _service_private_key = _load_secret_file(SERVICE_JWT_PRIVATE_KEY_PATH)
+    return _service_private_key
 
 
 def create_service_token(
