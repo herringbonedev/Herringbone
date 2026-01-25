@@ -41,9 +41,9 @@ secrets:
   jwt_secret:
     file: ./secrets/runtime/jwt_secret
   service_jwt_private_key:
-    file: ./secrets/runtime/service_jwt_private.pem
+    file: ./secrets/runtime/service_jwt_private_key
   service_jwt_public_key:
-    file: ./secrets/runtime/service_jwt_public.pem
+    file: ./secrets/runtime/service_jwt_public_key
 networks:
   herringbone:
     external: true
