@@ -6,6 +6,12 @@ from jose import jwt, JWTError
 SERVICE_JWT_ALG = "RS256"
 SERVICE_JWT_AUD = "herringbone-services"
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/herringbone/auth/service-token")
+
+
+def is_auth_enabled() -> bool:
+    return os.environ.get("AUTH_ENABLED", "false").lower() == "true"
+
 
 def load_service_public_key() -> str:
     env = os.environ.get("SERVICE_JWT_PUBLIC_KEY")
@@ -14,18 +20,24 @@ def load_service_public_key() -> str:
     raise RuntimeError("Service JWT public key not configured (SERVICE_JWT_PUBLIC_KEY)")
 
 
-SERVICE_JWT_PUBLIC_KEY = load_service_public_key()
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/herringbone/auth/service-token")
-
-
 def get_current_service(token: str = Depends(oauth2_scheme)) -> dict:
+    # Bootstrap mode → fake trusted service
+    if not is_auth_enabled():
+        return {
+            "service_id": "bootstrap",
+            "service": "bootstrap",
+            "scopes": ["*"],
+            "bootstrap": True,
+        }
+
     try:
+        public_key = load_service_public_key()
+
         payload = jwt.decode(
             token,
-            SERVICE_JWT_PUBLIC_KEY,
+            public_key,
             algorithms=[SERVICE_JWT_ALG],
-            audience=SERVICE_JWT_AUD,   # <-- IMPORTANT
+            audience=SERVICE_JWT_AUD,
         )
     except JWTError:
         raise HTTPException(
@@ -48,6 +60,9 @@ def get_current_service(token: str = Depends(oauth2_scheme)) -> dict:
 
 def require_service_scope(required_scope: str):
     def checker(service: dict = Depends(get_current_service)):
+        if service.get("bootstrap"):
+            return service
+
         if required_scope not in service.get("scopes", []):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
