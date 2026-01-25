@@ -1,7 +1,7 @@
 services:
   herringbone-auth:
     container_name: herringbone-auth
-    image: quay.io/herringbone/herringbone-auth:e5cabd57@sha256:704d9762a804df69c33c6f66d53e5549b5d1e9b9109d8c0fb3325bdecede4806
+    image: quay.io/herringbone/herringbone-auth:c5f31497@sha256:03e561881f30c5480a33c3c39ae80747f9f5b2f834f894f7c1c19524c9f067e8
     restart: unless-stopped
     depends_on:
       mongodb:
