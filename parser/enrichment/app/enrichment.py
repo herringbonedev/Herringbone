@@ -4,16 +4,23 @@ import time
 import requests
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.service import service_auth_headers
 
 
 POLL_INTERVAL = float(os.environ.get("ENRICHMENT_POLL_INTERVAL", 1.0))
 EXTRACTOR_SVC = os.environ.get("EXTRACTOR_SVC")
 USE_TEST = EXTRACTOR_SVC == "test.service"
 
+SERVICE_TOKEN_PATH = "/run/secrets/service_token"
+
 print("[*] Enrichment service has started")
 if USE_TEST:
     print("[*] [Test Service] Started in test mode")
+
+
+def service_auth_headers():
+    with open(SERVICE_TOKEN_PATH, "r") as f:
+        token = f.read().strip()
+    return {"Authorization": f"Bearer {token}"}
 
 
 def get_mongo():
@@ -89,10 +96,7 @@ def main():
     while True:
         print("[*] Polling for unparsed event_state")
 
-        state = mongo.find_one(
-            "event_state",
-            {"parsed": False},
-        )
+        state = mongo.find_one("event_state", {"parsed": False})
 
         if not state:
             print("[x] No unparsed event_state found")
@@ -101,17 +105,11 @@ def main():
 
         print(f"[*] Found event_state for event {state.get('event_id')}")
 
-        event = mongo.find_one(
-            "events",
-            {"_id": state["event_id"]},
-        )
+        event = mongo.find_one("events", {"_id": state["event_id"]})
 
         if not event:
             print("[x] Event not found, marking state as parsed")
-            mongo.upsert_event_state(
-                state["event_id"],
-                {"parsed": True},
-            )
+            mongo.upsert_event_state(state["event_id"], {"parsed": True})
             continue
 
         print(f"[*] Processing event {event.get('_id')}")
@@ -135,41 +133,32 @@ def main():
                 if not isinstance(result, dict):
                     raise RuntimeError("Extractor returned invalid result shape")
 
-                for k, v in result.items():
+                for v in result.values():
                     if not isinstance(v, list):
                         raise RuntimeError("Extractor returned invalid result shape")
 
-                mongo.insert_parse_result(
-                    {
-                        "event_id": event["_id"],
-                        "card": card.get("name"),
-                        "results": result,
-                        "created_at": datetime.utcnow(),
-                    }
-                )
+                mongo.insert_parse_result({
+                    "event_id": event["_id"],
+                    "card": card.get("name"),
+                    "results": result,
+                    "created_at": datetime.utcnow(),
+                })
 
                 print("[✓] Parse result inserted")
 
             except Exception as e:
                 print("[x] Extractor failed:", e)
 
-                mongo.insert_parse_result(
-                    {
-                        "event_id": event["_id"],
-                        "card": card.get("name"),
-                        "error": str(e),
-                        "created_at": datetime.utcnow(),
-                    }
-                )
+                mongo.insert_parse_result({
+                    "event_id": event["_id"],
+                    "card": card.get("name"),
+                    "error": str(e),
+                    "created_at": datetime.utcnow(),
+                })
 
         print("[*] Marking event as parsed")
 
-        mongo.upsert_event_state(
-            event["_id"],
-            {
-                "parsed": True,
-            },
-        )
+        mongo.upsert_event_state(event["_id"], {"parsed": True})
 
         print("[✓] Event marked as parsed")
         time.sleep(POLL_INTERVAL)
