@@ -9,8 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY ../requirements.txt /tmp/requirements.txt
 
+# Install into a clean directory we control
 RUN pip install --upgrade pip && \
-    pip install --prefix=/install --no-cache-dir -r /tmp/requirements.txt
+    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt
 
 COPY ../app/. /app/
 
@@ -20,14 +21,15 @@ FROM gcr.io/distroless/python3-debian12
 
 WORKDIR /app
 
-COPY --from=builder /install /usr/local
+# Copy app + packages
 COPY --from=builder /app /app
+COPY --from=builder /python-packages /python-packages
 
-# Distroless default UID is 65532 (nonroot)
+# Non-root user
 USER 65532:65532
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app:/python-packages
 
 EXPOSE 7001
 
