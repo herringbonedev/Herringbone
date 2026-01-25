@@ -142,7 +142,7 @@ async def register_service(
 
     svc_doc = {
         "service_name": payload.service_name,
-        "service_id": payload.service_name,  # can be UUID later
+        "service_id": payload.service_name,
         "scopes": payload.scopes,
         "enabled": True,
         "created_at": datetime.utcnow(),
