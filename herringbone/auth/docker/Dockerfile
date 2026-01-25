@@ -16,7 +16,7 @@ COPY ../app/. /app/
 
 
 # ---------- Runtime Stage ----------
-FROM cgr.dev/chainguard/python:3.11
+FROM cgr.dev/chainguard/python:3.11.13
 
 WORKDIR /app
 
