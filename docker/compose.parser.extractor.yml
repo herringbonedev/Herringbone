@@ -7,6 +7,10 @@ services:
       - herringbone
     ports:
       - "7006:7006"
+    environment:
+      # Auth
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_JWT_PUBLIC_KEY: ${SERVICE_JWT_PUBLIC_KEY}
     read_only: true
     tmpfs:
       - /tmp
