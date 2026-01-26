@@ -1,7 +1,7 @@
 services:
   parser-cardset:
     container_name: parser-cardset
-    image: quay.io/herringbone/parser-cardset:79236b80@sha256:1f3006836a152888b91f1028dad2504e6f268231ee94c5a9d20030fc47b52102
+    image: docker-parser-cardset:latest
     restart: unless-stopped
     networks:
       - herringbone
@@ -23,13 +23,18 @@ services:
     secrets:
       - service_token
       - service_jwt_public_key
+      - jwt_secret
     depends_on:
       - mongodb
+
 secrets:
   service_token:
     file: ./secrets/runtime/parser_cardset_service_token
   service_jwt_public_key:
     file: ./secrets/runtime/service_jwt_public_key
+  jwt_secret:
+    file: ./secrets/runtime/jwt_secret
+
 networks:
   herringbone:
     external: true

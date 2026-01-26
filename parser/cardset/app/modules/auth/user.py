@@ -57,12 +57,15 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     }
 
 
-def require_role(required_role: str):
+def require_role(required_roles: str | list[str]):
+    if isinstance(required_roles, str):
+        required_roles = [required_roles]
+
     def checker(user: dict = Depends(get_current_user)):
-        if user.get("role") != required_role:
+        if user.get("role") not in required_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions",
+                detail=f"Insufficient permissions (requires one of: {required_roles})",
             )
         return user
 

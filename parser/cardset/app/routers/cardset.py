@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from schema import CardSchema
 from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.mix import service_or_user
+from modules.auth.user import require_role
 
 router = APIRouter(
     prefix="/parser/cardset",
@@ -78,7 +79,10 @@ def cards_collection():
 
 
 @router.post("/insert_card", response_model=InsertCardResponse)
-async def insert_card(card: CardModel):
+async def insert_card(
+    card: CardModel,
+    user=Depends(require_role(["admin", "analyst"]))
+):
     mongo = get_mongo()
 
     payload = card.model_dump()
@@ -156,7 +160,10 @@ async def pull_all_cards(
 
 
 @router.post("/delete_cards", response_model=DeleteCardsResponse)
-async def delete_cards(body: DeleteCardsRequest):
+async def delete_cards(
+    body: DeleteCardsRequest,
+    user=Depends(require_role(["admin"])),
+):
     mongo = get_mongo()
 
     sel_type = body.selector_type
@@ -178,7 +185,10 @@ async def delete_cards(body: DeleteCardsRequest):
 
 
 @router.post("/update_card", response_model=UpdateCardResponse)
-async def update_card(new_card: CardModel):
+async def update_card(
+    new_card: CardModel,
+    user=Depends(require_role(["admin"])),
+):
     mongo = get_mongo()
 
     payload = new_card.model_dump()
