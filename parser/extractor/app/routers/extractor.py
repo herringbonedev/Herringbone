@@ -38,7 +38,7 @@ class ExtractResponse(BaseModel):
 )
 async def parse(
     payload: ExtractRequest,
-    service=Depends(require_service_scope("parser:extract")),
+    service=Depends(require_service_scope("extractor:call")),
 ):
     card = payload.card.model_dump()
     input_data = payload.input
