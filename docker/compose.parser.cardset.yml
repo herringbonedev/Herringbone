@@ -20,6 +20,16 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
+    secrets:
+      - service_token
+      - service_jwt_public_key
+    depends_on:
+      - mongodb
+secrets:
+  service_token:
+    file: ./secrets/runtime/parser_cardset_service_token
+  service_jwt_public_key:
+    file: ./secrets/runtime/service_jwt_public_key
 networks:
   herringbone:
     external: true
