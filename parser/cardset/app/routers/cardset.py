@@ -104,7 +104,7 @@ async def insert_card(card: CardModel):
 @router.post("/pull_cards", response_model=PullCardsResponse)
 async def pull_cards(
     body: PullCardsRequest,
-    auth=Depends(require_user_or_service_scope("parser:cards:read")),
+    auth=Depends(service_or_user("parser:cards:read")),
 ):
     mongo = get_mongo()
 
