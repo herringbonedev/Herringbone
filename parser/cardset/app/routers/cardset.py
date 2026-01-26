@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from schema import CardSchema
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.mix import require_user_or_service_scope
+from modules.auth.mix import service_or_user
 
 router = APIRouter(
     prefix="/parser/cardset",
