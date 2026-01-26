@@ -67,7 +67,7 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
 # ============================
 
 SERVICE_JWT_ALG = "RS256"
-SERVICE_JWT_EXPIRE_MINUTES = 60
+SERVICE_JWT_EXPIRE_MINUTES = 60 * 24 * 365
 
 
 def get_service_private_key() -> str:
