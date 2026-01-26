@@ -1,7 +1,7 @@
 services:
   parser-cardset:
     container_name: parser-cardset
-    image: docker-parser-cardset:latest
+    image: quay.io/herringbone/parser-cardset:79236b80@sha256:1f3006836a152888b91f1028dad2504e6f268231ee94c5a9d20030fc47b52102
     restart: unless-stopped
     networks:
       - herringbone
