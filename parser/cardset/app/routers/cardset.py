@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from schema import CardSchema
 from modules.database.mongo_db import HerringboneMongoDatabase
+from modules.auth.mix import require_user_or_service_scope
 
 router = APIRouter(
     prefix="/parser/cardset",
@@ -101,7 +102,10 @@ async def insert_card(card: CardModel):
 
 
 @router.post("/pull_cards", response_model=PullCardsResponse)
-async def pull_cards(body: PullCardsRequest):
+async def pull_cards(
+    body: PullCardsRequest,
+    auth=Depends(require_user_or_service_scope("parser:cards:read")),
+):
     mongo = get_mongo()
 
     sel_type = body.selector_type
@@ -132,7 +136,9 @@ async def pull_cards(body: PullCardsRequest):
 
 
 @router.get("/pull_all_cards")
-async def pull_all_cards():
+async def pull_all_cards(
+    auth=Depends(require_user_or_service_scope("parser:cards:read")),
+):
     mongo = get_mongo()
 
     try:
