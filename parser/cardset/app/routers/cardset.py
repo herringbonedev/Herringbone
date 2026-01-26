@@ -137,7 +137,7 @@ async def pull_cards(
 
 @router.get("/pull_all_cards")
 async def pull_all_cards(
-    auth=Depends(require_user_or_service_scope("parser:cards:read")),
+    auth=Depends(service_or_user("parser:cards:read")),
 ):
     mongo = get_mongo()
 
