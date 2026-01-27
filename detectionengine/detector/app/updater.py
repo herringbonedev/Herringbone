@@ -3,7 +3,19 @@ import requests
 from datetime import datetime
 from modules.database.mongo_db import HerringboneMongoDatabase
 
+
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", None)
+SERVICE_TOKEN_PATH = "/run/secrets/service_token"
+
+
+def service_auth_headers():
+    try:
+        with open(SERVICE_TOKEN_PATH, "r") as f:
+            token = f.read().strip()
+        return {"Authorization": f"Bearer {token}"}
+    except Exception as e:
+        print(f"[✗] Failed to read service token: {e}")
+        return {}
 
 
 def _db() -> HerringboneMongoDatabase:
@@ -30,7 +42,11 @@ def notify_orchestrator(payload):
         return
 
     try:
-        resp = requests.post(ORCHESTRATOR_URL, json=payload, timeout=2)
+        resp = requests.post(ORCHESTRATOR_URL, 
+                             json=payload, 
+                             headers=service_auth_headers(), 
+                             timeout=2)
+        
         resp.raise_for_status()
         print("[✓] Detection forwarded to orchestrator")
     except Exception as e:

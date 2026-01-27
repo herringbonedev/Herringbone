@@ -12,6 +12,17 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
+    secrets:
+      - service_token
+      - service_jwt_public_key
+      - jwt_secret
+secrets:
+  service_token:
+    file: ./secrets/runtime/detectionengine_matcher_service_token
+  service_jwt_public_key:
+    file: ./secrets/runtime/service_jwt_public_key
+  jwt_secret:
+    file: ./secrets/runtime/jwt_secret
 networks:
   herringbone:
     external: true
