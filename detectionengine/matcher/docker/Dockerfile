@@ -2,30 +2,34 @@
 FROM python:3.11-slim AS builder
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
  && rm -rf /var/lib/apt/lists/*
 
-COPY ../requirements.txt /tmp/requirements.txt
-RUN pip install --upgrade pip && \
-    pip install --prefix=/install --no-cache-dir -r /tmp/requirements.txt
+# copy requirements
+COPY detectionengine/matcher/requirements.txt /tmp/requirements.txt
 
-# Copy ONLY the contents of the app/ folder into /app
-COPY ../app/. /app/
+# copy shared package source
+COPY modules /modules
+
+# install deps + shared modules
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt
+
+# copy app
+COPY detectionengine/matcher/app /app
 
 # ---------- Runtime Stage ----------
-FROM python:3.11-slim
+FROM gcr.io/distroless/python3-debian12
 WORKDIR /app
 
-COPY --from=builder /install /usr/local
 COPY --from=builder /app /app
+COPY --from=builder /python-packages /python-packages
 
-RUN useradd -u 65532 -m appuser
-USER appuser
+USER 65532:65532
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/python-packages
 
 EXPOSE 7003
 
-ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7003"]
+ENTRYPOINT ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7003"]
