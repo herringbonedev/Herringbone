@@ -1,3 +1,4 @@
+-e /modules
 fastapi>=0.110
 uvicorn>=0.30
 jsonpath-ng==1.7.0

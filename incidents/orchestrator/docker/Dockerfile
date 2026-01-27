@@ -31,6 +31,6 @@ USER 65532:65532
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/python-packages:/modules
 
-EXPOSE 7011
+EXPOSE 7013
 
-ENTRYPOINT ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7011"]
+ENTRYPOINT ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7013"]

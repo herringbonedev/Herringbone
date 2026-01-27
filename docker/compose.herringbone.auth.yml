@@ -20,8 +20,6 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-      # Auth flags
-      AUTH_ENABLED: ${AUTH_ENABLED}
       # Secrets files
       JWT_SECRET_FILE: /run/secrets/jwt_secret
       SERVICE_JWT_PRIVATE_KEY_FILE: /run/secrets/service_jwt_private_key
