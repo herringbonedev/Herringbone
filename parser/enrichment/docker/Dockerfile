@@ -1,4 +1,4 @@
-# ---------- Builder Stage ----------
+# ---------- Builder ----------
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -7,17 +7,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
  && rm -rf /var/lib/apt/lists/*
 
-COPY ../requirements.txt /tmp/requirements.txt
+# service deps
+COPY parser/enrichment/requirements.txt /tmp/requirements.txt
 
-# copy shared package source
-COPY ../modules /modules
+# shared modules
+COPY modules/modules /modules
 
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt
 
-COPY ../app/. /app/
+# service source
+COPY parser/enrichment/app /app
 
-# ---------- Runtime Stage ----------
+# ---------- Runtime ----------
 FROM gcr.io/distroless/python3-debian12
 
 WORKDIR /app
