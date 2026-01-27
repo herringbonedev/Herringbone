@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
  && rm -rf /var/lib/apt/lists/*
 
 # copy requirements
-COPY detectionengine/matcher/requirements.txt /tmp/requirements.txt
+COPY detectionengine/ruleset/requirements.txt /tmp/requirements.txt
 
 # copy shared package source
 COPY modules /modules
@@ -16,7 +16,7 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt
 
 # copy app
-COPY detectionengine/matcher/app /app
+COPY detectionengine/ruleset/app /app
 
 # ---------- Runtime Stage ----------
 FROM gcr.io/distroless/python3-debian12
