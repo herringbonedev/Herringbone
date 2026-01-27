@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 from bson import ObjectId
 from bson.json_util import dumps
 from modules.database.mongo_db import HerringboneMongoDatabase
+from modules.auth.service import require_service_scope
+from modules.auth.mix import service_or_role
 from schema import RuleSchema
 import os
 import json
@@ -39,7 +41,11 @@ def get_mongo():
 
 
 @router.post("/insert_rule")
-async def insert_rule(payload: RuleCreate, mongo=Depends(get_mongo)):
+async def insert_rule(
+    payload: RuleCreate,
+    mongo=Depends(get_mongo),
+    auth=Depends(service_or_role("rules:write", ["admin", "analyst"]))
+):
     data = payload.dict()
 
     validation = validator(data)
@@ -58,7 +64,10 @@ async def insert_rule(payload: RuleCreate, mongo=Depends(get_mongo)):
 
 
 @router.get("/get_rules")
-async def get_rules(mongo=Depends(get_mongo)):
+async def get_rules(
+    mongo=Depends(get_mongo),
+    auth=Depends(service_or_role("rules:read", ["admin", "analyst"]))
+):
     try:
         docs = mongo.find("rules", {})
         return JSONResponse(content=json.loads(dumps(docs)))
@@ -67,7 +76,11 @@ async def get_rules(mongo=Depends(get_mongo)):
 
 
 @router.get("/delete_rule")
-async def delete_rule(id: str = Query(...), mongo=Depends(get_mongo)):
+async def delete_rule(
+    id: str = Query(...),
+    mongo=Depends(get_mongo),
+    auth=Depends(service_or_role("rules:write", ["admin"]))
+):
     try:
         oid = ObjectId(id)
     except Exception:
@@ -83,7 +96,11 @@ async def delete_rule(id: str = Query(...), mongo=Depends(get_mongo)):
 
 
 @router.post("/update_rule")
-async def update_rule(payload: RuleUpdate, mongo=Depends(get_mongo)):
+async def update_rule(
+    payload: RuleUpdate,
+    mongo=Depends(get_mongo),
+        auth=Depends(service_or_role("rules:write", ["admin", "analyst"]))
+):
     data = payload.model_dump(by_alias=True)
 
     rule_id = data.pop("_id", None)
