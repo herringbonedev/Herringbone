@@ -1,7 +1,7 @@
 services:
   incidents-incidentset:
     container_name: incidents-incidentset
-    image: quay.io/herringbone/incidents-incidentset:65e0482b@sha256:227214c56989da3951232c307fa08a38055c33b33f77269ec5be313083d798bb
+    image: quay.io/herringbone/incidents-incidentset:92e57d90@sha256:e047c8b9f3842bc9412bd16d213627f978ae6fd411d3f430f872e6a6afc5e011
     restart: unless-stopped
     networks:
       - herringbone
@@ -20,12 +20,10 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
     secrets:
       - service_token
       - service_jwt_public_key
       - jwt_secret
-
 secrets:
   service_token:
     file: ./secrets/runtime/incidents_incidentset_service_token
@@ -33,7 +31,6 @@ secrets:
     file: ./secrets/runtime/service_jwt_public_key
   jwt_secret:
     file: ./secrets/runtime/jwt_secret
-
 networks:
   herringbone:
     external: true
