@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   mongodb:
     image: mongo:latest
@@ -25,8 +27,9 @@ services:
     container_name: incidents-incidentset
 
     build:
+      # repo root context so Dockerfile can access /modules
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: incidents/incidentset/docker/Dockerfile
 
     restart: unless-stopped
 
@@ -51,8 +54,8 @@ services:
     container_name: incidents-correlator
 
     build:
-      context: ../correlator
-      dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: incidents/correlator/docker/Dockerfile
 
     restart: unless-stopped
 
@@ -77,8 +80,8 @@ services:
     container_name: incidents-orchestrator
 
     build:
-      context: ../orchestrator
-      dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: incidents/orchestrator/docker/Dockerfile
 
     restart: unless-stopped
 

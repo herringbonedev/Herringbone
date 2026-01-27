@@ -69,7 +69,10 @@ jobs:
 
       - name: Build image
         run: |
-          docker build -t $IMAGE_REPO:${{ steps.vars.outputs.tag }} -f $DOCKERFILE $SERVICE_PATH
+          docker build \
+            -t $IMAGE_REPO:${{ steps.vars.outputs.tag }} \
+            -f $DOCKERFILE \
+            .
 
       - name: Push image
         run: |

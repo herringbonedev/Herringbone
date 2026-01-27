@@ -28,16 +28,13 @@ services:
 
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: incidents/correlator/docker/Dockerfile
 
     restart: unless-stopped
-
     ports:
       - "7012:7012"
-
     env_file:
       - .env
-
     environment:
       MONGO_HOST: mongodb
       MONGO_USER: ${MONGO_USER}

@@ -1,34 +1,36 @@
 version: "3.8"
 
 services:
-  # mongodb:
-  #   image: mongo:latest
-  #   container_name: mongodb
-  #   restart: unless-stopped
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    restart: unless-stopped
 
-  #   ports:
-  #     - "27017:27017"
+    ports:
+      - "27017:27017"
 
-  #   env_file:
-  #     - .env
+    env_file:
+      - .env
 
-  #   environment:
-  #     MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
-  #     MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
-  #     MONGO_INITDB_DATABASE: ${AUTH_DB}
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
+      MONGO_INITDB_DATABASE: ${AUTH_DB}
 
-  #   volumes:
-  #     - mongo_data:/data/db
-  #     - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    volumes:
+      - mongo_data:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
 
-  #   command: ["--auth", "--bind_ip_all"]
+    command: ["--auth", "--bind_ip_all"]
 
   incidents-incidentset:
     container_name: incidents-incidentset
 
     build:
+      # repo root as build context (required for shared modules package)
       context: ..
-      dockerfile: docker/Dockerfile
+      # correct service Dockerfile path
+      dockerfile: incidents/incidentset/docker/Dockerfile
 
     restart: unless-stopped
 
@@ -46,8 +48,8 @@ services:
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: "incidents"
 
-    # depends_on:
-    #   - mongodb
+    depends_on:
+      - mongodb
 
 volumes:
   mongo_data:
