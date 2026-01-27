@@ -5,6 +5,9 @@ from datetime import datetime
 from bson import ObjectId
 from bson.json_util import dumps
 from modules.database.mongo_db import HerringboneMongoDatabase
+from modules.auth.user import require_role
+from modules.auth.service import require_service_scope
+from modules.auth.mix import service_or_role
 from schema import IncidentSchema
 import os
 import json
@@ -44,7 +47,11 @@ def incidents_collection():
 
 
 @router.post("/insert_incident")
-async def insert_incident(payload: IncidentCreate, mongo=Depends(get_mongo)):
+async def insert_incident(
+    payload: IncidentCreate,
+    mongo=Depends(get_mongo),
+    auth=Depends(service_or_role("incidents:write", ["admin", "analyst"])),
+):
     data = payload.dict()
     now = datetime.utcnow()
 
@@ -70,7 +77,11 @@ import traceback
 import traceback
 
 @router.post("/update_incident")
-async def update_incident(payload: dict, mongo=Depends(get_mongo)):
+async def update_incident(
+    payload: dict, 
+    mongo=Depends(get_mongo),
+    auth=Depends(service_or_role("incidents:write", ["admin", "analyst"])),
+):
     print("\n========== UPDATE INCIDENT ==========")
     print("Raw payload:")
     print(json.dumps(payload, default=str, indent=2))
@@ -108,7 +119,6 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
     print(json.dumps(update_doc, default=str, indent=2))
 
     try:
-        # 🔑 OPEN CONNECTION MANUALLY
         client, db = mongo.open_mongo_connection()
 
         collection = db[incidents_collection()]
@@ -136,7 +146,10 @@ async def update_incident(payload: dict, mongo=Depends(get_mongo)):
 
 
 @router.get("/get_incidents")
-async def get_incidents(mongo=Depends(get_mongo)):
+async def get_incidents(
+    mongo=Depends(get_mongo),
+    auth=Depends(service_or_role("incidents:read", ["admin", "analyst"])),
+):
     try:
         docs = mongo.find(incidents_collection(), {})
         return JSONResponse(content=json.loads(dumps(docs)))
@@ -145,7 +158,11 @@ async def get_incidents(mongo=Depends(get_mongo)):
 
 
 @router.get("/get_incident/{incident_id}")
-async def get_incident(incident_id: str, mongo=Depends(get_mongo)):
+async def get_incident(
+    incident_id: str,
+    mongo=Depends(get_mongo),
+    auth=Depends(service_or_role("incidents:read", ["admin", "analyst"])),
+):
     try:
         oid = ObjectId(incident_id)
     except Exception:
