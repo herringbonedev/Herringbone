@@ -30,6 +30,8 @@ const defaultScopes = [
   { scope: "incidents:write", description: "Create or update incidents", tier: "free" },
   { scope: "incidents:assign", description: "Assign incidents", tier: "free" },
   { scope: "incidents:close", description: "Close incidents", tier: "free" },
+  { scope: "incidents:orchestrate", description: "Run orchestrations", tier: "free" },
+  { scope: "incidents:correlate", description: "Run orchestrations", tier: "free" },
 
   // Search
   { scope: "search:query", description: "Execute search queries", tier: "free" },

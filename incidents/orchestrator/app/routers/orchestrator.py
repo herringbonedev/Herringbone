@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from modules.auth.service import require_service_scope
 import requests
 import os
 
@@ -6,6 +7,8 @@ router = APIRouter(
     prefix="/incidents/orchestrator",
     tags=["orchestrator"],
 )
+
+SERVICE_TOKEN_PATH = "/run/secrets/service_token"
 
 CORRELATOR_URL = os.environ.get(
     "CORRELATOR_URL",
@@ -18,8 +21,30 @@ INCIDENTSET_API = os.environ.get(
 )
 
 
+_service_token_cache: str | None = None
+
+
+def service_auth_headers():
+    global _service_token_cache
+
+    if _service_token_cache is None:
+        try:
+            with open(SERVICE_TOKEN_PATH, "r") as f:
+                _service_token_cache = f.read().strip()
+        except Exception as e:
+            raise RuntimeError(f"Failed to read service token: {e}")
+
+        if not _service_token_cache:
+            raise RuntimeError("Service token is empty")
+
+    return {"Authorization": f"Bearer {_service_token_cache}"}
+
+
 @router.post("/process_detection")
-async def process_detection(payload: dict):
+async def process_detection(
+    payload: dict,
+    service=Depends(require_service_scope("incidents:orchestrate"))
+):
     print("[*] Received detection payload")
     print(payload)
 
@@ -35,7 +60,12 @@ async def process_detection(payload: dict):
 
     print(f"[*] Calling correlator at {CORRELATOR_URL}")
     try:
-        resp = requests.post(CORRELATOR_URL, json=payload, timeout=5)
+        resp = requests.post(
+            CORRELATOR_URL,
+            json=payload,
+            headers=service_auth_headers(),
+            timeout=5,
+        )
         resp.raise_for_status()
         decision = resp.json()
         print("[✓] Correlator response:")
@@ -67,6 +97,7 @@ async def process_detection(payload: dict):
             resp = requests.post(
                 f"{INCIDENTSET_API}/update_incident",
                 json=update_payload,
+                headers=service_auth_headers(),
                 timeout=5,
             )
             resp.raise_for_status()
@@ -102,6 +133,7 @@ async def process_detection(payload: dict):
             resp = requests.post(
                 f"{INCIDENTSET_API}/insert_incident",
                 json=create_payload,
+                headers=service_auth_headers(),
                 timeout=5,
             )
             resp.raise_for_status()
