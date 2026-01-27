@@ -1,38 +1,35 @@
 # ---------- Builder Stage ----------
 FROM python:3.11-slim AS builder
-
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
  && rm -rf /var/lib/apt/lists/*
 
-COPY ../requirements.txt /tmp/requirements.txt
+# copy requirements
+COPY parser/cardset/requirements.txt /tmp/requirements.txt
 
 # copy shared package source
-COPY ../modules /modules
+COPY modules /modules
 
-# Install into a clean directory we control
+# install deps + shared modules
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt
 
-COPY ../app/. /app/
+# copy app
+COPY parser/cardset/app /app
 
 # ---------- Runtime Stage ----------
 FROM gcr.io/distroless/python3-debian12
-
 WORKDIR /app
 
-# Copy app + packages + shared modules
 COPY --from=builder /app /app
 COPY --from=builder /python-packages /python-packages
 COPY --from=builder /modules /modules
 
-# Non-root user
 USER 65532:65532
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app:/python-packages:/modules
+    PYTHONPATH=/python-packages:/modules
 
 EXPOSE 7005
 
