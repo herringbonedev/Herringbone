@@ -1,7 +1,7 @@
 services:
   incidents-correlator:
     container_name: incidents-correlator
-    image: quay.io/herringbone/incidents-correlator:38fdb6b1@sha256:e68e0cbf7b7a93dd3f51b8c519a5e382c584a18e898d69755b4a5783ec948696
+    image: quay.io/herringbone/incidents-correlator:92e57d90@sha256:8ca91ba97c740ef9a0c6720d00a33548d4e8e061fd77f8bf204d7673524c4b94
     restart: unless-stopped
     networks:
       - herringbone
@@ -21,12 +21,10 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
     secrets:
       - service_token
       - service_jwt_public_key
       - jwt_secret
-
 secrets:
   service_token:
     file: ./secrets/runtime/incidents_correlator_service_token
@@ -34,7 +32,6 @@ secrets:
     file: ./secrets/runtime/service_jwt_public_key
   jwt_secret:
     file: ./secrets/runtime/jwt_secret
-
 networks:
   herringbone:
     external: true
