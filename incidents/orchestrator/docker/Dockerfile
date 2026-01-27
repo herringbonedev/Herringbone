@@ -15,6 +15,7 @@ RUN pip install --upgrade pip && \
 
 COPY ../app/. /app/
 
+COPY ../../../modules /app/modules
 
 # ---------- Runtime Stage ----------
 FROM gcr.io/distroless/python3-debian12
