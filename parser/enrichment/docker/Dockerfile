@@ -1,27 +1,25 @@
-# ---------- Builder ----------
+# ---------- Builder Stage ----------
 FROM python:3.11-slim AS builder
-
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
  && rm -rf /var/lib/apt/lists/*
 
-# service deps
+# copy requirements
 COPY parser/enrichment/requirements.txt /tmp/requirements.txt
 
-# shared modules
-COPY modules/modules /modules
+# copy shared package source
+COPY modules /modules
 
+# install deps + shared modules
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt
 
-# service source
+# copy app
 COPY parser/enrichment/app /app
 
-# ---------- Runtime ----------
+# ---------- Runtime Stage ----------
 FROM gcr.io/distroless/python3-debian12
-
 WORKDIR /app
 
 COPY --from=builder /app /app
@@ -31,6 +29,6 @@ COPY --from=builder /modules /modules
 USER 65532:65532
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app:/python-packages:/modules
+    PYTHONPATH=/python-packages:/modules
 
-ENTRYPOINT ["python3", "enrichment.py"]
+ENTRYPOINT ["python3", "main.py"]
