@@ -1,7 +1,7 @@
 services:
   incidents-orchestrator:
     container_name: incidents-orchestrator
-    image: quay.io/herringbone/incidents-orchestrator:2ba2bd13@sha256:7b53ad9c90cbed64b3f7d7acc3dee10a6ed426bd62bad505a36df85dcddfda8b
+    image: quay.io/herringbone/incidents-orchestrator:92e57d90@sha256:165c38290b706fae8db0ff330ca4f841a8865f99cea1dbc29b059a4c9b7bfcfd
     restart: unless-stopped
     networks:
       - herringbone
@@ -15,12 +15,10 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
     secrets:
       - service_token
       - service_jwt_public_key
       - jwt_secret
-
 secrets:
   service_token:
     file: ./secrets/runtime/incidents_orchestrator_service_token
@@ -28,7 +26,6 @@ secrets:
     file: ./secrets/runtime/service_jwt_public_key
   jwt_secret:
     file: ./secrets/runtime/jwt_secret
-    
 networks:
   herringbone:
     external: true
