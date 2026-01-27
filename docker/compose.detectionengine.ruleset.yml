@@ -1,7 +1,7 @@
 services:
   detectionengine-ruleset:
     container_name: detectionengine-ruleset
-    image: quay.io/herringbone/detectionengine-ruleset:fbda0be7@sha256:758898d295a32d355cfef55b60c49f84e571aea90d1531a17d6473e099f7b2ac
+    image: quay.io/herringbone/detectionengine-ruleset:5efb654e@sha256:d5720cc0e2adbb3db2e8477748f7b6c17066a138ffebc3343c217150e6e31465
     restart: unless-stopped
     networks:
       - herringbone
