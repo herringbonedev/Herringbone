@@ -31,4 +31,4 @@ USER 65532:65532
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/python-packages:/modules
 
-ENTRYPOINT ["python3", "main.py"]
+ENTRYPOINT ["python3", "enrichment.py"]
