@@ -1,4 +1,4 @@
--e ./modules
+-e /modules
 fastapi
 uvicorn[standard]
 jsonschema>=4.0,<5.0
