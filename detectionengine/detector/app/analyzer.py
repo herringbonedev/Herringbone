@@ -3,6 +3,17 @@ import requests
 
 
 MATCHER_URL = os.environ.get("MATCHER_API")
+SERVICE_TOKEN_PATH = "/run/secrets/service_token"
+
+
+def service_auth_headers():
+    try:
+        with open(SERVICE_TOKEN_PATH, "r") as f:
+            token = f.read().strip()
+        return {"Authorization": f"Bearer {token}"}
+    except Exception as e:
+        print(f"[✗] Failed to read service token: {e}")
+        return {}
 
 
 def analyze_log_with_rules(log_data: dict, rules: list[dict]) -> dict:
@@ -18,7 +29,11 @@ def analyze_log_with_rules(log_data: dict, rules: list[dict]) -> dict:
 			"log_data": log_data,
 		}
 
-		resp = requests.post(MATCHER_URL, json=payload, timeout=10)
+		resp = requests.post(MATCHER_URL, 
+                       		json=payload,
+                            headers=service_auth_headers(),
+                            timeout=10)
+        
 		resp.raise_for_status()
 		match = resp.json()
 
