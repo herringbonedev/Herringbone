@@ -12,7 +12,7 @@ COPY incidents/orchestrator/requirements.txt /tmp/requirements.txt
 COPY modules /modules
 
 # install deps + shared modules
-RUN pip install --upgrade pip && \
+RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt
 
 # copy app
@@ -24,11 +24,12 @@ WORKDIR /app
 
 COPY --from=builder /app /app
 COPY --from=builder /python-packages /python-packages
+COPY --from=builder /modules /modules
 
 USER 65532:65532
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/python-packages
+    PYTHONPATH=/python-packages:/modules
 
 EXPOSE 7011
 

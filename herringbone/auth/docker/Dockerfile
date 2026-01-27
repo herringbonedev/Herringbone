@@ -9,27 +9,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY ../requirements.txt /tmp/requirements.txt
 
+# copy shared package source
+COPY ../modules /modules
+
 # Install into a clean directory we control
-RUN pip install --upgrade pip && \
+RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt
 
 COPY ../app/. /app/
-
 
 # ---------- Runtime Stage ----------
 FROM gcr.io/distroless/python3-debian12
 
 WORKDIR /app
 
-# Copy app + packages
+# Copy app + packages + shared modules
 COPY --from=builder /app /app
 COPY --from=builder /python-packages /python-packages
+COPY --from=builder /modules /modules
 
 # Non-root user
 USER 65532:65532
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app:/python-packages
+    PYTHONPATH=/app:/python-packages:/modules
 
 EXPOSE 7001
 

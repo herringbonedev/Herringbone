@@ -9,11 +9,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY ../requirements.txt /tmp/requirements.txt
 
-RUN pip install --upgrade pip && \
+# copy shared package source
+COPY ../modules /modules
+
+RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt
 
 COPY ../app/. /app/
-
 
 # ---------- Runtime Stage ----------
 FROM gcr.io/distroless/python3-debian12
@@ -22,10 +24,11 @@ WORKDIR /app
 
 COPY --from=builder /app /app
 COPY --from=builder /python-packages /python-packages
+COPY --from=builder /modules /modules
 
 USER 65532:65532
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app:/python-packages
+    PYTHONPATH=/app:/python-packages:/modules
 
 ENTRYPOINT ["python3", "enrichment.py"]
