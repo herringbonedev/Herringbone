@@ -1,7 +1,7 @@
 services:
   parser-cardset:
     container_name: parser-cardset
-    image: quay.io/herringbone/parser-cardset:7f4043fc@sha256:40562068de99bf7963cfaa67e1f83932bea07b0682350be3cba9c878d24732cb
+    image: quay.io/herringbone/parser-cardset:6a54e94d@sha256:7420d6911d7a0ac010566bff42bdb5bdc66d12d3f9e1d5462aab80effb7e6c93
     restart: unless-stopped
     networks:
       - herringbone
