@@ -40,18 +40,17 @@ def analyze_log_with_rules(log_data: dict, rules: list[dict]) -> dict:
 		matched = bool(match.get("matched", False))
 		if matched:
 			detected = True
-
-		results.append(
-			{
-				"rule_name": rule_entry.get("name"),
-				"severity": rule_entry.get("severity"),
-				"description": rule_entry.get("description"),
-				"matched": matched,
-				"matcher_details": match.get("details"),
-				"matcher_rule": rule_entry.get("rule"),
-				"correlate_on": rule_entry.get("correlate_on")
-			}
-		)
+			results.append(
+				{
+					"rule_name": rule_entry.get("name"),
+					"severity": rule_entry.get("severity"),
+					"description": rule_entry.get("description"),
+					"matched": matched,
+					"matcher_details": match.get("details"),
+					"matcher_rule": rule_entry.get("rule"),
+					"correlate_on": rule_entry.get("correlate_on")
+				}
+			)
 
 	return {
 		"detection": detected,
