@@ -2,16 +2,19 @@ services:
   herringbone-auth:
     container_name: herringbone-auth
     image: quay.io/herringbone/herringbone-auth:35905ec0@sha256:74335f8361c7b5e6a8d62d05d72e88f0ac07fb5078e46ae30af58dd6154052e5
-    # Run as non-root (Chainguard standard)
     user: "65532:65532"
     restart: unless-stopped
+
     depends_on:
       mongodb:
         condition: service_healthy
+
     networks:
       - herringbone
+
     ports:
       - "7001:7001"
+
     environment:
       # Mongo
       MONGO_HOST: ${MONGO_HOST}
@@ -20,28 +23,39 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
+
       # Secrets files
       JWT_SECRET_FILE: /run/secrets/jwt_secret
       SERVICE_JWT_PRIVATE_KEY_FILE: /run/secrets/service_jwt_private_key
       SERVICE_JWT_PUBLIC_KEY_FILE: /run/secrets/service_jwt_public_key
+
+      # Bootstrap token
+      BOOTSTRAP_TOKEN_FILE: /run/secrets/bootstrap_token
+
     secrets:
       - jwt_secret
       - service_jwt_private_key
       - service_jwt_public_key
+      - bootstrap_token
+
     read_only: true
     tmpfs:
       - /tmp
+
     security_opt:
       - no-new-privileges:true
+
     cap_drop:
       - ALL
 secrets:
   jwt_secret:
     file: ./secrets/runtime/jwt_secret
+
   service_jwt_private_key:
     file: ./secrets/runtime/service_jwt_private_key
+
   service_jwt_public_key:
     file: ./secrets/runtime/service_jwt_public_key
-networks:
-  herringbone:
-    external: true
+
+  bootstrap_token:
+    file: ./secrets/runtime/bootstrap_token
