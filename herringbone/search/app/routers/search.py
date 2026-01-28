@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from bson import ObjectId
 import os
 
 from modules.database.mongo_db import HerringboneMongoDatabase
+from modules.auth.user import get_current_user
 from service import search_collection_service, get_collection_fields
 
 from config import (
@@ -78,6 +79,7 @@ def search_collection(
     filter_in: Optional[str] = Query(None),
     sort: Optional[str] = Query(None),
     order: str = Query("desc", pattern="^(asc|desc)$"),
+    user=Depends(get_current_user),
 ):
     if collection not in ALLOWED_COLLECTIONS:
         raise HTTPException(status_code=400, detail="Collection not allowed")
@@ -121,7 +123,10 @@ def search_collection(
 
 
 @router.get("/{collection}/fields")
-def list_collection_fields(collection: str):
+def list_collection_fields(
+    collection: str,
+    user=Depends(get_current_user),
+):
     if collection not in ALLOWED_COLLECTIONS:
         raise HTTPException(status_code=400, detail="Collection not allowed")
 
@@ -226,7 +231,10 @@ def _walk_fields(obj: Any, prefix: str, depth: int, out: Dict[str, Dict[str, Any
 
 
 @router.get("/{collection}/schema")
-def get_collection_schema(collection: str):
+def get_collection_schema(
+    collection: str,
+    user=Depends(get_current_user),
+):
     if collection not in ALLOWED_COLLECTIONS:
         raise HTTPException(status_code=400, detail="Collection not allowed")
 

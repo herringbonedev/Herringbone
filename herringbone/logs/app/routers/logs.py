@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from datetime import datetime, timedelta
@@ -6,6 +6,8 @@ from bson import ObjectId
 import os
 
 from modules.database.mongo_db import HerringboneMongoDatabase
+from modules.auth.user import get_current_user
+from modules.auth.mix import service_or_user
 
 router = APIRouter(prefix="/herringbone/logs", tags=["logs"])
 
@@ -29,9 +31,6 @@ def encode(obj):
 
 
 def merge_parse_results(mongo, event_ids):
-    """
-    Build {event_id: {field: [values]}} from parse_results
-    """
     results = mongo.find(
         collection="parse_results",
         filter_query={"event_id": {"$in": event_ids}},
@@ -53,7 +52,10 @@ def merge_parse_results(mongo, event_ids):
 
 
 @router.get("/events")
-def list_events(n: int = Query(25, ge=1, le=500)):
+def list_events(
+    n: int = Query(25, ge=1, le=500),
+    auth=Depends(service_or_user("events:get")),
+):
     mongo = get_mongo()
 
     events = mongo.find_sorted(
@@ -62,7 +64,7 @@ def list_events(n: int = Query(25, ge=1, le=500)):
         sort=[("_id", -1)],
         limit=n,
     )
-    
+
     if not events:
         return JSONResponse(content=[])
 
@@ -85,7 +87,10 @@ def list_events(n: int = Query(25, ge=1, le=500)):
 
 
 @router.get("/events/{event_id}")
-def get_event(event_id: str):
+def get_event(
+    event_id: str,
+    auth=Depends(service_or_user("events:get")),
+):
     mongo = get_mongo()
 
     oid = ObjectId(event_id)
@@ -109,15 +114,13 @@ def get_event(event_id: str):
 
     return JSONResponse(content=encode(event))
 
-from datetime import datetime, timedelta
 
 @router.get("/dashboard/summary")
-def dashboard_summary():
+def dashboard_summary(user=Depends(get_current_user)):
     mongo = get_mongo()
     now = datetime.utcnow()
     since = now - timedelta(hours=24)
 
-    # Events in last 24h
     events = mongo.find(
         collection="events",
         filter_query={"ingested_at": {"$gte": since}},
@@ -154,8 +157,12 @@ def dashboard_summary():
         "failed": failed,
     }
 
+
 @router.get("/dashboard/recent-events")
-def dashboard_recent_events(n: int = Query(10, ge=1, le=50)):
+def dashboard_recent_events(
+    n: int = Query(10, ge=1, le=50),
+    user=Depends(get_current_user),
+):
     mongo = get_mongo()
 
     events = mongo.find_sorted(
@@ -190,8 +197,12 @@ def dashboard_recent_events(n: int = Query(10, ge=1, le=50)):
 
     return encode(out)
 
+
 @router.get("/dashboard/recent-detections")
-def dashboard_recent_detections(n: int = Query(10, ge=1, le=50)):
+def dashboard_recent_detections(
+    n: int = Query(10, ge=1, le=50),
+    user=Depends(get_current_user),
+):
     mongo = get_mongo()
 
     detections = mongo.find_sorted(
@@ -210,8 +221,12 @@ def dashboard_recent_detections(n: int = Query(10, ge=1, le=50)):
         for d in detections
     ])
 
+
 @router.get("/dashboard/recent-incidents")
-def recent_incidents(n: int = Query(10, ge=1, le=50)):
+def recent_incidents(
+    n: int = Query(10, ge=1, le=50),
+    user=Depends(get_current_user),
+):
     mongo = get_mongo()
 
     incidents = mongo.find_sorted(
@@ -234,8 +249,12 @@ def recent_incidents(n: int = Query(10, ge=1, le=50)):
 
     return JSONResponse(content=encode(results))
 
+
 @router.get("/dashboard/incidents-throughput")
-def incidents_throughput(days: int = Query(7, ge=1, le=30)):
+def incidents_throughput(
+    days: int = Query(7, ge=1, le=30),
+    user=Depends(get_current_user),
+):
     mongo = get_mongo()
 
     since = datetime.utcnow() - timedelta(days=days)
@@ -266,6 +285,7 @@ def incidents_throughput(days: int = Query(7, ge=1, le=30)):
     ]
 
     return JSONResponse(content=encode(result))
+
 
 @router.get("/livez")
 def livez():
