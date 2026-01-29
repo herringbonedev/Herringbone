@@ -22,6 +22,11 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
+    secrets:
+      - jwt_secret
 networks:
   herringbone:
     external: true
+secrets:
+  jwt_secret:
+    file: ./secrets/runtime/jwt_secret

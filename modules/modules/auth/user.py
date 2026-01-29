@@ -3,10 +3,10 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 
 JWT_ALG = "HS256"
-
 USER_JWT_SECRET_PATH = "/run/secrets/jwt_secret"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/herringbone/auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/herringbone/auth/login", auto_error=False)
 
 _user_jwt_secret: str | None = None
 
@@ -31,30 +31,41 @@ def get_user_jwt_secret() -> str:
     return _user_jwt_secret
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
-    try:
-        payload = jwt.decode(
-            token,
-            get_user_jwt_secret(),
-            algorithms=[JWT_ALG],
-        )
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
+def decode_user_token(token: str) -> dict:
+    payload = jwt.decode(
+        token,
+        get_user_jwt_secret(),
+        algorithms=[JWT_ALG],
+    )
 
     if payload.get("typ") != "user":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token type",
-        )
+        raise JWTError("Invalid token type")
 
     return {
         "id": payload.get("sub"),
         "email": payload.get("email"),
         "role": payload.get("role"),
     }
+
+
+def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+    try:
+        return decode_user_token(token)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
+
+def get_current_user_optional(token: str | None = Depends(oauth2_scheme_optional)) -> dict | None:
+    if not token:
+        return None
+
+    try:
+        return decode_user_token(token)
+    except JWTError:
+        return None
 
 
 def require_role(required_roles: str | list[str]):

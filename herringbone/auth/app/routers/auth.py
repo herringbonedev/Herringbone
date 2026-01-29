@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, EmailStr, Field
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.user import require_admin, get_current_user
+from modules.auth.user import require_admin, get_current_user, get_current_user_optional
 from security import (
 	hash_password,
 	verify_password,
@@ -78,53 +78,69 @@ class UserDeleteRequest(BaseModel):
 
 
 @router.post("/register")
-async def register_user(payload: RegisterRequest, request: Request):
-	mongo = get_mongo()
+async def register_user(
+    payload: RegisterRequest,
+    request: Request,
+    current_user: dict | None = Depends(get_current_user_optional),
+):
+    mongo = get_mongo()
 
-	if is_bootstrap_required(mongo):
-		expected = load_bootstrap_token()
-		provided = request.headers.get("x-bootstrap-token")
+    bootstrap_required = is_bootstrap_required(mongo)
 
-		if not expected or not provided or provided != expected:
-			raise HTTPException(
-				status_code=403,
-				detail="Bootstrap token required for first user",
-			)
+    # Bootstrap path (first user)
+    if bootstrap_required:
+        expected = load_bootstrap_token()
+        provided = request.headers.get("x-bootstrap-token")
 
-	if mongo.find_one("users", {"email": payload.email}):
-		raise HTTPException(status_code=400, detail="User already exists")
+        if not expected or not provided or provided != expected:
+            raise HTTPException(
+                status_code=403,
+                detail="Bootstrap token required for first user",
+            )
+    
+    # Normal path (admin only)
+    else:
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
 
-	user_count = len(mongo.find("users", {}))
-	role = "admin" if user_count == 0 else "analyst"
+        if current_user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    # Create user
+    if mongo.find_one("users", {"email": payload.email}):
+        raise HTTPException(status_code=400, detail="User already exists")
 
-	user_doc = {
-		"email": payload.email,
-		"password_hash": hash_password(payload.password),
-		"role": role,
-		"created_at": datetime.utcnow(),
-	}
+    user_count = len(mongo.find("users", {}))
+    role = "admin" if user_count == 0 else "analyst"
 
-	user_id = mongo.insert_one("users", user_doc)
+    user_doc = {
+        "email": payload.email,
+        "password_hash": hash_password(payload.password),
+        "role": role,
+        "created_at": datetime.utcnow(),
+    }
 
-	if role == "admin":
-		try:
-			mongo.insert_one(
-				"audit_log",
-				{
-					"event": "bootstrap_admin_created",
-					"email": payload.email,
-					"ip": request.client.host if request.client else None,
-					"ts": datetime.utcnow(),
-				},
-			)
-		except Exception:
-			pass
+    user_id = mongo.insert_one("users", user_doc)
 
-	return {
-		"ok": True,
-		"user_id": str(user_id),
-		"role": role,
-	}
+    if role == "admin":
+        try:
+            mongo.insert_one(
+                "audit_log",
+                {
+                    "event": "bootstrap_admin_created",
+                    "email": payload.email,
+                    "ip": request.client.host if request.client else None,
+                    "ts": datetime.utcnow(),
+                },
+            )
+        except Exception:
+            pass
+
+    return {
+        "ok": True,
+        "user_id": str(user_id),
+        "role": role,
+    }
 
 
 @router.post("/login")
