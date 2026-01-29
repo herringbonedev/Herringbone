@@ -3,3 +3,4 @@ fastapi>=0.110
 uvicorn>=0.30
 pymongo>=4,<5
 jsonschema
+python-jose[cryptography]==3.5.0

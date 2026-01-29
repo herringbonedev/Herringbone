@@ -61,6 +61,20 @@ class ServiceTokenRequest(BaseModel):
 class ServiceRegisterRequest(BaseModel):
 	service_name: str
 	scopes: list[str] = []
+	
+
+class ServiceScopeUpdateRequest(BaseModel):
+    service_name: str
+    scopes: list[str]
+
+
+class UserRoleUpdateRequest(BaseModel):
+    email: EmailStr
+    role: str
+
+
+class UserDeleteRequest(BaseModel):
+    email: EmailStr
 
 
 @router.post("/register")
@@ -251,6 +265,93 @@ async def create_service_token_api(
 		"access_token": token,
 		"token_type": "bearer",
 	}
+
+
+@router.delete("/services/{service_name}")
+async def delete_service(service_name: str, user=Depends(require_admin)):
+    mongo = get_mongo()
+
+    svc = mongo.find_one("service_accounts", {"service_name": service_name})
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    mongo.delete_one("service_accounts", {"_id": svc["_id"]})
+
+    return {"ok": True, "deleted": service_name}
+
+
+@router.post("/services/scopes/remove")
+async def remove_service_scopes(
+    payload: ServiceScopeUpdateRequest,
+    user=Depends(require_admin),
+):
+    mongo = get_mongo()
+
+    svc = mongo.find_one("service_accounts", {"service_name": payload.service_name})
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    mongo.update_one(
+        "service_accounts",
+        {"_id": svc["_id"]},
+        {
+            "$pull": {
+                "scopes": {"$in": payload.scopes}
+            }
+        },
+    )
+
+    return {"ok": True, "service": payload.service_name, "removed": payload.scopes}
+
+
+@router.post("/users/role")
+async def change_user_role(
+    payload: UserRoleUpdateRequest,
+    user=Depends(require_admin),
+):
+    mongo = get_mongo()
+
+    target = mongo.find_one("users", {"email": payload.email})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.get("role") == "admin" and payload.role != "admin":
+        admins = mongo.find("users", {"role": "admin"})
+        if len(admins) <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot remove role from last admin user",
+            )
+
+    mongo.update_one(
+        "users",
+        {"_id": target["_id"]},
+        {"$set": {"role": payload.role}},
+    )
+
+    return {"ok": True, "email": payload.email, "role": payload.role}
+
+
+@router.delete("/users")
+async def delete_user(
+    payload: UserDeleteRequest,
+    user=Depends(require_admin),
+):
+    mongo = get_mongo()
+
+    target = mongo.find_one("users", {"email": payload.email})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.get("role") == "admin":
+        raise HTTPException(
+            status_code=400,
+            detail="Admin users cannot be deleted",
+        )
+
+    mongo.delete_one("users", {"_id": target["_id"]})
+
+    return {"ok": True, "deleted": payload.email}
 
 
 @router.get("/healthz")
