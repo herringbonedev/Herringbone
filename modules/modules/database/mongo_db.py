@@ -222,6 +222,27 @@ class HerringboneMongoDatabase:
     @with_connection
     def find_one(self, collection: str, filter_query: dict, *, projection: dict | None = None, mongo_db):
         return mongo_db[collection].find_one(filter_query, projection or None)
+    
+    @with_connection
+    def update_one(
+        self,
+        collection: str,
+        filter_query: dict,
+        update_query: dict,
+        *,
+        mongo_db,
+    ):
+        return mongo_db[collection].update_one(filter_query, update_query)
+
+    @with_connection
+    def delete_one(
+        self,
+        collection: str,
+        filter_query: dict,
+        *,
+        mongo_db,
+    ):
+        return mongo_db[collection].delete_one(filter_query)
 
     # ===========================
     # Canonical Herringbone APIs
