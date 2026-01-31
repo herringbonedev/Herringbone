@@ -100,6 +100,7 @@ async def register_user(
     
     # Normal path (admin only)
     else:
+        print(f"[Register new account] {str(current_user)}")
         if not current_user:
             raise HTTPException(status_code=401, detail="Authentication required")
 
