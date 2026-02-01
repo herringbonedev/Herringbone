@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 import os
 import time
 import requests
@@ -141,7 +141,7 @@ def main():
                     "event_id": event["_id"],
                     "card": card.get("name"),
                     "results": result,
-                    "created_at": datetime.utcnow(),
+                    "created_at": datetime.now(UTC),
                 })
 
                 print("[✓] Parse result inserted")
@@ -153,7 +153,7 @@ def main():
                     "event_id": event["_id"],
                     "card": card.get("name"),
                     "error": str(e),
-                    "created_at": datetime.utcnow(),
+                    "created_at": datetime.now(UTC),
                 })
 
         print("[*] Marking event as parsed")
