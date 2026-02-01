@@ -1,171 +1,56 @@
-# 🧠 Herringbone Parser: Extractor Service
+# Parser Extractor Service
 
-The **Extractor Service** is a FastAPI-based microservice that executes parsing rules (cards) stored in the Herringbone framework.  
-It takes a log (string or JSON) and applies **regex** and/or **JSONPath** matchers to extract structured values.
+The extractor service applies regex and JSONPath extraction logic to input data based on a provided card definition.
 
----
+It is a pure processing service and does not persist state.
 
-## 🚀 Overview
+## Responsibilities
 
-The **Extractor Service** is a standalone, pluggable microservice within the Herringbone framework.  
-It can operate **independently** or alongside other components like `parser/cardset`, which defines reusable extraction rules (“cards”).  
+The extractor service:
 
-Each **card** contains:
-- A `selector` (the entity or context for extraction)
-- A collection of **regex** or **jsonp** rules for parsing logs, text, or structured data.
+Processes structured or unstructured input
+Applies regex selectors when defined
+Applies JSONPath selectors when defined
+Returns a normalized extraction result
+Enforces authenticated, scoped access
 
-When integrated, the Extractor automatically consumes cards from `parser/cardset` to standardize parsing logic.  
-When deployed on its own, it can directly receive a card and input payload, making it ideal for **modular, on-demand parsing** or embedding in other services.
+## API
 
----
+POST /parser/extractor/parse
 
-## 🧩 Example Card Schema
+The parse endpoint accepts a card definition and an input payload, then returns extracted results in a stable response shape.
 
-```json
-{
-  "selector": {
-    "type": "domain",
-    "value": "google.com"
-  },
-  "regex": [
-    { "domain": "([a-z0-9.-]+\.com)" },
-    { "url": "https?://[^\s]+" }
-  ]
-}
-```
+Authentication is required and enforced via service scope.
 
-or for JSONPath-based extraction:
+## Response Contract
 
-```json
-{
-  "selector": {
-    "type": "source_ip",
-    "value": "192.168.1.10"
-  },
-  "jsonp": [
-    { "ip": "$.network.source.ip" }
-  ]
-}
-```
+Successful responses always include a top level results object.
 
----
+Errors related to JSONPath evaluation are returned as structured data within the results object rather than failing the request.
 
-## ⚙️ API Endpoints
+Invalid request payloads are rejected with a 422 response.
 
-| Method | Route | Description |
-|---------|-------|-------------|
-| `POST` | `/parser/extractor/parse` | Parse input using the card’s regex/JSONPath rules |
-| `GET` | `/parser/cardset/livez` | Liveness probe (returns `{ "ok": true }`) |
-| `GET` | `/parser/cardset/readyz` | Readiness probe (returns `{ "ok": true }`) |
+## Testing
 
----
+This service uses contract tests to enforce API behavior and prevent schema drift.
 
-## 🧠 Request Body
+Tests cover:
 
-### Example: Regex Parsing
+Authentication enforcement
+Response schema stability
+Regex output shape
+JSONPath output shape
+Error response behavior
 
-```json
-{
-  "card": {
-    "selector": {
-      "type": "domain",
-      "value": "ubuntu.com"
-    },
-    "regex": [
-      { "domain": "([a-z0-9.-]+\.ubuntu\.com)" },
-      { "url": "(https?://[^\s]+)" }
-    ]
-  },
-  "input": "Oct 12 14:25:10 webserver01 CRON[3482]: (root) CMD (curl -s https://updates.ubuntu.com/security/index.html)"
-}
-```
+All tests must pass before changes are merged.
 
-### Example: JSONPath Parsing
+## Running Tests
 
-```json
-{
-  "card": {
-    "selector": {
-      "type": "ip",
-      "value": "192.168.1.100"
-    },
-    "jsonp": [
-      { "source_ip": "$.network.source.ip" },
-      { "dest_ip": "$.network.dest.ip" }
-    ]
-  },
-  "input": {
-    "network": {
-      "source": {"ip": "192.168.1.100"},
-      "dest": {"ip": "8.8.8.8"}
-    }
-  }
-}
-```
+Run tests locally using the Makefile:
 
----
+make test
 
-## 🧾 Example Response
+## Notes
 
-```json
-{
-  "selector": { "type": "domain", "value": "ubuntu.com" },
-  "results": {
-    "domain": "updates.ubuntu.com",
-    "url": "https://updates.ubuntu.com/security/index.html"
-  }
-}
-```
-
----
-
-## 🐍 Core Components
-
-### `parser.py`
-Defines the **CardParser** class, which supports:
-- **Regex mode** → Extracts text from log strings
-- **JSONPath mode** → Extracts values from structured JSON
-
-```python
-regex_parser = CardParser("regex")
-result = regex_parser(card["regex"], input_string)
-
-jsonp_parser = CardParser("jsonp")
-result = jsonp_parser(card["jsonp"], json_data)
-```
-
----
-
-### `extractor.py`
-Implements the **FastAPI** service with:
-- `/parser/extractor/parse` — the main entrypoint
-- Pydantic models for `card`, `input`, and response
-- Auto-generated `/docs` via OpenAPI
-
----
-
-## 🧱 Docker
-
-### Build
-```bash
-docker build -t parser-extractor .
-```
-
-### Run
-```bash
-docker run -d   -p 7003:7003   parser-extractor
-```
-
-### Verify
-```bash
-curl -X POST http://localhost:7003/parser/extractor/parse   -H "Content-Type: application/json"   -d '{"card":{"selector":{"type":"domain","value":"ubuntu.com"},"regex":[{"domain":"([a-z0-9.-]+\.ubuntu\.com)"}]},"input":"curl https://updates.ubuntu.com"}'
-```
-
----
-
-## 🩺 Health Probes
-
-| Route | Purpose |
-|--------|----------|
-| `/parser/cardset/livez` | Checks if the container is running |
-| `/parser/cardset/readyz` | Always returns `{ok: true}` |
+This service intentionally avoids side effects and database access.
+All externally visible behavior is enforced through tests.
