@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from bson import json_util
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from schema import CardSchema
+from app.schema import CardSchema
 from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.mix import service_or_user
 from modules.auth.user import require_role
