@@ -13,7 +13,8 @@ COPY modules /modules
 
 # install deps + shared modules
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt
+    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt && \
+    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements-internal.txt
 
 # copy app
 COPY parser/enrichment/app /app
