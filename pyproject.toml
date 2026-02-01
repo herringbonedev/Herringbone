@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+# Code formatting
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+
+# Linting and import rules
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+fix = false
+extend-select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+exclude = [".git", ".venv", "build", "dist", "__pycache__"]
+
+# Import ordering
+[tool.ruff.isort]
+known-first-party = ["app"]
+
+
+# Global pytest behavior
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-ra"
+filterwarnings = [
+  "error::DeprecationWarning",
+  "error::PendingDeprecationWarning",
+]
+
+
+# Coverage configuration (not enforced yet)
+[tool.coverage.run]
+branch = true
+source = ["app"]
+omit = ["tests/*", "**/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

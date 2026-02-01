@@ -1,0 +1,8 @@
+# Test framework
+pytest==9.0.2
+pytest-cov==7.0.0
+requests-mock==1.12.1
+
+# Formatting and linting
+black==24.10.0
+ruff==0.9.6

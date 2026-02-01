@@ -1,0 +1,41 @@
+# Python virtual environments
+.venv/
+
+# Python bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+
+# Pytest cache and coverage output
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Docker local overrides
+docker-compose.override.yml
+
+# Docker secrets directories
+docker/secrets/
+
+# Environment files and secrets
+.env
+.env.*
+*.key
+*.pem

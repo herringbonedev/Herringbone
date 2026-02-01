@@ -19,8 +19,8 @@ Special Units, such as **Mind**, contain AI powered elements. These are designed
 ## Core Principles  
 
 All elements follow two guiding principles:  
-1. **Independence** – no element depends on another to function.  
-2. **Interoperability** – all elements expose universal inputs and outputs, enabling easy integration with any system, including other elements.  
+1. **Independence** - no element depends on another to function.  
+2. **Interoperability** - all elements expose universal inputs and outputs, enabling easy integration with any system, including other elements.  
 
 These principles allow you to host Herringbone components wherever you choose. While Herringbone is designed and tested on vanilla Kubernetes, nothing prevents you from running receivers or other elements as containers distributed across multiple cloud providers and networks. As long as they share a common database, the system works seamlessly.  
 
