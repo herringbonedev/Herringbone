@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 
 # copy requirements
 COPY parser/enrichment/requirements.txt /tmp/requirements.txt
+COPY parser/cardset/requirements-internal.txt /tmp/requirements-internal.txt
 
 # copy shared package source
 COPY modules /modules
