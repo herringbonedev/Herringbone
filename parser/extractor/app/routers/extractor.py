@@ -2,10 +2,12 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional, Union
-from parser import CardParser
+from app.parser import CardParser
 import json
 
 from modules.auth.service import get_current_service, require_service_scope
+
+extractor_call_scope = require_service_scope("extractor:call")
 
 router = APIRouter(
     prefix="/parser/extractor",
@@ -38,7 +40,7 @@ class ExtractResponse(BaseModel):
 )
 async def parse(
     payload: ExtractRequest,
-    service=Depends(require_service_scope("extractor:call")),
+    service=Depends(extractor_call_scope),
 ):
     card = payload.card.model_dump()
     input_data = payload.input
