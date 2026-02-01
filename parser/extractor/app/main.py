@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import extractor
+from app.routers import extractor
 
 app = FastAPI()
 
