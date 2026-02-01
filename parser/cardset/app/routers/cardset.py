@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from datetime import datetime
+from datetime import datetime, UTC
 import os
 import json
 from typing import Any, Dict, List, Optional
@@ -10,6 +10,12 @@ from app.schema import CardSchema
 from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.mix import service_or_user
 from modules.auth.user import require_role
+
+
+cardset_write_user = require_role(["admin", "analyst"])
+cardset_admin_user = require_role(["admin"])
+cardset_read_any = service_or_user("parser:cards:read")
+
 
 router = APIRouter(
     prefix="/parser/cardset",
@@ -81,9 +87,8 @@ def cards_collection():
 @router.post("/insert_card", response_model=InsertCardResponse)
 async def insert_card(
     card: CardModel,
-    user=Depends(require_role(["admin", "analyst"]))
+    mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
-    mongo = get_mongo()
 
     payload = card.model_dump()
     result = validator(payload)
@@ -95,7 +100,7 @@ async def insert_card(
     if existing:
         return {"ok": False, "message": "Card with this selector already exists."}
 
-    payload["last_updated"] = datetime.utcnow()
+    payload["last_updated"] = datetime.now(UTC)
 
     try:
         mongo.insert_one(cards_collection(), payload)
@@ -108,9 +113,9 @@ async def insert_card(
 @router.post("/pull_cards", response_model=PullCardsResponse)
 async def pull_cards(
     body: PullCardsRequest,
-    auth=Depends(service_or_user("parser:cards:read")),
+    auth=Depends(cardset_read_any),
+    mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
-    mongo = get_mongo()
 
     sel_type = body.selector_type
     sel_value = body.selector_value
@@ -141,9 +146,9 @@ async def pull_cards(
 
 @router.get("/pull_all_cards")
 async def pull_all_cards(
-    auth=Depends(service_or_user("parser:cards:read")),
+    auth=Depends(cardset_read_any),
+    mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
-    mongo = get_mongo()
 
     try:
         docs = mongo.find(cards_collection(), {"deleted": {"$ne": True}})
@@ -162,9 +167,8 @@ async def pull_all_cards(
 @router.post("/delete_cards", response_model=DeleteCardsResponse)
 async def delete_cards(
     body: DeleteCardsRequest,
-    user=Depends(require_role(["admin"])),
+    mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
-    mongo = get_mongo()
 
     sel_type = body.selector_type
     sel_value = body.selector_value
@@ -176,7 +180,7 @@ async def delete_cards(
         res = mongo.upsert_one(
             cards_collection(),
             {"selector.type": sel_type, "selector.value": sel_value},
-            {"deleted": True, "deleted_at": datetime.utcnow()},
+            {"deleted": True, "deleted_at": datetime.now(UTC)},
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
@@ -187,9 +191,9 @@ async def delete_cards(
 @router.post("/update_card", response_model=UpdateCardResponse)
 async def update_card(
     new_card: CardModel,
-    user=Depends(require_role(["admin"])),
+    user=Depends(cardset_admin_user),
+    mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
-    mongo = get_mongo()
 
     payload = new_card.model_dump()
     result = validator(payload)
@@ -205,7 +209,7 @@ async def update_card(
 
     filter_query = {"selector.type": sel_type, "selector.value": sel_value}
 
-    payload["last_updated"] = datetime.utcnow()
+    payload["last_updated"] = datetime.now(UTC)
     payload["deleted"] = False
     payload.pop("deleted_at", None)
 
@@ -228,9 +232,10 @@ async def update_card(
 
 
 @router.get("/readyz")
-async def readyz():
+async def readyz(
+    mongo: HerringboneMongoDatabase = Depends(get_mongo),
+):
     try:
-        mongo = get_mongo()
         mongo.find_one(cards_collection(), {})
         return {"ok": True}
     except Exception:
