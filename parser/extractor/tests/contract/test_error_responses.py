@@ -1,9 +1,6 @@
-from .conftest import client, PARSE_PATH
-
-
-def test_jsonpath_error_is_string_field():
+def test_jsonpath_error_is_string_field(client):
     response = client.post(
-        PARSE_PATH,
+        "/parser/extractor/parse",
         json={
             "card": {
                 "selector": {"type": "test", "value": "test"},

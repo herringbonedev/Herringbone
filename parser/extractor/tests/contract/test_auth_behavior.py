@@ -1,9 +1,7 @@
 from fastapi.testclient import TestClient
 from app.main import app
-from .conftest import PARSE_PATH
 
-
-def test_parse_requires_auth():
+def test_parse_requires_auth(client):
     original_overrides = app.dependency_overrides.copy()
 
     try:
@@ -12,7 +10,7 @@ def test_parse_requires_auth():
         client = TestClient(app)
 
         response = client.post(
-            PARSE_PATH,
+            "/parser/extractor/parse",
             json={
                 "card": {"selector": "test"},
                 "input": "example",

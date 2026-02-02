@@ -1,9 +1,6 @@
-from .conftest import client, PARSE_PATH
-
-
-def test_regex_output_is_object_map():
+def test_regex_output_is_object_map(client):
     response = client.post(
-        PARSE_PATH,
+        "/parser/extractor/parse",
         json={
             "card": {
                 "selector": {"type": "test", "value": "test"},
