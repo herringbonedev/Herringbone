@@ -1,9 +1,6 @@
-from .conftest import client, PARSE_PATH
-
-
-def test_parse_response_has_results_field():
+def test_parse_response_has_results_field(client):
     response = client.post(
-        PARSE_PATH,
+        "/parser/extractor/parse",
         json={
             "card": {
                 "selector": {"type": "test", "value": "test"},
