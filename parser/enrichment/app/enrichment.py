@@ -130,6 +130,16 @@ def process_event(mongo, state):
     mongo.upsert_event_state(event["_id"], {"parsed": True})
 
 
+def process_once(mongo) -> bool:
+    state = mongo.find_one("event_state", {"parsed": False})
+
+    if not state:
+        return False  # nothing processed
+
+    process_event(mongo, state)
+    return True
+
+
 def main():
     mongo = get_mongo()
     print("[✓] Connected to MongoDB")
@@ -137,18 +147,11 @@ def main():
     while True:
         print("[*] Polling for unparsed event_state")
 
-        state = mongo.find_one("event_state", {"parsed": False})
+        processed = process_once(mongo)
 
-        if not state:
+        if not processed:
             print("[x] No unparsed event_state found")
-            time.sleep(POLL_INTERVAL)
-            continue
 
-        print(f"[*] Found event_state for event {state.get('event_id')}")
-
-        process_event(mongo, state)
-
-        print("[✓] Event processed")
         time.sleep(POLL_INTERVAL)
 
 
