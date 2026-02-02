@@ -1,4 +1,4 @@
-from tests.contract.conftest import FakeMongo
+from tests.conftest import FakeMongo
 
 
 def _assert_common_fields(doc: dict):

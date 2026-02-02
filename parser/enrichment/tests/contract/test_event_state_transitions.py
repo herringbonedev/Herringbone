@@ -1,4 +1,4 @@
-from tests.contract.conftest import FakeMongo
+from tests.conftest import FakeMongo
 
 
 def test_event_state_parsed_transitions_once_per_event(run_once):

@@ -89,6 +89,47 @@ def call_extractor(card: dict, raw_log: str) -> dict:
     return data
 
 
+def process_event(mongo, state):
+    event = mongo.find_one("events", {"_id": state["event_id"]})
+
+    if not event:
+        mongo.upsert_event_state(state["event_id"], {"parsed": True})
+        return
+
+    cards = mongo.find("parse_cards", {})
+
+    for card in cards:
+        if not selector_matches(card.get("selector", {}), event):
+            continue
+
+        try:
+            result = call_extractor(card, event.get("raw", ""))
+
+            if not isinstance(result, dict):
+                raise RuntimeError("Extractor returned invalid result shape")
+
+            for v in result.values():
+                if not isinstance(v, list):
+                    raise RuntimeError("Extractor returned invalid result shape")
+
+            mongo.insert_parse_result({
+                "event_id": event["_id"],
+                "card": card.get("name"),
+                "results": result,
+                "created_at": datetime.now(UTC),
+            })
+
+        except Exception as e:
+            mongo.insert_parse_result({
+                "event_id": event["_id"],
+                "card": card.get("name"),
+                "error": str(e),
+                "created_at": datetime.now(UTC),
+            })
+
+    mongo.upsert_event_state(event["_id"], {"parsed": True})
+
+
 def main():
     mongo = get_mongo()
     print("[✓] Connected to MongoDB")
@@ -105,62 +146,9 @@ def main():
 
         print(f"[*] Found event_state for event {state.get('event_id')}")
 
-        event = mongo.find_one("events", {"_id": state["event_id"]})
+        process_event(mongo, state)
 
-        if not event:
-            print("[x] Event not found, marking state as parsed")
-            mongo.upsert_event_state(state["event_id"], {"parsed": True})
-            continue
-
-        print(f"[*] Processing event {event.get('_id')}")
-        print(f"[*] Event keys: {list(event.keys())}")
-
-        cards = mongo.find("parse_cards", {})
-        print("[*] Loaded parse cards")
-
-        for card in cards:
-            print(f"[*] Evaluating card '{card.get('name')}'")
-
-            if not selector_matches(card.get("selector", {}), event):
-                print("[x] Selector did not match, skipping card")
-                continue
-
-            print("[*] Selector matched, running extractor")
-
-            try:
-                result = call_extractor(card, event.get("raw", ""))
-
-                if not isinstance(result, dict):
-                    raise RuntimeError("Extractor returned invalid result shape")
-
-                for v in result.values():
-                    if not isinstance(v, list):
-                        raise RuntimeError("Extractor returned invalid result shape")
-
-                mongo.insert_parse_result({
-                    "event_id": event["_id"],
-                    "card": card.get("name"),
-                    "results": result,
-                    "created_at": datetime.now(UTC),
-                })
-
-                print("[✓] Parse result inserted")
-
-            except Exception as e:
-                print("[x] Extractor failed:", e)
-
-                mongo.insert_parse_result({
-                    "event_id": event["_id"],
-                    "card": card.get("name"),
-                    "error": str(e),
-                    "created_at": datetime.now(UTC),
-                })
-
-        print("[*] Marking event as parsed")
-
-        mongo.upsert_event_state(event["_id"], {"parsed": True})
-
-        print("[✓] Event marked as parsed")
+        print("[✓] Event processed")
         time.sleep(POLL_INTERVAL)
 
 

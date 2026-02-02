@@ -33,6 +33,13 @@ addopts = "-ra"
 filterwarnings = [
   "error::DeprecationWarning",
   "error::PendingDeprecationWarning",
+  "ignore:The wait_for_logs function.*:DeprecationWarning",
+]
+markers = [
+  "unit",
+  "contract",
+  "component",
+  "integration",
 ]
 
 
