@@ -1,7 +1,7 @@
 import importlib
 import pytest
 
-from tests.contract.conftest import FakeMongo, StopLoop
+from tests.conftest import FakeMongo, StopLoop
 
 
 def _import_service_module():

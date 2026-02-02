@@ -91,6 +91,10 @@ async def insert_card(
 ):
 
     payload = card.model_dump()
+    
+    payload["selector_type"] = payload["selector"]["type"]
+    payload["selector_value"] = payload["selector"]["value"]
+
     result = validator(payload)
 
     if not result.get("valid"):

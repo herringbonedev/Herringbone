@@ -32,18 +32,19 @@ class CardParser:
     def _apply_regex(self, regex_rules: List[Dict[str, str]], text: str) -> Dict[str, Any]:
         results: Dict[str, Any] = {}
         for rule in regex_rules:
-            for name, pattern in rule.items():
-                try:
-                    matches = re.findall(pattern, text, flags=re.IGNORECASE)
-                    # Normalize: if exactly one capture group, ensure List[str]
-                    if matches and isinstance(matches[0], tuple):
-                        # multiple groups per match -> keep tuples
-                        results[name] = matches  # List[Tuple[str,...]]
-                    else:
-                        # matches is either [] or List[str]
-                        results[name] = matches  # List[str]
-                except re.error as e:
-                    results[name] = f"[regex error: {e}]"
+            # Expect explicit {name, pattern} shape
+            name = rule.get("name")
+            pattern = rule.get("pattern")
+            if not name or not pattern:
+                continue  # skip invalid rules
+            try:
+                matches = re.findall(pattern, text, flags=re.IGNORECASE)
+                if matches and isinstance(matches[0], tuple):
+                    results[name] = matches  # multi-capture groups
+                else:
+                    results[name] = matches  # list[str]
+            except re.error as e:
+                results[name] = f"[regex error: {e}]"
         return results
 
     def _apply_jsonp(self, jsonp_rules: List[Dict[str, str]], json_data: Dict[str, Any]) -> Dict[str, Any]:
