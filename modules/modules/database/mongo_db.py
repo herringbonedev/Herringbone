@@ -5,7 +5,7 @@ import ipaddress
 from urllib.parse import quote_plus
 from functools import wraps
 from typing import Any, Dict, Iterable, Tuple
-from datetime import datetime
+from datetime import datetime, UTC
 import codecs
 
 from pymongo import MongoClient, errors
@@ -252,7 +252,7 @@ class HerringboneMongoDatabase:
         return self.insert_one("events", event)
 
     def upsert_event_state(self, event_id, state: dict):
-        state["last_updated"] = datetime.utcnow()
+        state["last_updated"] = datetime.now(UTC)
         return self.upsert_one("event_state", {"event_id": event_id}, state)
 
     def insert_parse_result(self, result: dict):

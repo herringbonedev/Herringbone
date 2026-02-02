@@ -4,17 +4,18 @@ import time
 import requests
 
 from modules.database.mongo_db import HerringboneMongoDatabase
+from extractor.app.parser import CardParser
 
 
 POLL_INTERVAL = float(os.environ.get("ENRICHMENT_POLL_INTERVAL", 1.0))
 EXTRACTOR_SVC = os.environ.get("EXTRACTOR_SVC")
-USE_TEST = EXTRACTOR_SVC == "test.service"
-
 SERVICE_TOKEN_PATH = "/run/secrets/service_token"
 
+LOCAL_EXTRACTOR = EXTRACTOR_SVC is None or EXTRACTOR_SVC == "local"
+
+
 print("[*] Enrichment service has started")
-if USE_TEST:
-    print("[*] [Test Service] Started in test mode")
+print(f"[*] Extractor mode: {'local' if LOCAL_EXTRACTOR else 'http'}")
 
 
 def service_auth_headers():
@@ -24,7 +25,6 @@ def service_auth_headers():
 
 
 def get_mongo():
-    print("[*] Initializing MongoDB connection")
     return HerringboneMongoDatabase(
         user=os.environ.get("MONGO_USER", ""),
         password=os.environ.get("MONGO_PASS", ""),
@@ -57,10 +57,15 @@ def selector_matches(selector: dict, event: dict) -> bool:
 
 
 def call_extractor(card: dict, raw_log: str) -> dict:
-    if not EXTRACTOR_SVC:
-        raise RuntimeError("EXTRACTOR_SVC is not set")
-
-    print(f"[*] Calling extractor for card '{card.get('name')}'")
+    if LOCAL_EXTRACTOR:
+        results = {}
+        if card.get("regex"):
+            parser = CardParser("regex")
+            results.update(parser(card["regex"], raw_log))
+        if card.get("jsonp"):
+            parser = CardParser("jsonp")
+            results.update(parser(card["jsonp"], raw_log))
+        return results
 
     payload = {
         "card": sanitize_card(card),
@@ -77,16 +82,10 @@ def call_extractor(card: dict, raw_log: str) -> dict:
 
     data = resp.json()
 
-    print("[✓] Extractor call succeeded")
-    print(data)
-
-    if isinstance(data, dict) and "results" in data and isinstance(data["results"], dict):
+    if isinstance(data, dict) and "results" in data:
         return data["results"]
 
-    if not isinstance(data, dict):
-        raise RuntimeError("Extractor returned invalid result shape")
-
-    return data
+    raise RuntimeError("Extractor returned invalid result shape")
 
 
 def process_event(mongo, state):
@@ -96,7 +95,7 @@ def process_event(mongo, state):
         mongo.upsert_event_state(state["event_id"], {"parsed": True})
         return
 
-    cards = mongo.find("parse_cards", {})
+    cards = mongo.find("cards", {})
 
     for card in cards:
         if not selector_matches(card.get("selector", {}), event):
@@ -104,9 +103,6 @@ def process_event(mongo, state):
 
         try:
             result = call_extractor(card, event.get("raw", ""))
-
-            if not isinstance(result, dict):
-                raise RuntimeError("Extractor returned invalid result shape")
 
             for v in result.values():
                 if not isinstance(v, list):
@@ -134,7 +130,7 @@ def process_once(mongo) -> bool:
     state = mongo.find_one("event_state", {"parsed": False})
 
     if not state:
-        return False  # nothing processed
+        return False
 
     process_event(mongo, state)
     return True
@@ -142,16 +138,9 @@ def process_once(mongo) -> bool:
 
 def main():
     mongo = get_mongo()
-    print("[✓] Connected to MongoDB")
 
     while True:
-        print("[*] Polling for unparsed event_state")
-
-        processed = process_once(mongo)
-
-        if not processed:
-            print("[x] No unparsed event_state found")
-
+        process_once(mongo)
         time.sleep(POLL_INTERVAL)
 
 
