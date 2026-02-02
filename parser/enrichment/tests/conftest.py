@@ -1,18 +1,21 @@
 import importlib
-import pytest
 import os
+import sys
+import pytest
 
-def _import_service_module():
-    try:
-        return importlib.import_module("app.enrichment")
-    except Exception:
-        return importlib.import_module("enrichment")
+# --- Ensure parser/ is on sys.path ---
+HERE = os.path.dirname(__file__)
+ENRICHMENT_DIR = os.path.abspath(os.path.join(HERE, ".."))
+PARSER_DIR = os.path.abspath(os.path.join(ENRICHMENT_DIR, ".."))
 
-svc = _import_service_module()
+if PARSER_DIR not in sys.path:
+    sys.path.insert(0, PARSER_DIR)
+
+# --- Import enrichment service module ---
+svc = importlib.import_module("enrichment.app.enrichment")
 
 
 class FakeMongo:
-    # Minimal fake used by enrichment tests
     def __init__(self, state=None, event=None, cards=None):
         self._state = state
         self._event = event
@@ -29,7 +32,7 @@ class FakeMongo:
         return None
 
     def find(self, collection, query):
-        if collection == "parse_cards":
+        if collection in ("cards", "parse_cards"):
             return list(self._cards)
         return []
 
@@ -43,30 +46,25 @@ class FakeMongo:
 
 
 class StopLoop(Exception):
-    # Raised to break daemon loop
     pass
 
 
 @pytest.fixture()
 def run_once(monkeypatch):
-    # Runs exactly one daemon iteration
-    def _runner(fake_mongo: FakeMongo, extractor_json=None, extractor_exc=None):
-        # Bypass service token
+    def _runner(fake_mongo, extractor_json=None, extractor_exc=None):
         monkeypatch.setattr(
             svc,
             "service_auth_headers",
             lambda: {"Authorization": "Bearer test"},
         )
 
-        # Force FakeMongo always
         monkeypatch.setattr(svc, "get_mongo", lambda: fake_mongo)
 
-        # Stop loop after first sleep
         def _sleep(_):
             raise StopLoop()
+
         monkeypatch.setattr(svc.time, "sleep", _sleep)
 
-        # Control extractor behavior
         if extractor_exc is not None:
             monkeypatch.setattr(
                 svc,
@@ -80,12 +78,8 @@ def run_once(monkeypatch):
                 lambda card, raw: extractor_json,
             )
 
-        # Ensure extractor env does not block
         monkeypatch.setenv("EXTRACTOR_SVC", "http://test/parse")
-        try:
-            monkeypatch.setattr(svc, "EXTRACTOR_SVC", "http://test/parse")
-        except Exception:
-            pass
+        monkeypatch.setattr(svc, "EXTRACTOR_SVC", "http://test/parse", raising=False)
 
         with pytest.raises(StopLoop):
             svc.main()
