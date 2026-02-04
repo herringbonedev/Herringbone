@@ -3,11 +3,11 @@ services:
     container_name: parser-cardset
     image: quay.io/herringbone/parser-cardset:20a0b775@sha256:2ce09ae6d0e0e0e8c29f8f9c70ebfdb7e5f31288bdd99c6279fa55f28faac449
     restart: unless-stopped
-    networks:
-      - herringbone
-    ports:
-      - "7005:7005"
+
+    working_dir: /app-root
+
     environment:
+      PYTHONPATH: /app-root:/python-packages:/modules
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
       MONGO_USER: ${MONGO_USER}
@@ -15,25 +15,24 @@ services:
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: "parse_cards"
+
+    ports:
+      - "7005:7005"
+
+    networks:
+      - herringbone
+
     read_only: true
     tmpfs:
       - /tmp
+
     security_opt:
       - no-new-privileges:true
+
     secrets:
       - service_token
       - service_jwt_public_key
       - jwt_secret
+
     depends_on:
       - mongodb
-secrets:
-  service_token:
-    file: ./secrets/runtime/parser_cardset_service_token
-  service_jwt_public_key:
-    file: ./secrets/runtime/service_jwt_public_key
-  jwt_secret:
-    file: ./secrets/runtime/jwt_secret
-networks:
-  herringbone:
-    external: true
-    name: herringbone_net
