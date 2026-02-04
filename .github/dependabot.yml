@@ -101,17 +101,6 @@ updates:
     commit-message:
       prefix: "deps(ruleset)"
 
-  # Mind Recon
-  - package-ecosystem: "pip"
-    directory: "/mind/recon"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "python"
-    commit-message:
-      prefix: "deps(mind-recon)"
-
   # Herringbone Logs service
   - package-ecosystem: "pip"
     directory: "/herringbone/logs"
