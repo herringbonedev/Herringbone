@@ -9,17 +9,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # copy requirements
 COPY parser/enrichment/requirements.txt /tmp/requirements.txt
-COPY parser/cardset/requirements-internal.txt /tmp/requirements-internal.txt
 
-# copy shared modules
+# copy shared modules (packaged via pyproject.toml)
 COPY modules /modules
 
-# install dependencies into controlled location
+# install dependencies + internal modules
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt && \
-    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements-internal.txt
+    pip install --no-cache-dir --target=/python-packages /modules
 
-# copy app as a top-level package
+# copy application code
 COPY parser/enrichment/app /app-root/app
 
 
@@ -30,11 +29,10 @@ WORKDIR /app-root
 
 COPY --from=builder /app-root /app-root
 COPY --from=builder /python-packages /python-packages
-COPY --from=builder /modules /modules
 
 USER 65532:65532
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app-root:/python-packages:/modules
+    PYTHONPATH=/app-root:/python-packages
 
-ENTRYPOINT ["python3", "-m", "app.enrichment"]
+ENTRYPOINT ["python3","-m","app.enrichment"]

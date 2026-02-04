@@ -3,17 +3,6 @@ import os
 import sys
 import pytest
 
-# --- Ensure parser/ is on sys.path ---
-HERE = os.path.dirname(__file__)
-ENRICHMENT_DIR = os.path.abspath(os.path.join(HERE, ".."))
-PARSER_DIR = os.path.abspath(os.path.join(ENRICHMENT_DIR, ".."))
-
-if PARSER_DIR not in sys.path:
-    sys.path.insert(0, PARSER_DIR)
-
-# --- Import enrichment service module ---
-svc = importlib.import_module("enrichment.app.enrichment")
-
 
 class FakeMongo:
     def __init__(self, state=None, event=None, cards=None):
@@ -52,6 +41,15 @@ class StopLoop(Exception):
 @pytest.fixture()
 def run_once(monkeypatch):
     def _runner(fake_mongo, extractor_json=None, extractor_exc=None):
+        # ---- REQUIRED: set env BEFORE import ----
+        monkeypatch.setenv("EXTRACTOR_SVC", "http://test/parse")
+
+        # ensure clean import (important if tests run multiple times)
+        sys.modules.pop("app.enrichment", None)
+
+        svc = importlib.import_module("app.enrichment")
+
+        # ---- patch internals ----
         monkeypatch.setattr(
             svc,
             "service_auth_headers",
@@ -78,9 +76,7 @@ def run_once(monkeypatch):
                 lambda card, raw: extractor_json,
             )
 
-        monkeypatch.setenv("EXTRACTOR_SVC", "http://test/parse")
-        monkeypatch.setattr(svc, "EXTRACTOR_SVC", "http://test/parse", raising=False)
-
+        # ---- run exactly one loop ----
         with pytest.raises(StopLoop):
             svc.main()
 

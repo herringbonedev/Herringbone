@@ -14,7 +14,7 @@ rebuild:
 	docker compose -f docker/docker-compose.yml build --no-cache
 
 logs:
-	docker compose -f docker/docker-compose.yml logs -f parser-cardset
+	docker compose -f docker/docker-compose.yml logs -f parser-enrichment
 
 venv:
 	python3 -m venv $(VENV)

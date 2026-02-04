@@ -4,18 +4,10 @@ import time
 import requests
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from extractor.app.parser import CardParser
 
 
 POLL_INTERVAL = float(os.environ.get("ENRICHMENT_POLL_INTERVAL", 1.0))
-EXTRACTOR_SVC = os.environ.get("EXTRACTOR_SVC")
 SERVICE_TOKEN_PATH = "/run/secrets/service_token"
-
-LOCAL_EXTRACTOR = EXTRACTOR_SVC is None or EXTRACTOR_SVC == "local"
-
-
-print("[*] Enrichment service has started")
-print(f"[*] Extractor mode: {'local' if LOCAL_EXTRACTOR else 'http'}")
 
 
 def service_auth_headers():
@@ -57,15 +49,9 @@ def selector_matches(selector: dict, event: dict) -> bool:
 
 
 def call_extractor(card: dict, raw_log: str) -> dict:
-    if LOCAL_EXTRACTOR:
-        results = {}
-        if card.get("regex"):
-            parser = CardParser("regex")
-            results.update(parser(card["regex"], raw_log))
-        if card.get("jsonp"):
-            parser = CardParser("jsonp")
-            results.update(parser(card["jsonp"], raw_log))
-        return results
+    extractor = os.environ.get("EXTRACTOR_SVC")
+    if not extractor:
+        raise RuntimeError("EXTRACTOR_SVC must be set (HTTP extractor required)")
 
     payload = {
         "card": sanitize_card(card),
@@ -73,7 +59,7 @@ def call_extractor(card: dict, raw_log: str) -> dict:
     }
 
     resp = requests.post(
-        EXTRACTOR_SVC,
+        extractor,
         json=payload,
         headers=service_auth_headers(),
         timeout=30,
@@ -137,7 +123,13 @@ def process_once(mongo) -> bool:
 
 
 def main():
+    if not os.environ.get("EXTRACTOR_SVC"):
+        raise RuntimeError("EXTRACTOR_SVC must be set (HTTP extractor required)")
+
     mongo = get_mongo()
+
+    print("[*] Enrichment service started")
+    print("[*] Extractor mode: HTTP")
 
     while True:
         process_once(mongo)

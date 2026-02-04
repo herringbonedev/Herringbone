@@ -21,22 +21,22 @@ services:
 
     command: ["mongod", "--auth", "--bind_ip_all"]
 
+
   parser-extractor:
     container_name: parser-extractor
-
     image: quay.io/herringbone/parser-extractor:latest-67bf7b0e-11
-
     restart: unless-stopped
 
     ports:
       - "7006:7006"
 
+
   parser-enrichment:
     container_name: parser-enrichment
 
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: ../../..
+      dockerfile: parser/enrichment/docker/Dockerfile
 
     restart: unless-stopped
 
@@ -56,6 +56,7 @@ services:
     depends_on:
       - mongodb
       - parser-extractor
+
 
 volumes:
   mongo_data:
