@@ -1,113 +1,435 @@
 version: 2
+
 updates:
-  # ----------------------------------------
-  # 1. GitHub Actions dependency updates
-  # ----------------------------------------
+  # -----------------------------
+  # GitHub Actions (workflows)
+  # -----------------------------
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
+      time: "02:15"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
     labels:
       - "dependencies"
-      - "actions"
+      - "security"
+      - "github-actions"
     commit-message:
-      prefix: "deps(actions)"
-    groups:
-      actions:
-        patterns:
-          - "*"
+      prefix: "chore(deps)"
+      include: "scope"
+    reviewers:
+      - "herringbonedev/security"
+    assignees:
+      - "herringbonedev/platform"
 
-  # ----------------------------------------
-  # 2. Dockerfile updates for every service
-  # ----------------------------------------
-  - package-ecosystem: "docker"
+  # -----------------------------
+  # Python (pip / requirements.txt)
+  # Root + shared modules
+  # -----------------------------
+  - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
+      time: "02:20"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
     labels:
       - "dependencies"
-      - "docker"
-    commit-message:
-      prefix: "deps(docker)"
-    # Dependabot automatically scans all Dockerfiles in the repo
-    # No need to list them individually
-
-  # ----------------------------------------
-  # 3. Python dependencies for each microservice
-  # ----------------------------------------
-  # Parser Extractor
-  - package-ecosystem: "pip"
-    directory: "/parser/extractor"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
+      - "security"
       - "python"
     commit-message:
-      prefix: "deps(parser-extractor)"
+      prefix: "chore(deps)"
+      include: "scope"
+    reviewers:
+      - "herringbonedev/security"
+    assignees:
+      - "herringbonedev/platform"
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+          - "minor"
 
-  # Parser Cardset
   - package-ecosystem: "pip"
-    directory: "/parser/cardset"
+    directory: "/modules"
     schedule:
-      interval: "weekly"
+      interval: "daily"
+      time: "02:25"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
     labels:
       - "dependencies"
+      - "security"
       - "python"
     commit-message:
-      prefix: "deps(parser-cardset)"
+      prefix: "chore(deps)"
+      include: "scope"
+    reviewers:
+      - "herringbonedev/security"
+    assignees:
+      - "herringbonedev/platform"
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+          - "minor"
 
-  # Parser Enrichment
-  - package-ecosystem: "pip"
-    directory: "/parser/enrichment"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "python"
-    commit-message:
-      prefix: "deps(enrichment)"
-
-  # Detection Engine: Detector
+  # -----------------------------
+  # detectionengine
+  # -----------------------------
   - package-ecosystem: "pip"
     directory: "/detectionengine/detector"
     schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "python"
-    commit-message:
-      prefix: "deps(detector)"
+      interval: "daily"
+      time: "02:30"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "detectionengine"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
 
-  # Detection Engine: Matcher
   - package-ecosystem: "pip"
     directory: "/detectionengine/matcher"
     schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "python"
-    commit-message:
-      prefix: "deps(matcher)"
+      interval: "daily"
+      time: "02:35"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "detectionengine"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
 
-  # Detection Engine: Ruleset
   - package-ecosystem: "pip"
     directory: "/detectionengine/ruleset"
     schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "python"
-    commit-message:
-      prefix: "deps(ruleset)"
+      interval: "daily"
+      time: "02:40"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "detectionengine"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
 
-  # Herringbone Logs service
+  # -----------------------------
+  # herringbone core services
+  # -----------------------------
+  - package-ecosystem: "pip"
+    directory: "/herringbone/auth"
+    schedule:
+      interval: "daily"
+      time: "02:45"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "herringbone"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+
   - package-ecosystem: "pip"
     directory: "/herringbone/logs"
     schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "python"
-    commit-message:
-      prefix: "deps(herringbone-logs)"
+      interval: "daily"
+      time: "02:50"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "herringbone"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+
+  - package-ecosystem: "pip"
+    directory: "/herringbone/search"
+    schedule:
+      interval: "daily"
+      time: "02:55"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "herringbone"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+
+  # -----------------------------
+  # incidents
+  # -----------------------------
+  - package-ecosystem: "pip"
+    directory: "/incidents/correlator"
+    schedule:
+      interval: "daily"
+      time: "03:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "incidents"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+
+  - package-ecosystem: "pip"
+    directory: "/incidents/incidentset"
+    schedule:
+      interval: "daily"
+      time: "03:05"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "incidents"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+
+  - package-ecosystem: "pip"
+    directory: "/incidents/orchestrator"
+    schedule:
+      interval: "daily"
+      time: "03:10"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "incidents"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+
+  # -----------------------------
+  # log ingestion + parser services
+  # -----------------------------
+  - package-ecosystem: "pip"
+    directory: "/logingestion/receiver"
+    schedule:
+      interval: "daily"
+      time: "03:15"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "logingestion"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+
+  - package-ecosystem: "pip"
+    directory: "/parser/cardset"
+    schedule:
+      interval: "daily"
+      time: "03:20"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "parser"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+
+  - package-ecosystem: "pip"
+    directory: "/parser/enrichment"
+    schedule:
+      interval: "daily"
+      time: "03:25"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "parser"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+
+  - package-ecosystem: "pip"
+    directory: "/parser/extractor"
+    schedule:
+      interval: "daily"
+      time: "03:30"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "python", "parser"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+    groups:
+      python-patch-minor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+
+  # -----------------------------
+  # Docker (Dockerfiles)
+  # -----------------------------
+  - package-ecosystem: "docker"
+    directory: "/detectionengine/detector/docker"
+    schedule: { interval: "daily", time: "03:35", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "detectionengine"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/detectionengine/matcher/docker"
+    schedule: { interval: "daily", time: "03:36", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "detectionengine"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/detectionengine/ruleset/docker"
+    schedule: { interval: "daily", time: "03:37", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "detectionengine"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/herringbone/auth/docker"
+    schedule: { interval: "daily", time: "03:38", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "herringbone"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/herringbone/logs/docker"
+    schedule: { interval: "daily", time: "03:39", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "herringbone"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/herringbone/search/docker"
+    schedule: { interval: "daily", time: "03:40", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "herringbone"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/incidents/correlator/docker"
+    schedule: { interval: "daily", time: "03:41", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "incidents"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/incidents/incidentset/docker"
+    schedule: { interval: "daily", time: "03:42", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "incidents"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/incidents/orchestrator/docker"
+    schedule: { interval: "daily", time: "03:43", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "incidents"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/logingestion/receiver/docker"
+    schedule: { interval: "daily", time: "03:44", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "logingestion"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/parser/cardset/docker"
+    schedule: { interval: "daily", time: "03:45", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "parser"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/parser/enrichment/docker"
+    schedule: { interval: "daily", time: "03:46", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "parser"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
+
+  - package-ecosystem: "docker"
+    directory: "/parser/extractor/docker"
+    schedule: { interval: "daily", time: "03:47", timezone: "America/Chicago" }
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "security", "docker", "parser"]
+    commit-message: { prefix: "chore(deps)", include: "scope" }
+    reviewers: ["herringbonedev/security"]
+    assignees: ["herringbonedev/platform"]
