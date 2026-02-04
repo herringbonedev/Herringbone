@@ -9,17 +9,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # copy requirements
 COPY parser/cardset/requirements.txt /tmp/requirements.txt
-COPY parser/cardset/requirements-internal.txt /tmp/requirements-internal.txt
 
-# copy shared modules
+# copy shared modules package
 COPY modules /modules
 
-# install dependencies into controlled location
+# install dependencies + internal modules
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt && \
-    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements-internal.txt
+    pip install --no-cache-dir --target=/python-packages /modules
 
-# copy app as a REAL top-level package
+# copy application code
 COPY parser/cardset/app /app-root/app
 
 
@@ -30,13 +29,12 @@ WORKDIR /app-root
 
 COPY --from=builder /app-root /app-root
 COPY --from=builder /python-packages /python-packages
-COPY --from=builder /modules /modules
 
 USER 65532:65532
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app-root:/python-packages:/modules
+    PYTHONPATH=/app-root:/python-packages
 
 EXPOSE 7005
 
-ENTRYPOINT ["python3","-m","uvicorn","main:app","--host","0.0.0.0","--port","7005"]
+ENTRYPOINT ["python3","-m","uvicorn","app.main:app","--host","0.0.0.0","--port","7005","--log-level","info"]

@@ -25,10 +25,10 @@ services:
 
   parser-cardset:
     container_name: parser-cardset
-
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: ../../..
+      dockerfile: parser/cardset/docker/Dockerfile
+
 
     restart: unless-stopped
 
