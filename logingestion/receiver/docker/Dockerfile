@@ -1,5 +1,5 @@
 # ---------- Builder Stage ----------
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -18,7 +18,7 @@ RUN pip install --upgrade pip setuptools wheel && \
 COPY ../app/. /app/
 
 # ---------- Runtime Stage ----------
-FROM python:3.11-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 COPY --from=builder /install /usr/local
