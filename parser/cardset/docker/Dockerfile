@@ -39,4 +39,4 @@ ENV PYTHONUNBUFFERED=1 \
 
 EXPOSE 7005
 
-ENTRYPOINT ["python3","-m","uvicorn","app.main:app","--host","0.0.0.0","--port","7005"]
+ENTRYPOINT ["python3","-m","uvicorn","main:app","--host","0.0.0.0","--port","7005"]

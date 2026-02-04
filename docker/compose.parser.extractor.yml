@@ -1,13 +1,15 @@
 services:
   parser-extractor:
     container_name: parser-extractor
-    image: quay.io/herringbone/parser-extractor:789fd98f@sha256:ec700d0647d884d14817955b0280a75870f512f1e934c416ad3b0707bb50974e
+    image: quay.io/herringbone/parser-extractor:20a0b775@sha256:b18d6aa231de6b544320b5d2b5d814c601553fa6331c8d9aa4ee2388de8d69bc
     restart: unless-stopped
-    working_dir: /app-root
-    ports:
-      - "7006:7006"
     networks:
       - herringbone
+    ports:
+      - "7006:7006"
+    working_dir: /app-root
+    environment:
+      PYTHONPATH: /app-root:/python-packages:/modules
     read_only: true
     tmpfs:
       - /tmp
@@ -15,7 +17,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    environment:
-      PYTHONPATH: /app-root:/python-packages:/modules
     secrets:
       - service_jwt_public_key
+networks:
+  herringbone:
+    external: true
+    name: herringbone_net
+secrets:
+  service_jwt_public_key:
+    file: ./secrets/runtime/service_jwt_public_key
