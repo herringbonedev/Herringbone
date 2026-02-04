@@ -1,14 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from bson import ObjectId
 from bson.json_util import dumps
 from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.service import require_service_scope
 from modules.auth.mix import service_or_role
-from schema import RuleSchema
+from app.schema import RuleSchema
 import os
 import json
+
+
+ruleset_write = service_or_role("rules:write", ["admin", "analyst"])
+ruleset_read = service_or_role("rules:read", ["admin", "analyst"])
+ruleset_admin = service_or_role("rules:write", ["admin"])
+
 
 router = APIRouter(
     prefix="/detectionengine/ruleset",
@@ -19,8 +25,9 @@ validator = RuleSchema()
 
 
 class RuleBase(BaseModel):
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(
+        extra="allow"
+    )
 
 
 class RuleCreate(RuleBase):
@@ -44,9 +51,10 @@ def get_mongo():
 async def insert_rule(
     payload: RuleCreate,
     mongo=Depends(get_mongo),
-    auth=Depends(service_or_role("rules:write", ["admin", "analyst"]))
+    auth=Depends(ruleset_write)
 ):
-    data = payload.dict()
+    data = payload.model_dump()
+
 
     validation = validator(data)
     if not validation["valid"]:
@@ -66,7 +74,7 @@ async def insert_rule(
 @router.get("/get_rules")
 async def get_rules(
     mongo=Depends(get_mongo),
-    auth=Depends(service_or_role("rules:read", ["admin", "analyst"]))
+    auth=Depends(ruleset_read)
 ):
     try:
         docs = mongo.find("rules", {})
@@ -79,7 +87,7 @@ async def get_rules(
 async def delete_rule(
     id: str = Query(...),
     mongo=Depends(get_mongo),
-    auth=Depends(service_or_role("rules:write", ["admin"]))
+    auth=Depends(ruleset_admin)
 ):
     try:
         oid = ObjectId(id)
@@ -99,7 +107,7 @@ async def delete_rule(
 async def update_rule(
     payload: RuleUpdate,
     mongo=Depends(get_mongo),
-        auth=Depends(service_or_role("rules:write", ["admin", "analyst"]))
+        auth=Depends(ruleset_write)
 ):
     data = payload.model_dump(by_alias=True)
 

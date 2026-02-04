@@ -6,14 +6,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
  && rm -rf /var/lib/apt/lists/*
 
 # copy requirements
-COPY detectionengine/ruleset/requirements.txt /tmp/requirements.txt
+COPY parser/cardset/requirements.txt /tmp/requirements.txt
+COPY parser/cardset/requirements-internal.txt /tmp/requirements-internal.txt
 
 # copy shared package source
 COPY modules /modules
 
 # install deps + shared modules
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt
+    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt && \
+    pip install --no-cache-dir -r /tmp/requirements-internal.txt
 
 # copy app
 COPY detectionengine/ruleset/app /app
