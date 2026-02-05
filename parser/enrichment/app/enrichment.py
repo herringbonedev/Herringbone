@@ -83,10 +83,17 @@ def call_extractor(card: dict, raw_log: str) -> dict:
     if isinstance(data, dict) and "results" in data and isinstance(data["results"], dict):
         return data["results"]
 
-    if not isinstance(data, dict):
-        raise RuntimeError("Extractor returned invalid result shape")
+    raise RuntimeError("Extractor returned invalid result shape")
 
-    return data
+
+def normalize_results(results: dict) -> dict:
+    normalized = {}
+    for k, v in results.items():
+        if isinstance(v, list):
+            normalized[k] = v
+        else:
+            normalized[k] = [v]
+    return normalized
 
 
 def main():
@@ -128,19 +135,17 @@ def main():
             print("[*] Selector matched, running extractor")
 
             try:
-                result = call_extractor(card, event.get("raw", ""))
+                raw_result = call_extractor(card, event.get("raw", ""))
 
-                if not isinstance(result, dict):
+                if not isinstance(raw_result, dict):
                     raise RuntimeError("Extractor returned invalid result shape")
 
-                for v in result.values():
-                    if not isinstance(v, list):
-                        raise RuntimeError("Extractor returned invalid result shape")
+                results = normalize_results(raw_result)
 
                 mongo.insert_parse_result({
                     "event_id": event["_id"],
                     "card": card.get("name"),
-                    "results": result,
+                    "results": results,
                     "created_at": datetime.utcnow(),
                 })
 
