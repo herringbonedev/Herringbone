@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import time
 import requests
@@ -89,10 +89,7 @@ def call_extractor(card: dict, raw_log: str) -> dict:
 def normalize_results(results: dict) -> dict:
     normalized = {}
     for k, v in results.items():
-        if isinstance(v, list):
-            normalized[k] = v
-        else:
-            normalized[k] = [v]
+        normalized[k] = v if isinstance(v, list) else [v]
     return normalized
 
 
@@ -146,7 +143,7 @@ def main():
                     "event_id": event["_id"],
                     "card": card.get("name"),
                     "results": results,
-                    "created_at": datetime.utcnow(),
+                    "created_at": datetime.now(timezone.utc),
                 })
 
                 print("[✓] Parse result inserted")
@@ -158,7 +155,7 @@ def main():
                     "event_id": event["_id"],
                     "card": card.get("name"),
                     "error": str(e),
-                    "created_at": datetime.utcnow(),
+                    "created_at": datetime.now(timezone.utc),
                 })
 
         print("[*] Marking event as parsed")
