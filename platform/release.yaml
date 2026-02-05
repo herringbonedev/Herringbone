@@ -7,7 +7,7 @@ services:
   detectionengine-matcher: quay.io/herringbone/detectionengine-matcher:d24b6bb5@sha256:28b3cd48af9703b5021121aeec82a7c2848d4dca1a45b8c42b76cc262726dbb9
   detectionengine-ruleset: quay.io/herringbone/detectionengine-ruleset:f76589f4@sha256:a138c1a5be67d2519e6239c926fdb90624cacce62d0e6acf572eb4e7472eaf6b
   parser-cardset: quay.io/herringbone/parser-cardset:8c65caf1@sha256:b45855db753f61582b7562d25e793c265cc6de51e553e786a40ad703612730de
-  parser-extractor: quay.io/herringbone/parser-extractor:e21e8f49@sha256:0a6ac694168d1438e2aaf5fb985a4ebf0de9b972f85fa3a1871132514827dec9
+  parser-extractor: quay.io/herringbone/parser-extractor:b224c3d7@sha256:83095836c9740302df2e8cfe473c980a56463ba4f989c756dc1ce0e09def4ac0
   parser-enrichment: quay.io/herringbone/parser-enrichment:ed63c87d@sha256:f0b8c1e421ab2cd74a73a553d33e880f76159338fd4bd413bda6cd3939302a0c
   incidents-correlator: quay.io/herringbone/incidents-correlator:d24b6bb5@sha256:393f4a09ec9bb6dfd65e5e6d9c9f13d5ef279fb0a11f464465c186a3b8cd6f28
   incidents-orchestrator: quay.io/herringbone/incidents-orchestrator:e471f2a1@sha256:f58bbf32a3c976596e18a7141257884f9591ab251f3ff8580b058b6abee05b70
