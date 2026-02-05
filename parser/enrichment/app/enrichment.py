@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import datetime
 import os
 import time
 import requests
@@ -7,7 +7,14 @@ from modules.database.mongo_db import HerringboneMongoDatabase
 
 
 POLL_INTERVAL = float(os.environ.get("ENRICHMENT_POLL_INTERVAL", 1.0))
+EXTRACTOR_SVC = os.environ.get("EXTRACTOR_SVC")
+USE_TEST = EXTRACTOR_SVC == "test.service"
+
 SERVICE_TOKEN_PATH = "/run/secrets/service_token"
+
+print("[*] Enrichment service has started")
+if USE_TEST:
+    print("[*] [Test Service] Started in test mode")
 
 
 def service_auth_headers():
@@ -17,6 +24,7 @@ def service_auth_headers():
 
 
 def get_mongo():
+    print("[*] Initializing MongoDB connection")
     return HerringboneMongoDatabase(
         user=os.environ.get("MONGO_USER", ""),
         password=os.environ.get("MONGO_PASS", ""),
@@ -49,9 +57,10 @@ def selector_matches(selector: dict, event: dict) -> bool:
 
 
 def call_extractor(card: dict, raw_log: str) -> dict:
-    extractor = os.environ.get("EXTRACTOR_SVC")
-    if not extractor:
-        raise RuntimeError("EXTRACTOR_SVC must be set (HTTP extractor required)")
+    if not EXTRACTOR_SVC:
+        raise RuntimeError("EXTRACTOR_SVC is not set")
+
+    print(f"[*] Calling extractor for card '{card.get('name')}'")
 
     payload = {
         "card": sanitize_card(card),
@@ -59,7 +68,7 @@ def call_extractor(card: dict, raw_log: str) -> dict:
     }
 
     resp = requests.post(
-        extractor,
+        EXTRACTOR_SVC,
         json=payload,
         headers=service_auth_headers(),
         timeout=30,
@@ -68,71 +77,90 @@ def call_extractor(card: dict, raw_log: str) -> dict:
 
     data = resp.json()
 
-    if isinstance(data, dict) and "results" in data:
+    print("[✓] Extractor call succeeded")
+    print(data)
+
+    if isinstance(data, dict) and "results" in data and isinstance(data["results"], dict):
         return data["results"]
 
-    raise RuntimeError("Extractor returned invalid result shape")
+    if not isinstance(data, dict):
+        raise RuntimeError("Extractor returned invalid result shape")
 
-
-def process_event(mongo, state):
-    event = mongo.find_one("events", {"_id": state["event_id"]})
-
-    if not event:
-        mongo.upsert_event_state(state["event_id"], {"parsed": True})
-        return
-
-    cards = mongo.find("cards", {})
-
-    for card in cards:
-        if not selector_matches(card.get("selector", {}), event):
-            continue
-
-        try:
-            result = call_extractor(card, event.get("raw", ""))
-
-            for v in result.values():
-                if not isinstance(v, list):
-                    raise RuntimeError("Extractor returned invalid result shape")
-
-            mongo.insert_parse_result({
-                "event_id": event["_id"],
-                "card": card.get("name"),
-                "results": result,
-                "created_at": datetime.now(UTC),
-            })
-
-        except Exception as e:
-            mongo.insert_parse_result({
-                "event_id": event["_id"],
-                "card": card.get("name"),
-                "error": str(e),
-                "created_at": datetime.now(UTC),
-            })
-
-    mongo.upsert_event_state(event["_id"], {"parsed": True})
-
-
-def process_once(mongo) -> bool:
-    state = mongo.find_one("event_state", {"parsed": False})
-
-    if not state:
-        return False
-
-    process_event(mongo, state)
-    return True
+    return data
 
 
 def main():
-    if not os.environ.get("EXTRACTOR_SVC"):
-        raise RuntimeError("EXTRACTOR_SVC must be set (HTTP extractor required)")
-
     mongo = get_mongo()
-
-    print("[*] Enrichment service started")
-    print("[*] Extractor mode: HTTP")
+    print("[✓] Connected to MongoDB")
 
     while True:
-        process_once(mongo)
+        print("[*] Polling for unparsed event_state")
+
+        state = mongo.find_one("event_state", {"parsed": False})
+
+        if not state:
+            print("[x] No unparsed event_state found")
+            time.sleep(POLL_INTERVAL)
+            continue
+
+        print(f"[*] Found event_state for event {state.get('event_id')}")
+
+        event = mongo.find_one("events", {"_id": state["event_id"]})
+
+        if not event:
+            print("[x] Event not found, marking state as parsed")
+            mongo.upsert_event_state(state["event_id"], {"parsed": True})
+            continue
+
+        print(f"[*] Processing event {event.get('_id')}")
+        print(f"[*] Event keys: {list(event.keys())}")
+
+        cards = mongo.find("parse_cards", {})
+        print("[*] Loaded parse cards")
+
+        for card in cards:
+            print(f"[*] Evaluating card '{card.get('name')}'")
+
+            if not selector_matches(card.get("selector", {}), event):
+                print("[x] Selector did not match, skipping card")
+                continue
+
+            print("[*] Selector matched, running extractor")
+
+            try:
+                result = call_extractor(card, event.get("raw", ""))
+
+                if not isinstance(result, dict):
+                    raise RuntimeError("Extractor returned invalid result shape")
+
+                for v in result.values():
+                    if not isinstance(v, list):
+                        raise RuntimeError("Extractor returned invalid result shape")
+
+                mongo.insert_parse_result({
+                    "event_id": event["_id"],
+                    "card": card.get("name"),
+                    "results": result,
+                    "created_at": datetime.utcnow(),
+                })
+
+                print("[✓] Parse result inserted")
+
+            except Exception as e:
+                print("[x] Extractor failed:", e)
+
+                mongo.insert_parse_result({
+                    "event_id": event["_id"],
+                    "card": card.get("name"),
+                    "error": str(e),
+                    "created_at": datetime.utcnow(),
+                })
+
+        print("[*] Marking event as parsed")
+
+        mongo.upsert_event_state(event["_id"], {"parsed": True})
+
+        print("[✓] Event marked as parsed")
         time.sleep(POLL_INTERVAL)
 
 

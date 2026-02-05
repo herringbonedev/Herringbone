@@ -60,6 +60,7 @@ async def parse(
         except Exception as e:
             results["jsonp_error"] = f"Invalid JSON input or evaluation error: {e}"
 
+    print(results)
     return JSONResponse(content={"results": results}, status_code=200)
 
 
