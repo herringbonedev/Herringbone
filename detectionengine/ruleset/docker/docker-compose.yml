@@ -27,7 +27,7 @@ services:
     container_name: detectionengine-ruleset
 
     build:
-      context: ..
+      context: ../../..
       dockerfile: docker/Dockerfile
 
     restart: unless-stopped
