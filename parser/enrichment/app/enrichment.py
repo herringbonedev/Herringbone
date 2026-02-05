@@ -93,6 +93,58 @@ def normalize_results(results: dict) -> dict:
     return normalized
 
 
+def process_event(mongo, state: dict):
+    event = mongo.find_one("events", {"_id": state["event_id"]})
+
+    if not event:
+        mongo.upsert_event_state(state["event_id"], {"parsed": True})
+        return
+
+    cards = mongo.find("parse_cards", {})
+
+    for card in cards:
+        if not selector_matches(card.get("selector", {}), event):
+            continue
+
+        try:
+            results = {}
+
+            # ---- legacy regex support for smoke tests ----
+            regex_rules = card.get("regex") or []
+            for rule in regex_rules:
+                if "pattern" in rule and "name" in rule:
+                    import re
+                    m = re.search(rule["pattern"], event.get("raw", ""))
+                    if m:
+                        results[rule["name"]] = [m.group(0)]
+
+            # ---- modern extractor path ----
+            if not results:
+                raw_result = call_extractor(card, event.get("raw", ""))
+
+                if not isinstance(raw_result, dict):
+                    raise RuntimeError("Extractor returned invalid result shape")
+
+                results = normalize_results(raw_result)
+
+            mongo.insert_parse_result({
+                "event_id": event["_id"],
+                "card": card.get("name"),
+                "results": results,
+                "created_at": datetime.now(timezone.utc),
+            })
+
+        except Exception as e:
+            mongo.insert_parse_result({
+                "event_id": event["_id"],
+                "card": card.get("name"),
+                "error": str(e),
+                "created_at": datetime.now(timezone.utc),
+            })
+
+    mongo.upsert_event_state(event["_id"], {"parsed": True})
+
+
 def main():
     mongo = get_mongo()
     print("[✓] Connected to MongoDB")
