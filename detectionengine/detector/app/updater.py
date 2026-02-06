@@ -1,6 +1,6 @@
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from modules.database.mongo_db import HerringboneMongoDatabase
 
 
@@ -54,7 +54,7 @@ def notify_orchestrator(payload):
 
 
 def set_failed(event_id, reason: str):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     mongo = _db()
 
     status_collection = os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state")
@@ -76,7 +76,7 @@ def set_failed(event_id, reason: str):
 
 
 def apply_result(event_id, analysis: dict, rule_id: str):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     severity = _max_severity(analysis)
     detected = bool(analysis.get("detection"))
 
