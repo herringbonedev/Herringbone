@@ -1,4 +1,8 @@
-.PHONY: up down rebuild logs shell test fmt lint
+.PHONY: up down rebuild logs test venv clean-venv
+
+VENV := .venv
+PYTHON := $(VENV)/bin/python
+PIP := $(PYTHON) -m pip
 
 up:
 	docker compose -f docker/docker-compose.yml up -d
@@ -12,14 +16,13 @@ rebuild:
 logs:
 	docker compose -f docker/docker-compose.yml logs -f detectionengine-detector
 
-shell:
-	docker compose -f docker/docker-compose.yml exec detectionengine-detector bash
+venv:
+	python3 -m venv $(VENV)
 
-test:
-	docker compose -f docker/docker-compose.yml exec detectionengine-detector pytest -q
+test: venv
+	$(PIP) install --upgrade pip
+	$(PIP) install -r requirements.txt -r ../../requirements-dev.txt
+	PYTHONPATH=../../modules $(PYTHON) -m pytest
 
-fmt:
-	docker compose -f docker/docker-compose.yml exec detectionengine-detector black .
-
-lint:
-	docker compose -f docker/docker-compose.yml exec detectionengine-detector flake8 .
+clean-venv:
+	rm -rf $(VENV)
