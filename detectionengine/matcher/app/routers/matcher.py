@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Dict, Any
 from matchengine import MatchEngine
 from modules.auth.service import require_service_scope
+
+run_matchengine = require_service_scope("detectionengine:run")
 
 router = APIRouter(
     prefix="/detectionengine/matcher",
@@ -19,9 +21,7 @@ class RuleMatchRequest(BaseModel):
     """
     rule: Dict[str, Any] = Field(..., description="Rule JSON")
     log_data: Dict[str, Any] = Field(..., description="Log JSON to evaluate")
-
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
 
 class RuleMatchResponse(BaseModel):
@@ -36,7 +36,7 @@ class RuleMatchResponse(BaseModel):
 @router.post("/find_match", response_model=RuleMatchResponse)
 async def find_match(
     payload: RuleMatchRequest,
-    service=Depends(require_service_scope("detectionengine:run"))
+    service=Depends(run_matchengine)
 ):
     """
     Uses a rule and log entry to find any matches.
