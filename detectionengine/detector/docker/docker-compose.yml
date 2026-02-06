@@ -36,7 +36,7 @@ services:
     container_name: detectionengine-detector
 
     build:
-      context: ..
+      context: ../../..
       dockerfile: docker/Dockerfile
 
     restart: unless-stopped
