@@ -1,47 +1,56 @@
 # Herringbone  
 
-**Herringbone** is a modular framework for building your own SIEM or log management solution. Inspired by the defensive herringbone formation, it is designed around independence, flexibility, and interoperability.  
+**Herringbone** is a modular framework for building SIEM and log management systems. It is designed to be flexible, composable, and deployable in many different ways, depending on your needs.
 
-## Learn how to use Herringbone
+![Homepage screenshot](.docs/images/homepage.png)
 
-Checkout the [Wiki](https://github.com/herringbonedev/Herringbone/wiki) for all the user guides!
+## Learn how to use Herringbone  
+
+See the [Wiki](https://github.com/herringbonedev/Herringbone/wiki) for guides, concepts, and usage documentation.
 
 ## Overview  
 
-Herringbone is composed of independent **elements**. Each element performs a specific task and can be deployed on its own or combined with others. Elements come together to form **Units**, which define the broader mission they are intended to accomplish.  
+Herringbone is built from small, independent services called **elements**.  
+Each element performs a single, well-defined function and can run on its own.
 
-For example, the **Detection Engine Unit** includes the **Ruleset** and **Detector** elements. On their own, these elements cannot act as a complete detection system. Together, the Ruleset manages detection rules while the Detector applies them to logs, identifies matches, and alerts the user.  
+Related elements can be grouped into **Units**, which represent a larger capability or purpose. Units are organizational—not mandatory deployment boundaries.
 
-You are never required to deploy an entire Unit. You can choose to run only the elements you need, providing full control over the shape and size of your deployment.  
+For example, the **Detection Engine Unit** includes the **Ruleset** and **Detector** elements:
+- **Ruleset** manages detection rules
+- **Detector** evaluates logs against those rules and produces detections
 
-Special Units, such as **Mind**, contain AI powered elements. These are designed to support interchangeable models, giving you the flexibility to Bring Your Own Model. With Mind, the accuracy and power of your Herringbone deployment scales directly with the quality of the models you choose to integrate.  
+You can run these elements together, separately, or alongside other systems. You are never required to deploy a full Unit.
 
 ## Core Principles  
 
-All elements follow two guiding principles:  
-1. **Independence** - no element depends on another to function.  
-2. **Interoperability** - all elements expose universal inputs and outputs, enabling easy integration with any system, including other elements.  
+All elements follow two core principles:
 
-These principles allow you to host Herringbone components wherever you choose. While Herringbone is designed and tested on vanilla Kubernetes, nothing prevents you from running receivers or other elements as containers distributed across multiple cloud providers and networks. As long as they share a common database, the system works seamlessly.  
+1. **Independence**  
+   Each element can run and scale on its own without tight coupling to other elements.
+
+2. **Interoperability**  
+   Elements communicate through consistent, well-defined inputs and outputs, making them easy to integrate with each other or with external systems.
+
+Because of this, Herringbone components can be deployed almost anywhere. While development and testing focus on Kubernetes, elements can run as standalone containers across different environments as long as they share access to the same data store.
 
 ## Features  
 
-- Modular elements that can run independently  
-- Units that combine elements into powerful missions  
-- AI powered Mind Unit with Bring Your Own Model capability  
-- Designed and tested on Kubernetes, deployable in any container environment  
-- Universal inputs and outputs for flexible integration  
+- Independent, composable elements  
+- Optional Units for organizing related functionality  
+- AI-assisted elements with Bring Your Own Model support  
+- Designed for Kubernetes but runnable in any container environment  
+- Consistent interfaces for integration and extension  
 
 ## Getting Started  
 
-1. Familiarize yourself with the **Concepts** documentation to understand the principles of Herringbone.  
-2. Explore the available **Units** and decide which elements fit your use case.  
-3. Enable or disable elements as needed to tailor the solution to your environment.  
+1. Read the **Concepts** documentation to understand how Herringbone is structured  
+2. Review the available **Units** and **elements**  
+3. Deploy only what you need and expand over time  
 
 ## Contributing  
 
-Contributions are welcome. Please review the [Contributing document](./CONTRIBUTING.md) before submitting issues or pull requests. Code reviews are required before merging into the main branch to maintain quality and consistency.  
+Contributions are welcome. Please read the [Contributing guide](./CONTRIBUTING.md) before submitting issues or pull requests. All changes require review before merging.
 
 ## License  
 
-Herringbone is released under the [Apache 2.0 License](LICENSE).  
+Herringbone is released under the [Apache 2.0 License](LICENSE).
