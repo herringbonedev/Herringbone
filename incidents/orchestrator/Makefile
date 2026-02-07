@@ -1,4 +1,8 @@
-.PHONY: up down rebuild logs shell test fmt lint
+.PHONY: up down rebuild logs test venv clean-venv
+
+VENV := .venv
+PYTHON := $(VENV)/bin/python
+PIP := $(PYTHON) -m pip
 
 up:
 	docker compose -f docker/docker-compose.yml up -d
@@ -12,14 +16,13 @@ rebuild:
 logs:
 	docker compose -f docker/docker-compose.yml logs -f incidents-orchestrator
 
-shell:
-	docker compose -f docker/docker-compose.yml exec incidents-orchestrator sh
+venv:
+	python3 -m venv $(VENV)
 
-test:
-	docker compose -f docker/docker-compose.yml exec incidents-orchestrator pytest -q
+test: venv
+	$(PIP) install --upgrade pip
+	$(PIP) install -r requirements.txt -r ../../requirements-dev.txt
+	PYTHONPATH=../../modules $(PYTHON) -m pytest
 
-fmt:
-	docker compose -f docker/docker-compose.yml exec incidents-orchestrator black .
-
-lint:
-	docker compose -f docker/docker-compose.yml exec incidents-orchestrator flake8 .
+clean-venv:
+	rm -rf $(VENV)

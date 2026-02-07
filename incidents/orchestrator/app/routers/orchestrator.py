@@ -3,6 +3,8 @@ from modules.auth.service import require_service_scope
 import requests
 import os
 
+orchestrator_run = require_service_scope("incidents:orchestrate")
+
 router = APIRouter(
     prefix="/incidents/orchestrator",
     tags=["orchestrator"],
@@ -43,7 +45,7 @@ def service_auth_headers():
 @router.post("/process_detection")
 async def process_detection(
     payload: dict,
-    service=Depends(require_service_scope("incidents:orchestrate"))
+    service=Depends(orchestrator_run)
 ):
     print("[*] Received detection payload")
     print(payload)

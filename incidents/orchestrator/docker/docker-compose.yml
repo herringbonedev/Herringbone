@@ -28,7 +28,7 @@ services:
 
     build:
       # repo root context so Dockerfile can access /modules
-      context: ..
+      context: ../../..
       dockerfile: incidents/incidentset/docker/Dockerfile
 
     restart: unless-stopped
