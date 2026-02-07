@@ -4,16 +4,14 @@ import warnings
 
 import pytest
 from fastapi import FastAPI
-from fastapi.routing import APIRoute
 from starlette.testclient import TestClient
-
 
 # Make app/ importable so incidentset's `from schema import IncidentSchema` works.
 APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "app"))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
-# Silence datetime.utcnow() deprecation warnings in tests only.
+# Silence datetime deprecations in tests only
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from routers import incidentset  # noqa: E402
@@ -30,7 +28,11 @@ class _FakeCollection:
         self.result = _FakeUpdateResult()
 
     def update_one(self, flt, upd, upsert=False):
-        self.last_update_one = {"filter": flt, "update": upd, "upsert": upsert}
+        self.last_update_one = {
+            "filter": flt,
+            "update": upd,
+            "upsert": upsert,
+        }
         return self.result
 
 
@@ -89,22 +91,17 @@ def app(fake_mongo):
     app = FastAPI()
     app.include_router(incidentset.router)
 
-    # Override mongo dependency.
+    # --- Mongo override ---
     app.dependency_overrides[incidentset.get_mongo] = lambda: fake_mongo
 
-    # Override auth dependencies on each route, WITHOUT overriding get_mongo.
-    # incidentset uses Depends(service_or_role(...)) which is evaluated at import time,
-    # so we override those callable dependencies directly.
-    for route in app.routes:
-        if not isinstance(route, APIRoute):
-            continue
-        if not route.path.startswith("/incidents/incidentset/"):
-            continue
-
-        for dep in route.dependant.dependencies:
-            if dep.call is incidentset.get_mongo:
-                continue
-            app.dependency_overrides[dep.call] = lambda: {"scope": "test"}
+    # --- Auth overrides (IMPORTANT) ---
+    # These must override the *variables*, not service_or_role(...)
+    app.dependency_overrides[incidentset.incident_writer] = (
+        lambda: {"scope": "incidents:write", "roles": ["admin"]}
+    )
+    app.dependency_overrides[incidentset.incident_reader] = (
+        lambda: {"scope": "incidents:read", "roles": ["admin"]}
+    )
 
     return app
 

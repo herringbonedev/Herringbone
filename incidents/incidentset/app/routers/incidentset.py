@@ -12,6 +12,11 @@ from schema import IncidentSchema
 import os
 import json
 
+
+incident_writer = service_or_role("incidents:write", ["admin", "analyst"])
+incident_reader = service_or_role("incidents:read", ["admin", "analyst"])
+
+
 router = APIRouter(
     prefix="/incidents/incidentset",
     tags=["incidentset"],
@@ -50,7 +55,7 @@ def incidents_collection():
 async def insert_incident(
     payload: IncidentCreate,
     mongo=Depends(get_mongo),
-    auth=Depends(service_or_role("incidents:write", ["admin", "analyst"])),
+    auth=Depends(incident_writer),
 ):
     data = payload.model_dump()
     now = datetime.now(timezone.utc)
@@ -80,7 +85,7 @@ import traceback
 async def update_incident(
     payload: dict, 
     mongo=Depends(get_mongo),
-    auth=Depends(service_or_role("incidents:write", ["admin", "analyst"])),
+    auth=Depends(incident_writer),
 ):
     print("\n========== UPDATE INCIDENT ==========")
     print("Raw payload:")
@@ -148,7 +153,7 @@ async def update_incident(
 @router.get("/get_incidents")
 async def get_incidents(
     mongo=Depends(get_mongo),
-    auth=Depends(service_or_role("incidents:read", ["admin", "analyst"])),
+    auth=Depends(incident_reader),
 ):
     try:
         docs = mongo.find(incidents_collection(), {})
@@ -161,7 +166,7 @@ async def get_incidents(
 async def get_incident(
     incident_id: str,
     mongo=Depends(get_mongo),
-    auth=Depends(service_or_role("incidents:read", ["admin", "analyst"])),
+    auth=Depends(incident_reader),
 ):
     try:
         oid = ObjectId(incident_id)
