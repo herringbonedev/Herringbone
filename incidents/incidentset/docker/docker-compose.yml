@@ -28,7 +28,7 @@ services:
 
     build:
       # repo root as build context (required for shared modules package)
-      context: ..
+      context: ../../..
       # correct service Dockerfile path
       dockerfile: incidents/incidentset/docker/Dockerfile
 

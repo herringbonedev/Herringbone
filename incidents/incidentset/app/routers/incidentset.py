@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 from bson import ObjectId
 from bson.json_util import dumps
 from modules.database.mongo_db import HerringboneMongoDatabase
@@ -52,8 +52,8 @@ async def insert_incident(
     mongo=Depends(get_mongo),
     auth=Depends(service_or_role("incidents:write", ["admin", "analyst"])),
 ):
-    data = payload.dict()
-    now = datetime.utcnow()
+    data = payload.model_dump()
+    now = datetime.now(timezone.utc)
 
     data["created_at"] = now
     data["last_updated"] = now
@@ -96,7 +96,7 @@ async def update_incident(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid _id")
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     set_fields = {
         "last_updated": now,
