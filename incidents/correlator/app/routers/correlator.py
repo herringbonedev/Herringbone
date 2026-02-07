@@ -1,11 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from bson import ObjectId
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.service import require_service_scope
 import os
 import json
 import requests
+
+
+correlate_required = require_service_scope("incidents:correlate")
+
 
 router = APIRouter(
     prefix="/incidents/correlator",
@@ -78,7 +82,7 @@ def extract_correlate_values(event: dict, correlate_on: list[str]):
 async def correlate(
     payload: dict, 
     mongo=Depends(get_mongo),
-    service=Depends(require_service_scope("incidents:correlate"))
+    service=Depends(correlate_required)
 ):
     print("[*] Correlator invoked")
     print(json.dumps(payload, indent=2, default=str))
@@ -93,7 +97,7 @@ async def correlate(
 
     incidents_collection = os.environ.get("COLLECTION_NAME", "incidents")
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     window_start = now - timedelta(minutes=30)
 
     rule_clauses = [{"rule_id": rule_id}]
