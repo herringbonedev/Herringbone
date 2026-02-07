@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime, timezone
 from bson import ObjectId
 from bson.json_util import dumps
@@ -26,8 +26,7 @@ validator = IncidentSchema()
 
 
 class IncidentBase(BaseModel):
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
 
 class IncidentCreate(IncidentBase):
