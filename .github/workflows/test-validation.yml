@@ -1,0 +1,21 @@
+name: "Test Validation"
+description: "Running tests to validate changes"
+
+inputs:
+  directory:
+    description: "Directory to run make test in"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Run make test
+      shell: bash
+      run: |
+        set -e
+        echo "Running tests in directory: ${{ inputs.directory }}"
+        cd "${{ inputs.directory }}"
+        make test
