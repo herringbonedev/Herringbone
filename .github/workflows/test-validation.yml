@@ -1,17 +1,22 @@
-name: "Test Validation"
-description: "Run make test in a specified directory and fail if tests fail"
+name: Test Validation
 
-inputs:
-  directory:
-    description: "Directory to run make test in"
-    required: true
+on:
+  workflow_call:
+    inputs:
+      directory:
+        required: true
+        type: string
 
-runs:
-  using: "composite"
-  steps:
-    - name: Run make test
-      shell: bash
-      run: |
-        set -e
-        cd "${{ inputs.directory }}"
-        make test
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run make test
+        shell: bash
+        run: |
+          set -e
+          cd "${{ inputs.directory }}"
+          make test
