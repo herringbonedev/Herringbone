@@ -9,12 +9,12 @@ venv:
 
 test: venv
 	$(PIP) install --upgrade pip
-	$(PIP) install -r correlator/requirements.txt
-	$(PIP) install -r incidentset/requirements.txt
-	$(PIP) install -r orchestrator/requirements.txt
+	$(PIP) install -r detector/requirements.txt
+	$(PIP) install -r matcher/requirements.txt
+	$(PIP) install -r ruleset/requirements.txt
 	$(PIP) install -r ../requirements-dev.txt
-	PYTHONPATH=correlator/app:incidentset/app:orchestrator/app:../modules \
-	$(PYTHON) -m pytest -q tests
+	PYTHONPATH=detector/app:detector:matcher:ruleset:incidentset/app:incidentset:correlator/app:correlator:orchestrator/app:orchestrator:../modules \
+	$(PYTHON) -m pytest -q tests/smoke
 
 clean-venv:
 	rm -rf $(VENV)
