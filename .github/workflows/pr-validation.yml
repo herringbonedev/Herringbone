@@ -6,9 +6,7 @@ on:
 
 jobs:
   detect-changes:
-    name: Detect Changed Elements
     runs-on: ubuntu-latest
-
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
 
@@ -18,14 +16,11 @@ jobs:
           fetch-depth: 0
 
       - id: set-matrix
-        name: Build test matrix
         shell: bash
         run: |
           set -e
 
           BASE="${{ github.base_ref }}"
-          echo "Diffing against $BASE"
-
           CHANGED_FILES=$(git diff --name-only origin/$BASE...HEAD)
 
           ELEMENT_DIRS=(
@@ -47,21 +42,15 @@ jobs:
             exit 0
           fi
 
-          MATRIX="{\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}"
-
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "matrix={\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}" >> $GITHUB_OUTPUT
 
   test:
-    name: Element Tests
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.matrix != '{"directory":[]}' }}
-    runs-on: ubuntu-latest
-
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
 
-    steps:
-      - uses: ./.github/actions/test-validation
-        with:
-          directory: ${{ matrix.directory }}
+    uses: ./.github/workflows/test-validation.yml
+    with:
+      directory: ${{ matrix.directory }}
