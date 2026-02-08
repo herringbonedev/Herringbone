@@ -44,7 +44,7 @@ jobs:
 
           echo "matrix={\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}" >> $GITHUB_OUTPUT
 
-  test:
+  Run element test:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.matrix != '{"directory":[]}' }}
     strategy:
