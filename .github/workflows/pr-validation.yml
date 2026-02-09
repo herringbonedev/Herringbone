@@ -83,20 +83,21 @@ jobs:
     if: ${{ always() }}
 
     steps:
-      - name: Gate
+      - name: Evaluate merge conditions
         shell: bash
         run: |
           HAS_TESTS="${{ needs.detect-changes.outputs.has_tests }}"
           TEST_RESULT="${{ needs.element-test-matrix.result }}"
 
-          if [[ "$HAS_TESTS" == "true" ]]; then
-            if [[ "$TEST_RESULT" != "success" ]]; then
-              echo "Element tests required but did not succeed (result=$TEST_RESULT)"
-              exit 1
-            fi
-            echo "Element tests required and succeeded."
+          if [[ "$HAS_TESTS" == "false" ]]; then
+            echo "No monitored directories changed — auto-pass."
             exit 0
           fi
 
-          echo "No element tests required for this PR."
-          exit 0
+          if [[ "$TEST_RESULT" == "success" ]]; then
+            echo "Tests ran and passed."
+            exit 0
+          fi
+
+          echo "Tests were required but did not pass."
+          exit 1
