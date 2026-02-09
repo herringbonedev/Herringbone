@@ -4,35 +4,41 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   push:
-    branches: [main]
+    branches: [main]   # discovery only
 
 jobs:
-  status-check:
-    name: Run element tests
-    if: github.event_name == 'push'
+  detect-changes:
+    name: Detect changed elements
     runs-on: ubuntu-latest
-    steps:
-      - run: echo "Status check registration only"
-  
-  pr-tests:
-    name: Run element tests
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Detect changed elements
+      - id: set-matrix
         shell: bash
         run: |
-          set -e
+          set -u  # DO NOT use -e here
 
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          HEAD_SHA="${{ github.sha }}"
+          EVENT="${GITHUB_EVENT_NAME}"
 
-          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          if [[ "$EVENT" == "pull_request" ]]; then
+            BASE="${{ github.base_ref }}"
+            DIFF_RANGE="origin/$BASE...HEAD"
+          else
+            # push to main: safe, non-failing diff
+            DIFF_RANGE="HEAD~1...HEAD"
+          fi
+
+          echo "Diff range: $DIFF_RANGE"
+
+          CHANGED_FILES=$(git diff --name-only $DIFF_RANGE 2>/dev/null || true)
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
 
           ELEMENT_DIRS=(
             "parser/cardset"
@@ -51,24 +57,37 @@ jobs:
 
           for dir in "${ELEMENT_DIRS[@]}"; do
             if echo "$CHANGED_FILES" | grep -q "^$dir/"; then
-              TEST_DIRS+=("$dir")
+              TEST_DIRS+=("\"$dir\"")
             fi
           done
 
-          if [ ${#TEST_DIRS[@]} -eq 0 ]; then
-            echo "No matching element directories changed"
+          # HARD FAIL ONLY ON PRs
+          if [[ "$EVENT" == "pull_request" && ${#TEST_DIRS[@]} -eq 0 ]]; then
+            echo "ERROR: No element tests triggered on PR."
+            echo "Failing by policy to prevent silent merge."
             exit 1
           fi
 
-          printf "%s\n" "${TEST_DIRS[@]}" > test_dirs.txt
+          if [ ${#TEST_DIRS[@]} -eq 0 ]; then
+            echo 'matrix={"directory":[]}' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
-      - name: Run tests
-        shell: bash
-        run: |
-          set -e
-          while read -r dir; do
-            echo "Running tests in $dir"
-            cd "$dir"
-            make test
-            cd -
-          done < test_dirs.txt
+          MATRIX="{\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}"
+
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
+  run-element-tests:
+    name: Run element tests
+    needs: detect-changes
+
+    # ONLY run tests on PRs
+    if: ${{ github.event_name == 'pull_request' }}
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+
+    uses: ./.github/workflows/test-validation.yml
+    with:
+      directory: ${{ matrix.directory }}
