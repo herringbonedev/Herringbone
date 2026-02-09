@@ -3,9 +3,12 @@ name: PR Validation
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
 
 jobs:
   detect-changes:
+    name: Detect changed elements
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -18,10 +21,21 @@ jobs:
       - id: set-matrix
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          BASE="${{ github.base_ref }}"
-          CHANGED_FILES=$(git diff --name-only origin/$BASE...HEAD)
+          # Determine base branch safely
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            BASE="${{ github.base_ref }}"
+          else
+            BASE="HEAD~1"
+          fi
+
+          echo "Diffing against base: $BASE"
+
+          CHANGED_FILES=$(git diff --name-only "$BASE"...HEAD || true)
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
 
           ELEMENT_DIRS=(
             "parser/cardset"
@@ -44,17 +58,19 @@ jobs:
             fi
           done
 
-          if [ ${#TEST_DIRS[@]} -eq 0 ]; then
-            echo 'matrix={"directory":[]}' >> $GITHUB_OUTPUT
-            exit 0
-          fi
+          MATRIX="{\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}"
 
-          echo "matrix={\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}" >> $GITHUB_OUTPUT
+          echo "Test matrix:"
+          echo "$MATRIX"
 
-  run-element-test:
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
+  run-element-tests:
     name: Run element tests
     needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.matrix != '{"directory":[]}' }}
+
+    # Skip actual test execution on push to main
+    if: ${{ github.event_name == 'pull_request' }}
 
     strategy:
       fail-fast: false
