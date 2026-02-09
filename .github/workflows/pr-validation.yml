@@ -7,16 +7,16 @@ on:
     branches: [main]
 
 jobs:
-  register-status-check:
+  status-check:
     name: Run element tests
-    if: ${{ github.event_name == 'push' }}
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Status check registration run"
-
-  run-element-tests:
+      - run: echo "Status check registration only"
+  
+  pr-tests:
     name: Run element tests
-    if: ${{ github.event_name == 'pull_request' }}
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
@@ -29,8 +29,10 @@ jobs:
         run: |
           set -e
 
-          BASE="origin/${{ github.base_ref }}"
-          CHANGED_FILES=$(git diff --name-only "$BASE"...HEAD)
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.sha }}"
+
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
 
           ELEMENT_DIRS=(
             "parser/cardset"
@@ -54,6 +56,7 @@ jobs:
           done
 
           if [ ${#TEST_DIRS[@]} -eq 0 ]; then
+            echo "No matching element directories changed"
             exit 1
           fi
 
@@ -64,6 +67,7 @@ jobs:
         run: |
           set -e
           while read -r dir; do
+            echo "Running tests in $dir"
             cd "$dir"
             make test
             cd -
