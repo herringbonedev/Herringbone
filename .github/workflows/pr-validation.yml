@@ -21,7 +21,7 @@ jobs:
       - id: set-matrix
         shell: bash
         run: |
-          set -u  # DO NOT use -e here
+          set -u
 
           EVENT="${GITHUB_EVENT_NAME}"
 
@@ -29,16 +29,10 @@ jobs:
             BASE="${{ github.base_ref }}"
             DIFF_RANGE="origin/$BASE...HEAD"
           else
-            # push to main: safe, non-failing diff
             DIFF_RANGE="HEAD~1...HEAD"
           fi
 
-          echo "Diff range: $DIFF_RANGE"
-
           CHANGED_FILES=$(git diff --name-only $DIFF_RANGE 2>/dev/null || true)
-
-          echo "Changed files:"
-          echo "$CHANGED_FILES"
 
           ELEMENT_DIRS=(
             "parser/cardset"
@@ -61,10 +55,8 @@ jobs:
             fi
           done
 
-          # HARD FAIL ONLY ON PRs
           if [[ "$EVENT" == "pull_request" && ${#TEST_DIRS[@]} -eq 0 ]]; then
-            echo "ERROR: No element tests triggered on PR."
-            echo "Failing by policy to prevent silent merge."
+            echo "No element tests triggered"
             exit 1
           fi
 
@@ -77,11 +69,9 @@ jobs:
 
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
-  run-element-tests:
-    name: Run element tests
+  element-test-matrix:
+    name: Element test matrix
     needs: detect-changes
-
-    # ONLY run tests on PRs
     if: ${{ github.event_name == 'pull_request' }}
 
     strategy:
@@ -91,3 +81,12 @@ jobs:
     uses: ./.github/workflows/test-validation.yml
     with:
       directory: ${{ matrix.directory }}
+
+  run-element-tests:
+    name: Run element tests
+    needs: element-test-matrix
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: echo "All element tests completed successfully"
