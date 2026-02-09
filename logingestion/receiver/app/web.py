@@ -1,12 +1,14 @@
 from flask import Flask, request
-from datetime import datetime
+from datetime import datetime, UTC
 import os
+
 from modules.database.mongo_db import HerringboneMongoDatabase
 from forwarder import forward_data
 
 app = Flask(__name__)
 
 forward_route = os.environ.get("FORWARD_ROUTE", None)
+
 
 def get_mongo():
     return HerringboneMongoDatabase(
@@ -18,13 +20,6 @@ def get_mongo():
         replica_set=os.environ.get("MONGO_REPLICA_SET", None),
     )
 
-try:
-    print("Connecting to database...")
-    mongo = get_mongo()
-    print("[✓] Mongo handler initialized")
-except Exception as e:
-    print(f"[✗] Mongo connection init failed: {e}")
-    mongo = None
 
 def _client_ip():
     xff = request.headers.getlist("X-Forwarded-For")
@@ -32,9 +27,12 @@ def _client_ip():
         return xff[0].split(",")[0].strip()
     return request.remote_addr
 
+
 @app.route("/logingestion/receiver", methods=["POST"])
 def receiver():
-    if mongo is None:
+    try:
+        mongo = get_mongo()
+    except Exception as e:
         return ("Database not initialized; check server logs for Mongo errors.", 500)
 
     data = request.get_json(silent=True) or None
@@ -54,8 +52,8 @@ def receiver():
                     "address": addr,
                     "kind": "http",
                 },
-                "event_time": datetime.utcnow(),
-                "ingested_at": datetime.utcnow(),
+                "event_time": datetime.now(UTC),
+                "ingested_at": datetime.now(UTC),
             })
 
             mongo.upsert_event_state(event_id, {
@@ -75,6 +73,7 @@ def receiver():
             return ("Forward succeed", 200)
         else:
             return ("Forward failed", 500)
+
 
 def start_http_receiver():
     print("Receiver type set to HTTP...")

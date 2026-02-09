@@ -44,6 +44,7 @@ jobs:
             "incidents/incidentset"
             "incidents/orchestrator"
             "incidents/correlator"
+            "logingestion/receiver"
             "herringbone/search"
             "herringbone/logs"
             "herringbone/auth"

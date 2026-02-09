@@ -1,35 +1,39 @@
 # ---------- Builder Stage ----------
 FROM python:3.11-slim AS builder
-WORKDIR /app
+
+WORKDIR /app-root
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
  && rm -rf /var/lib/apt/lists/*
 
-COPY ../requirements.txt /tmp/requirements.txt
+# copy requirements
+COPY incidents/orchestrator/requirements.txt /tmp/requirements.txt
 
-# copy shared package source
-COPY ../modules /modules
+# copy shared modules (packaged via pyproject.toml)
+COPY modules /modules
 
+# install dependencies + internal modules
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install --prefix=/install --no-cache-dir -r /tmp/requirements.txt
+    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt && \
+    pip install --no-cache-dir --target=/python-packages /modules
 
-# Copy ONLY the contents of the app/ folder into /app
-COPY ../app/. /app/
+# copy application code
+COPY incidents/orchestrator/app /app-root/app
+
 
 # ---------- Runtime Stage ----------
-FROM python:3.11-slim
-WORKDIR /app
+FROM gcr.io/distroless/python3-debian12
 
-COPY --from=builder /install /usr/local
-COPY --from=builder /app /app
-COPY --from=builder /modules /modules
+WORKDIR /app-root
 
-RUN useradd -u 65532 -m appuser
-USER appuser
+COPY --from=builder /app-root /app-root
+COPY --from=builder /python-packages /python-packages
+
+USER 65532:65532
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app:/modules
+    PYTHONPATH=/app-root:/python-packages
 
 EXPOSE 7004
 EXPOSE 7004/udp
