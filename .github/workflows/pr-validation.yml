@@ -51,9 +51,11 @@ jobs:
 
           echo "matrix={\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}" >> $GITHUB_OUTPUT
 
-  Run element test:
+  run-element-test:
+    name: Run element tests
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.matrix != '{"directory":[]}' }}
+
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
