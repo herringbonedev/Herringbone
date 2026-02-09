@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, Depends
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from bson import ObjectId
 import os
 
@@ -10,6 +10,9 @@ from modules.auth.user import get_current_user
 from modules.auth.mix import service_or_user
 
 router = APIRouter(prefix="/herringbone/logs", tags=["logs"])
+
+events_get_auth = Depends(service_or_user("events:get"))
+user_auth = Depends(get_current_user)
 
 
 def get_mongo():
@@ -54,7 +57,7 @@ def merge_parse_results(mongo, event_ids):
 @router.get("/events")
 def list_events(
     n: int = Query(25, ge=1, le=500),
-    auth=Depends(service_or_user("events:get")),
+    auth=events_get_auth,
 ):
     mongo = get_mongo()
 
@@ -89,7 +92,7 @@ def list_events(
 @router.get("/events/{event_id}")
 def get_event(
     event_id: str,
-    auth=Depends(service_or_user("events:get")),
+    auth=events_get_auth,
 ):
     mongo = get_mongo()
 
@@ -116,9 +119,9 @@ def get_event(
 
 
 @router.get("/dashboard/summary")
-def dashboard_summary(user=Depends(get_current_user)):
+def dashboard_summary(user=user_auth):
     mongo = get_mongo()
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     since = now - timedelta(hours=24)
 
     events = mongo.find(
@@ -161,7 +164,7 @@ def dashboard_summary(user=Depends(get_current_user)):
 @router.get("/dashboard/recent-events")
 def dashboard_recent_events(
     n: int = Query(10, ge=1, le=50),
-    user=Depends(get_current_user),
+    user=user_auth,
 ):
     mongo = get_mongo()
 
@@ -201,7 +204,7 @@ def dashboard_recent_events(
 @router.get("/dashboard/recent-detections")
 def dashboard_recent_detections(
     n: int = Query(10, ge=1, le=50),
-    user=Depends(get_current_user),
+    user=user_auth,
 ):
     mongo = get_mongo()
 
@@ -225,7 +228,7 @@ def dashboard_recent_detections(
 @router.get("/dashboard/recent-incidents")
 def recent_incidents(
     n: int = Query(10, ge=1, le=50),
-    user=Depends(get_current_user),
+    user=user_auth,
 ):
     mongo = get_mongo()
 
@@ -253,11 +256,11 @@ def recent_incidents(
 @router.get("/dashboard/incidents-throughput")
 def incidents_throughput(
     days: int = Query(7, ge=1, le=30),
-    user=Depends(get_current_user),
+    user=user_auth,
 ):
     mongo = get_mongo()
 
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(UTC) - timedelta(days=days)
 
     incidents = mongo.find(
         collection="incidents",

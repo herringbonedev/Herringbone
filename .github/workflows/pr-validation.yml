@@ -45,6 +45,7 @@ jobs:
             "incidents/orchestrator"
             "incidents/correlator"
             "herringbone/search"
+            "herringbone/logs"
           )
 
           TEST_DIRS=()
