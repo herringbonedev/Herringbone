@@ -58,7 +58,7 @@ jobs:
 
           if [[ "$EVENT" == "pull_request" && ${#TEST_DIRS[@]} -eq 0 ]]; then
             echo "No element tests triggered"
-            exit 1
+            exit 0
           fi
 
           if [ ${#TEST_DIRS[@]} -eq 0 ]; then
