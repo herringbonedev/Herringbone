@@ -3,8 +3,6 @@ name: PR Validation
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  push:
-    branches: [main]
 
 jobs:
   detect-changes:
@@ -22,18 +20,11 @@ jobs:
       - id: set-matrix
         shell: bash
         run: |
-          set -e
+          set -u
 
-          EVENT="${GITHUB_EVENT_NAME}"
-
-          if [[ "$EVENT" == "pull_request" ]]; then
-            BASE="${{ github.base_ref }}"
-            DIFF_RANGE="origin/$BASE...HEAD"
-          else
-            DIFF_RANGE="HEAD~1...HEAD"
-          fi
-
-          CHANGED_FILES=$(git diff --name-only $DIFF_RANGE || true)
+          BASE="${{ github.base_ref }}"
+          DIFF_RANGE="origin/$BASE...HEAD"
+          CHANGED_FILES=$(git diff --name-only $DIFF_RANGE 2>/dev/null || true)
 
           ELEMENT_DIRS=(
             "parser/cardset"
@@ -62,16 +53,17 @@ jobs:
           if [[ ${#TEST_DIRS[@]} -eq 0 ]]; then
             echo 'matrix={"directory":[]}' >> "$GITHUB_OUTPUT"
             echo "has_tests=false" >> "$GITHUB_OUTPUT"
-          else
-            MATRIX="{\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}"
-            echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-            echo "has_tests=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-  element-tests:
-    name: Element tests
+          MATRIX="{\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}"
+
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "has_tests=true" >> "$GITHUB_OUTPUT"
+
+  element-test-matrix:
+    name: Element test matrix
     needs: detect-changes
-    runs-on: ubuntu-latest
     if: ${{ needs.detect-changes.outputs.has_tests == 'true' }}
 
     strategy:
@@ -87,13 +79,24 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - detect-changes
-      - element-tests
+      - element-test-matrix
+    if: ${{ always() }}
 
     steps:
-      - name: Decide merge outcome
+      - name: Gate
+        shell: bash
         run: |
-          if [[ "${{ needs.detect-changes.outputs.has_tests }}" == "true" ]]; then
-            echo "Tests were required and completed."
-          else
-            echo "No tests required for this PR."
+          HAS_TESTS="${{ needs.detect-changes.outputs.has_tests }}"
+          TEST_RESULT="${{ needs.element-test-matrix.result }}"
+
+          if [[ "$HAS_TESTS" == "true" ]]; then
+            if [[ "$TEST_RESULT" != "success" ]]; then
+              echo "Element tests required but did not succeed (result=$TEST_RESULT)"
+              exit 1
+            fi
+            echo "Element tests required and succeeded."
+            exit 0
           fi
+
+          echo "No element tests required for this PR."
+          exit 0
