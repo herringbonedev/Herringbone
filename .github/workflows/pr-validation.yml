@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   push:
-    branches: [main]
+    branches: [main]   # discovery only
 
 jobs:
   detect-changes:
@@ -21,18 +21,21 @@ jobs:
       - id: set-matrix
         shell: bash
         run: |
-          set -euo pipefail
+          set -u  # DO NOT use -e here
 
-          # Determine base branch safely
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+          EVENT="${GITHUB_EVENT_NAME}"
+
+          if [[ "$EVENT" == "pull_request" ]]; then
             BASE="${{ github.base_ref }}"
+            DIFF_RANGE="origin/$BASE...HEAD"
           else
-            BASE="HEAD~1"
+            # push to main: safe, non-failing diff
+            DIFF_RANGE="HEAD~1...HEAD"
           fi
 
-          echo "Diffing against base: $BASE"
+          echo "Diff range: $DIFF_RANGE"
 
-          CHANGED_FILES=$(git diff --name-only "$BASE"...HEAD || true)
+          CHANGED_FILES=$(git diff --name-only $DIFF_RANGE 2>/dev/null || true)
 
           echo "Changed files:"
           echo "$CHANGED_FILES"
@@ -58,10 +61,19 @@ jobs:
             fi
           done
 
-          MATRIX="{\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}"
+          # HARD FAIL ONLY ON PRs
+          if [[ "$EVENT" == "pull_request" && ${#TEST_DIRS[@]} -eq 0 ]]; then
+            echo "ERROR: No element tests triggered on PR."
+            echo "Failing by policy to prevent silent merge."
+            exit 1
+          fi
 
-          echo "Test matrix:"
-          echo "$MATRIX"
+          if [ ${#TEST_DIRS[@]} -eq 0 ]; then
+            echo 'matrix={"directory":[]}' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          MATRIX="{\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}"
 
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
@@ -69,7 +81,7 @@ jobs:
     name: Run element tests
     needs: detect-changes
 
-    # Skip actual test execution on push to main
+    # ONLY run tests on PRs
     if: ${{ github.event_name == 'pull_request' }}
 
     strategy:
