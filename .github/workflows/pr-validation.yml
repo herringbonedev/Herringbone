@@ -91,3 +91,19 @@ jobs:
 
     steps:
       - run: echo "No element tests required for this PR"
+
+  pr-merge-gate:
+    name: PR Merge Gate
+    runs-on: ubuntu-latest
+    needs:
+      - detect-changes
+      - element-test-matrix
+    if: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - name: Decide merge outcome
+        run: |
+          if [[ "${{ needs.detect-changes.outputs.has_tests }}" == "true" ]]; then
+            echo "Tests were required and have completed."
+          else
+            echo "No tests required for this PR."
+          fi
