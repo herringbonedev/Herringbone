@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
-      has_tests: ${{ steps.set-matrix.outputs.has_tests }}
 
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +28,6 @@ jobs:
           if [[ "$EVENT" == "pull_request" ]]; then
             BASE="origin/${{ github.base_ref }}"
           else
-            # push to main: diff last commit safely
             BASE="HEAD~1"
           fi
 
@@ -56,27 +54,32 @@ jobs:
             fi
           done
 
-          # PRs MUST trigger tests
           if [[ "$EVENT" == "pull_request" && ${#TEST_DIRS[@]} -eq 0 ]]; then
             echo "ERROR: No element tests triggered on PR."
             exit 1
           fi
 
-          # push to main: force a harmless single entry so job completes
-          if [[ "$EVENT" == "push" && ${#TEST_DIRS[@]} -eq 0 ]]; then
-            echo 'matrix={"directory":["."]}' >> "$GITHUB_OUTPUT"
-            echo "has_tests=false" >> "$GITHUB_OUTPUT"
+          if [ ${#TEST_DIRS[@]} -eq 0 ]; then
+            echo 'matrix={"directory":[]}' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          MATRIX="{\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}"
+          echo "matrix={\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}" >> "$GITHUB_OUTPUT"
+  
+  register-status-check:
+    name: Run element tests
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
 
-          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-          echo "has_tests=true" >> "$GITHUB_OUTPUT"
-
+    steps:
+      - run: |
+          echo "Registering status check on main."
+          echo "No tests run on push to main."
+  
   run-element-tests:
     name: Run element tests
     needs: detect-changes
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -86,16 +89,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # No-op step so the job completes on push to main
-      - name: Status check registration
-        if: ${{ needs.detect-changes.outputs.has_tests == 'false' }}
-        run: |
-          echo "No element tests required on main push."
-          echo "Status check registered successfully."
-
-      # Real tests only on PRs
       - name: Run make test
-        if: ${{ needs.detect-changes.outputs.has_tests == 'true' }}
         shell: bash
         run: |
           set -e
