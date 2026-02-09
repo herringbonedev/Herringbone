@@ -3,35 +3,25 @@ name: PR Validation
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  push:
-    branches: [main]
 
 jobs:
-  detect-changes:
-    name: Detect changed elements
+  pr-merge-gate:
+    name: PR Merge Gate
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-      has_tests: ${{ steps.set-matrix.outputs.has_tests }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - id: set-matrix
+      - name: Detect changed elements
+        id: detect
         shell: bash
         run: |
           set -e
 
-          EVENT="${GITHUB_EVENT_NAME}"
-
-          if [[ "$EVENT" == "pull_request" ]]; then
-            BASE="${{ github.base_ref }}"
-            DIFF_RANGE="origin/$BASE...HEAD"
-          else
-            DIFF_RANGE="HEAD~1...HEAD"
-          fi
+          BASE="${{ github.base_ref }}"
+          DIFF_RANGE="origin/$BASE...HEAD"
 
           CHANGED_FILES=$(git diff --name-only $DIFF_RANGE || true)
 
@@ -55,45 +45,26 @@ jobs:
 
           for dir in "${ELEMENT_DIRS[@]}"; do
             if echo "$CHANGED_FILES" | grep -q "^$dir/"; then
-              TEST_DIRS+=("\"$dir\"")
+              TEST_DIRS+=("$dir")
             fi
           done
 
           if [[ ${#TEST_DIRS[@]} -eq 0 ]]; then
-            echo 'matrix={"directory":[]}' >> "$GITHUB_OUTPUT"
             echo "has_tests=false" >> "$GITHUB_OUTPUT"
           else
-            MATRIX="{\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}"
-            echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
             echo "has_tests=true" >> "$GITHUB_OUTPUT"
+            echo "dirs=${TEST_DIRS[*]}" >> "$GITHUB_OUTPUT"
           fi
 
-  element-tests:
-    name: Element tests
-    needs: detect-changes
-    runs-on: ubuntu-latest
-    if: ${{ needs.detect-changes.outputs.has_tests == 'true' }}
-
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
-
-    uses: ./.github/workflows/test-validation.yml
-    with:
-      directory: ${{ matrix.directory }}
-
-  pr-merge-gate:
-    name: PR Merge Gate
-    runs-on: ubuntu-latest
-    needs:
-      - detect-changes
-      - element-tests
-
-    steps:
-      - name: Decide merge outcome
+      - name: Run element tests
+        if: steps.detect.outputs.has_tests == 'true'
+        shell: bash
         run: |
-          if [[ "${{ needs.detect-changes.outputs.has_tests }}" == "true" ]]; then
-            echo "Tests were required and completed."
-          else
-            echo "No tests required for this PR."
-          fi
+          for dir in ${{ steps.detect.outputs.dirs }}; do
+            echo "Running tests for $dir"
+            ./.github/workflows/test-validation.sh "$dir"
+          done
+
+      - name: No tests required
+        if: steps.detect.outputs.has_tests == 'false'
+        run: echo "No element tests required for this PR"
