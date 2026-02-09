@@ -46,6 +46,7 @@ jobs:
             "incidents/correlator"
             "herringbone/search"
             "herringbone/logs"
+            "herringbone/auth"
           )
 
           TEST_DIRS=()

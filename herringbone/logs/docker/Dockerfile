@@ -36,6 +36,6 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app-root:/python-packages
 
 
-EXPOSE 7014
+EXPOSE 7010
 
-ENTRYPOINT ["python3","-m","uvicorn","app.main:app","--host","0.0.0.0","--port","7014"]
+ENTRYPOINT ["python3","-m","uvicorn","app.main:app","--host","0.0.0.0","--port","7010"]
