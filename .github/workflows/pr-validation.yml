@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   push:
-    branches: [main]   # discovery only
+    branches: [main]
 
 jobs:
   detect-changes:
@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_tests: ${{ steps.set-matrix.outputs.has_tests }}
 
     steps:
       - uses: actions/checkout@v4
@@ -21,24 +22,18 @@ jobs:
       - id: set-matrix
         shell: bash
         run: |
-          set -u  # DO NOT use -e here
+          set -u
 
           EVENT="${GITHUB_EVENT_NAME}"
 
           if [[ "$EVENT" == "pull_request" ]]; then
-            BASE="${{ github.base_ref }}"
-            DIFF_RANGE="origin/$BASE...HEAD"
+            BASE="origin/${{ github.base_ref }}"
           else
-            # push to main: safe, non-failing diff
-            DIFF_RANGE="HEAD~1...HEAD"
+            # push to main: diff last commit safely
+            BASE="HEAD~1"
           fi
 
-          echo "Diff range: $DIFF_RANGE"
-
-          CHANGED_FILES=$(git diff --name-only $DIFF_RANGE 2>/dev/null || true)
-
-          echo "Changed files:"
-          echo "$CHANGED_FILES"
+          CHANGED_FILES=$(git diff --name-only "$BASE"...HEAD 2>/dev/null || true)
 
           ELEMENT_DIRS=(
             "parser/cardset"
@@ -61,33 +56,48 @@ jobs:
             fi
           done
 
-          # HARD FAIL ONLY ON PRs
+          # PRs MUST trigger tests
           if [[ "$EVENT" == "pull_request" && ${#TEST_DIRS[@]} -eq 0 ]]; then
             echo "ERROR: No element tests triggered on PR."
-            echo "Failing by policy to prevent silent merge."
             exit 1
           fi
 
-          if [ ${#TEST_DIRS[@]} -eq 0 ]; then
-            echo 'matrix={"directory":[]}' >> "$GITHUB_OUTPUT"
+          # push to main: force a harmless single entry so job completes
+          if [[ "$EVENT" == "push" && ${#TEST_DIRS[@]} -eq 0 ]]; then
+            echo 'matrix={"directory":["."]}' >> "$GITHUB_OUTPUT"
+            echo "has_tests=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           MATRIX="{\"directory\":[$(IFS=,; echo "${TEST_DIRS[*]}")]}"
 
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "has_tests=true" >> "$GITHUB_OUTPUT"
 
   run-element-tests:
     name: Run element tests
     needs: detect-changes
-
-    # ONLY run tests on PRs
-    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
 
-    uses: ./.github/workflows/test-validation.yml
-    with:
-      directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # No-op step so the job completes on push to main
+      - name: Status check registration
+        if: ${{ needs.detect-changes.outputs.has_tests == 'false' }}
+        run: |
+          echo "No element tests required on main push."
+          echo "Status check registered successfully."
+
+      # Real tests only on PRs
+      - name: Run make test
+        if: ${{ needs.detect-changes.outputs.has_tests == 'true' }}
+        shell: bash
+        run: |
+          set -e
+          cd "${{ matrix.directory }}"
+          make test
