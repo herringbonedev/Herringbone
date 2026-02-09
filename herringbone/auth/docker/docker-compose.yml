@@ -37,7 +37,7 @@ services:
       - service_jwt_public_key
 
     build:
-      context: ..
+      context: ../../..
       dockerfile: docker/Dockerfile
 
     restart: unless-stopped
