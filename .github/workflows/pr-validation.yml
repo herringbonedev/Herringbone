@@ -73,7 +73,7 @@ jobs:
   element-test-matrix:
     name: Element test matrix
     needs: detect-changes
-    if: ${{ github.event_name == 'pull_request' && needs.detect-changes.outputs.has_tests == 'true' }}
+    if: ${{ needs.detect-changes.outputs.has_tests == 'true' }}
 
     strategy:
       fail-fast: false
@@ -83,27 +83,17 @@ jobs:
     with:
       directory: ${{ matrix.directory }}
 
-  run-element-tests:
-    name: Run element tests
-    needs: detect-changes
-    if: ${{ github.event_name == 'pull_request' && needs.detect-changes.outputs.has_tests == 'false' }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - run: echo "No element tests required for this PR"
-
   pr-merge-gate:
     name: PR Merge Gate
     runs-on: ubuntu-latest
     needs:
       - detect-changes
       - element-test-matrix
-    if: ${{ github.event_name == 'pull_request' }}
     steps:
-      - name: Decide merge outcome
+      - name: Evaluate merge conditions
         run: |
           if [[ "${{ needs.detect-changes.outputs.has_tests }}" == "true" ]]; then
-            echo "Tests were required and have completed."
+            echo "Tests were required and completed."
           else
             echo "No tests required for this PR."
           fi
