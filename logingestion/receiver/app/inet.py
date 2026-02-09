@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 import socket
 import os
 from modules.database.mongo_db import HerringboneMongoDatabase
@@ -47,8 +47,8 @@ def start_udp_receiver():
                         "address": addr[0],
                         "kind": "udp",
                     },
-                    "event_time": datetime.utcnow(),
-                    "ingested_at": datetime.utcnow(),
+                    "event_time": datetime.now(UTC),
+                    "ingested_at": datetime.now(UTC),
                 })
 
                 mongo.upsert_event_state(event_id, {
@@ -95,8 +95,8 @@ def start_tcp_receiver():
                         "address": addr[0],
                         "kind": "tcp",
                     },
-                    "event_time": datetime.utcnow(),
-                    "ingested_at": datetime.utcnow(),
+                    "event_time": datetime.now(UTC),
+                    "ingested_at": datetime.now(UTC),
                 })
 
                 mongo.upsert_event_state(event_id, {

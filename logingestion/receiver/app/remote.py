@@ -1,5 +1,5 @@
 from flask import Flask, request
-from datetime import datetime
+from datetime import datetime, UTC
 import os
 from modules.database.mongo_db import HerringboneMongoDatabase
 
@@ -15,17 +15,12 @@ def get_mongo():
         replica_set=os.environ.get("MONGO_REPLICA_SET", None),
     )
 
-try:
-    print("Connecting to database...")
-    mongo = get_mongo()
-    print("[✓] Mongo handler initialized")
-except Exception as e:
-    print(f"[✗] Mongo connection init failed: {e}")
-    mongo = None
-
 @app.route("/logingestion/remote", methods=["POST"])
 def receiver_v2():
-    if mongo is None:
+    try:
+        mongo = get_mongo()
+    except Exception as e:
+        print(f"[✗] Mongo connection init failed: {e}")
         return ("Database not initialized; check server logs for Mongo errors.", 500)
 
     payload = request.get_json(silent=True) or None
@@ -57,8 +52,8 @@ def receiver_v2():
                 "address": addr,
                 "kind": "remote",
             },
-            "event_time": datetime.utcnow(),
-            "ingested_at": datetime.utcnow(),
+            "event_time": datetime.now(UTC),
+            "ingested_at": datetime.now(UTC),
         })
 
         mongo.upsert_event_state(event_id, {
