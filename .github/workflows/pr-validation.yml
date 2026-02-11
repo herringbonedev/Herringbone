@@ -6,6 +6,7 @@ on:
 
 jobs:
   detect-changes:
+    name: Detect Changed Elements
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -22,6 +23,8 @@ jobs:
           set -u
 
           BASE="${{ github.base_ref }}"
+          git fetch origin "$BASE"
+
           DIFF_RANGE="origin/$BASE...HEAD"
           CHANGED_FILES=$(git diff --name-only "$DIFF_RANGE" || true)
 
@@ -55,7 +58,9 @@ jobs:
             exit 0
           fi
 
-          echo "matrix={\"directory\":[$(IFS=,; echo "${MATCHED[*]}")]}" >> "$GITHUB_OUTPUT"
+          MATRIX_JSON="{\"directory\":[$(IFS=,; echo "${MATCHED[*]}")]}"
+
+          echo "matrix=$MATRIX_JSON" >> "$GITHUB_OUTPUT"
           echo "has_tests=true" >> "$GITHUB_OUTPUT"
 
   element-tests:
@@ -71,10 +76,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run tests
+      - name: Run make test
         shell: bash
         run: |
           set -e
-          echo "Running tests in: ${{ matrix.directory }}"
+          echo "Running tests in ${{ matrix.directory }}"
           cd "${{ matrix.directory }}"
           make test
+
+  finalize:
+    name: PR Validation
+    runs-on: ubuntu-latest
+    needs:
+      - detect-changes
+      - element-tests
+    if: always()
+
+    steps:
+      - name: Evaluate Final Status
+        shell: bash
+        run: |
+          HAS_TESTS="${{ needs.detect-changes.outputs.has_tests }}"
+          TEST_RESULT="${{ needs.element-tests.result }}"
+
+          if [[ "$HAS_TESTS" == "false" ]]; then
+            echo "No monitored directories changed — auto-pass."
+            exit 0
+          fi
+
+          if [[ "$TEST_RESULT" == "success" ]]; then
+            echo "All required tests passed."
+            exit 0
+          fi
+
+          echo "Tests failed."
+          exit 1
