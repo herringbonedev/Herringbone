@@ -28,37 +28,39 @@ jobs:
           DIFF_RANGE="origin/$BASE...HEAD"
           CHANGED_FILES=$(git diff --name-only "$DIFF_RANGE" || true)
 
-          ELEMENT_DIRS=(
-            "parser/cardset"
-            "parser/enrichment"
-            "parser/extractor"
-            "detectionengine/ruleset"
-            "detectionengine/detector"
-            "detectionengine/matcher"
-            "incidents/incidentset"
-            "incidents/orchestrator"
-            "incidents/correlator"
-            "logingestion/receiver"
-            "herringbone/search"
-            "herringbone/logs"
-            "herringbone/auth"
-          )
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
 
-          MATCHED=()
+          MATCHED_DIRS=()
 
-          for dir in "${ELEMENT_DIRS[@]}"; do
-            if echo "$CHANGED_FILES" | grep -q "^$dir/"; then
-              MATCHED+=("\"$dir\"")
+          while read -r file; do
+            # extract first two path segments (unit/element)
+            DIR=$(echo "$file" | cut -d/ -f1,2)
+
+            # skip if malformed
+            if [[ "$DIR" == "$file" ]]; then
+              continue
             fi
-          done
 
-          if [[ ${#MATCHED[@]} -eq 0 ]]; then
+            # if directory has a Makefile, treat it as testable element
+            if [[ -f "$DIR/Makefile" ]]; then
+              MATCHED_DIRS+=("\"$DIR\"")
+            fi
+          done <<< "$CHANGED_FILES"
+
+          # deduplicate
+          UNIQUE_DIRS=($(printf "%s\n" "${MATCHED_DIRS[@]}" | sort -u))
+
+          if [[ ${#UNIQUE_DIRS[@]} -eq 0 ]]; then
             echo 'matrix={"directory":[]}' >> "$GITHUB_OUTPUT"
             echo "has_tests=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          MATRIX_JSON="{\"directory\":[$(IFS=,; echo "${MATCHED[*]}")]}"
+          MATRIX_JSON="{\"directory\":[$(IFS=,; echo "${UNIQUE_DIRS[*]}")]}"
+
+          echo "Matrix JSON:"
+          echo "$MATRIX_JSON"
 
           echo "matrix=$MATRIX_JSON" >> "$GITHUB_OUTPUT"
           echo "has_tests=true" >> "$GITHUB_OUTPUT"
@@ -99,8 +101,11 @@ jobs:
           HAS_TESTS="${{ needs.detect-changes.outputs.has_tests }}"
           TEST_RESULT="${{ needs.element-tests.result }}"
 
+          echo "has_tests=$HAS_TESTS"
+          echo "test_result=$TEST_RESULT"
+
           if [[ "$HAS_TESTS" == "false" ]]; then
-            echo "No monitored directories changed — auto-pass."
+            echo "No testable elements changed — auto-pass."
             exit 0
           fi
 
