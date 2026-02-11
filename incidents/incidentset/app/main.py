@@ -12,4 +12,4 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(incidentset.routerz)
+app.include_router(incidentset.router)
