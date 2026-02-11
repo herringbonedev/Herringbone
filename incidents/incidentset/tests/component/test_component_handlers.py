@@ -15,7 +15,7 @@ def test_insert_incident_invalid_payload_400(fake_mongo):
         anyio.run(run)
         assert False, "Expected HTTPException"
     except HTTPException as e:
-        assert e.status_code == 500
+        assert e.status_code == 400
 
 
 def test_insert_incident_valid_inserts(fake_mongo):
