@@ -8,7 +8,7 @@ from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.user import get_current_user
 from app.service import search_collection_service, get_collection_fields
 
-from config import (
+from app.config import (
     MAX_LIMIT,
     MAX_SCHEMA_SAMPLE,
     MAX_SCHEMA_DEPTH,
