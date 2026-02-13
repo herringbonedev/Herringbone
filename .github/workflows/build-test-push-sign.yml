@@ -179,7 +179,7 @@ jobs:
         if: steps.bump.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.HERRINGBONE_ACTIONS_BOT }}
           commit-message: "chore(${{ inputs.service_name }}): bump image"
           title: "chore(${{ inputs.service_name }}): bump ${{ inputs.service_name }} image"
           body: |
@@ -199,6 +199,3 @@ jobs:
             automation
             digest
 
-      - name: Cleanup
-        if: always()
-        run: docker system prune -af || true
