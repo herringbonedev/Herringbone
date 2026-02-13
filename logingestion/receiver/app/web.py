@@ -3,7 +3,7 @@ from datetime import datetime, UTC
 import os
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from forwarder import forward_data
+from app.forwarder import forward_data
 
 app = Flask(__name__)
 
