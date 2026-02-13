@@ -67,7 +67,7 @@ def receiver_v2():
 
     except Exception as e:
         print(f"[✗] Mongo insert operation failed: {e}")
-        return (f"Insert failed: {e}", 500)
+        return ("Insert failed; check server logs for details.", 500)
 
 
 def start_remote_receiver():
