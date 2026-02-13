@@ -38,4 +38,4 @@ ENV PYTHONUNBUFFERED=1 \
 EXPOSE 7004
 EXPOSE 7004/udp
 
-ENTRYPOINT ["python3", "receiver.py"]
+ENTRYPOINT ["python3", "-m", "app.receiver"]
