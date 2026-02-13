@@ -4,8 +4,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   push:
-    branches-ignore:
-      - main
+    branches:
+      - auto/**
 
 jobs:
   detect-changes:
