@@ -35,4 +35,4 @@ USER 65532:65532
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app-root:/python-packages
 
-ENTRYPOINT ["python3","-m","main.py"]
+ENTRYPOINT ["python3","-m","app.main"]
