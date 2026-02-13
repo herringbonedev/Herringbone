@@ -2,7 +2,7 @@ from datetime import datetime, UTC
 import socket
 import os
 from modules.database.mongo_db import HerringboneMongoDatabase
-from forwarder import forward_data
+from app.forwarder import forward_data
 
 forward_route = os.environ.get("FORWARD_ROUTE", None)
 
