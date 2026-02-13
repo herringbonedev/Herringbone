@@ -1,9 +1,9 @@
 from datetime import datetime
 from time import time
-from fetcher import fetch_one_undetected
-from rules import load_rules
-from analyzer import analyze_log_with_rules
-from updater import apply_result, set_failed
+from app.fetcher import fetch_one_undetected
+from app.rules import load_rules
+from app.analyzer import analyze_log_with_rules
+from app.updater import apply_result, set_failed
 
 
 _metrics = {

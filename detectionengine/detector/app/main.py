@@ -1,4 +1,4 @@
-from processor import process_one
+from app.processor import process_one
 import time
 
 

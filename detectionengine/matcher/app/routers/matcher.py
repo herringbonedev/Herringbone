@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Dict, Any
-from matchengine import MatchEngine
+from app.matchengine import MatchEngine
 from modules.auth.service import require_service_scope
 
 run_matchengine = require_service_scope("detectionengine:run")
