@@ -1,7 +1,7 @@
 services:
   herringbone-search:
     container_name: herringbone-search
-    image: quay.io/herringbone/herringbone-search:df2f1d5b@sha256:3580732a6c8b7fbe1f85574e634a0fdfccc02b5d85d9ce5041c1c451817c18e3
+    image: quay.io/herringbone/herringbone-search:01f77238@sha256:2c75d5ddc37cb6b02350dcbf86fb5bf5542132f110449b1a3617b17a6ebbde1e
     restart: unless-stopped
     depends_on:
       mongodb:
