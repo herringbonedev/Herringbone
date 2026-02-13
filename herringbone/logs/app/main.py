@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import logs
+from app.routers import logs
 from fastapi.middleware.cors import CORSMiddleware
 
 
