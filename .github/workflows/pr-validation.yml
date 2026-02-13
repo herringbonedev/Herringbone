@@ -3,9 +3,6 @@ name: PR Validation
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  push:
-    branches:
-      - auto/**
 
 jobs:
   detect-changes:
