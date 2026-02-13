@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 # copy requirements
-COPY incidents/orchestrator/requirements.txt /tmp/requirements.txt
+COPY logingestion/receiver/requirements.txt /tmp/requirements.txt
 
 # copy shared modules (packaged via pyproject.toml)
 COPY modules /modules
@@ -19,7 +19,7 @@ RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --target=/python-packages /modules
 
 # copy application code
-COPY incidents/orchestrator/app /app-root/app
+COPY logingestion/receiver/app /app-root/app
 
 
 # ---------- Runtime Stage ----------
