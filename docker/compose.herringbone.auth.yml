@@ -2,7 +2,6 @@ services:
   herringbone-auth:
     container_name: herringbone-auth
     image: quay.io/herringbone/herringbone-auth:1f155b71@sha256:12519030c135260dc44e4d3a87b37a2dd25cc2cb8693bad601ac4b164fe48bd7
-    # Run as non-root (Chainguard standard)
     user: "65532:65532"
     restart: unless-stopped
     depends_on:
