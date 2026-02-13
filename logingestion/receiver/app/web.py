@@ -66,7 +66,7 @@ def receiver():
             return ("Data received", 200)
         except Exception as e:
             print(f"[✗] Mongo insert operation failed: {e}")
-            return (f"Insert failed: {e}", 500)
+            return ("Insert failed; check server logs for details.", 500)
     else:
         result = forward_data(forward_route, data, addr)
         if result:
