@@ -11,7 +11,7 @@ from modules.auth.user import (
     get_current_user,
     get_current_user_optional,
 )
-from security import (
+from app.security import (
     hash_password,
     verify_password,
     create_access_token,
