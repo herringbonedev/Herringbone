@@ -5,19 +5,19 @@ print("Starting herringbone receiver..."+ TYPE)
 
 if TYPE == "UDP":
     import app.inet
-    inet.start_udp_receiver()
+    app.inet.start_udp_receiver()
 
 elif TYPE == "TCP":
     import app.inet
-    inet.start_tcp_receiver()
+    app.inet.start_tcp_receiver()
 
 elif TYPE == "HTTP":
     import app.web
-    web.start_http_receiver()
+    app.web.start_http_receiver()
 
 elif TYPE == "REMOTE":
     import app.remote
-    remote.start_remote_receiver()
+    app.remote.start_remote_receiver()
 
 else:
     print(f"Unknown receiver type: {TYPE}")
