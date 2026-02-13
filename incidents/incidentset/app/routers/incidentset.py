@@ -8,7 +8,7 @@ from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.user import require_role
 from modules.auth.service import require_service_scope
 from modules.auth.mix import service_or_role
-from schema import IncidentSchema
+from app.schema import IncidentSchema
 import os
 import json
 

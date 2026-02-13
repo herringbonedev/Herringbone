@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import correlator
+from app.routers import correlator
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
