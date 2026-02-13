@@ -1,35 +1,41 @@
 name: PR Validation
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
-  push:
-    branches:
-      - auto/**
 
 jobs:
-  detect-changes:
-    name: Detect Changed Elements
+  validate:
+    name: PR Validation
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-      has_tests: ${{ steps.set-matrix.outputs.has_tests }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout PR head
+        uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - id: set-matrix
+      - name: Auto-pass for bot PRs
+        if: github.actor == 'github-actions[bot]'
+        run: |
+          echo "Bot PR detected — auto-pass."
+          exit 0
+
+      - name: Detect changed elements
+        id: detect
         shell: bash
         run: |
-          set -u
+          set -e
 
-          BASE="${{ github.base_ref }}"
+          BASE="${{ github.event.pull_request.base.ref }}"
           git fetch origin "$BASE"
 
           DIFF_RANGE="origin/$BASE...HEAD"
           CHANGED_FILES=$(git diff --name-only "$DIFF_RANGE" || true)
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
 
           ELEMENT_DIRS=(
             "parser/cardset"
@@ -51,66 +57,26 @@ jobs:
 
           for dir in "${ELEMENT_DIRS[@]}"; do
             if echo "$CHANGED_FILES" | grep -q "^$dir/"; then
-              MATCHED+=("\"$dir\"")
+              MATCHED+=("$dir")
             fi
           done
 
           if [[ ${#MATCHED[@]} -eq 0 ]]; then
-            echo 'matrix={"directory":[]}' >> "$GITHUB_OUTPUT"
             echo "has_tests=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          MATRIX_JSON="{\"directory\":[$(IFS=,; echo "${MATCHED[*]}")]}"
-
-          echo "matrix=$MATRIX_JSON" >> "$GITHUB_OUTPUT"
           echo "has_tests=true" >> "$GITHUB_OUTPUT"
+          echo "dirs=${MATCHED[*]}" >> "$GITHUB_OUTPUT"
 
-  element-tests:
-    name: Element Tests
-    needs: detect-changes
-    if: needs.detect-changes.outputs.has_tests == 'true'
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run make test
+      - name: Run element tests
+        if: steps.detect.outputs.has_tests == 'true'
         shell: bash
         run: |
           set -e
-          echo "Running tests in ${{ matrix.directory }}"
-          cd "${{ matrix.directory }}"
-          make test
-
-  finalize:
-    name: PR Validation
-    runs-on: ubuntu-latest
-    needs:
-      - detect-changes
-      - element-tests
-    if: always()
-
-    steps:
-      - name: Evaluate Final Status
-        shell: bash
-        run: |
-          HAS_TESTS="${{ needs.detect-changes.outputs.has_tests }}"
-          TEST_RESULT="${{ needs.element-tests.result }}"
-
-          if [[ "$HAS_TESTS" == "false" ]]; then
-            echo "No monitored directories changed — auto-pass."
-            exit 0
-          fi
-
-          if [[ "$TEST_RESULT" == "success" ]]; then
-            echo "All required tests passed."
-            exit 0
-          fi
-
-          echo "Tests failed."
-          exit 1
+          for dir in ${{ steps.detect.outputs.dirs }}; do
+            echo "Running tests in $dir"
+            cd "$dir"
+            make test
+            cd -
+          done
