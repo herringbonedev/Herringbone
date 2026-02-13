@@ -1,7 +1,7 @@
 import json
 from typing import Optional, Dict, Any
 from fastapi import HTTPException
-from validators import validate_query_obj
+from app.validators import validate_query_obj
 
 def parse_q_string(q: Optional[str]) -> Dict[str, Any]:
     if not q:

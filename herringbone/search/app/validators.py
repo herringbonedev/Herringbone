@@ -1,6 +1,6 @@
 from typing import Any
 from fastapi import HTTPException
-from config import ALLOWED_OPERATORS
+from app.config import ALLOWED_OPERATORS
 
 def _is_plain_field_key(k: str) -> bool:
     if not isinstance(k, str):

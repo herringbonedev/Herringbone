@@ -1,8 +1,8 @@
-from query_parser import parse_q_string
-from filters import build_range_filters
-from pagination import coerce_after, apply_after
-from serializer import serialize
-from config import SORTABLE_FIELDS
+from app.query_parser import parse_q_string
+from app.filters import build_range_filters
+from app.pagination import coerce_after, apply_after
+from app.serializer import serialize
+from app.config import SORTABLE_FIELDS
 
 
 def search_collection_service(mongo, collection, params):
