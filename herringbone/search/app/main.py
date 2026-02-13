@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import search
+from routers import search
 from fastapi.middleware.cors import CORSMiddleware
 
 
