@@ -29,8 +29,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
-
-          # Deterministic yq v4
           sudo wget -q https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
           sudo chmod +x /usr/local/bin/yq
           yq --version
@@ -84,7 +82,7 @@ jobs:
             docker push "$BASE:$VERSION"
           done
 
-      - name: Prepare docker bundle (rewrite images safely)
+      - name: Prepare docker bundle (skip compose.mongo.yml)
         run: |
           set -euo pipefail
 
@@ -95,7 +93,8 @@ jobs:
           mkdir -p bundle
           cp -r docker bundle/docker
 
-          find bundle/docker -type f -name "*.yml" | while read -r FILE; do
+          # Rewrite all compose files EXCEPT compose.mongo.yml
+          find bundle/docker -type f -name "*.yml" ! -name "compose.mongo.yml" | while read -r FILE; do
             echo "Processing $FILE"
 
             yq -i '
@@ -108,7 +107,7 @@ jobs:
             ' "$FILE"
           done
 
-          # Safety check
+          # Safety check: fail if any image accidentally lost tag
           BAD=$(grep -R "image:.*:$" -n bundle/docker || true)
           if [ -n "$BAD" ]; then
             echo "ERROR: Some images missing tags after rewrite:"
@@ -118,7 +117,6 @@ jobs:
 
           ARCHIVE="herringbone-docker-${VERSION}.tar.gz"
           tar -czf "$ARCHIVE" -C bundle/docker .
-
           echo "ARCHIVE_NAME=$ARCHIVE" >> $GITHUB_ENV
           echo "Archive created: $ARCHIVE"
 
