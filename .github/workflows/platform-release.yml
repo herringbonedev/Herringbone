@@ -22,8 +22,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq
 
-          # Install deterministic yq v4 (do NOT use snap)
-          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          # Deterministic yq v4 (do NOT use snap)
+          sudo wget -q https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
           sudo chmod +x /usr/local/bin/yq
           yq --version
 
@@ -40,19 +40,25 @@ jobs:
       - name: Read platform manifest
         id: manifest
         run: |
-          VERSION=$(yq '.version' platform/release.yaml)
+          set -euo pipefail
+          VERSION="$(yq -r '.version' platform/release.yaml)"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+            echo "ERROR: platform/release.yaml .version is empty/null"
+            exit 1
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Releasing version $VERSION"
+          echo "Releasing version: $VERSION"
 
       - name: Verify and promote all images
         run: |
           set -euo pipefail
 
           VERSION="${{ steps.manifest.outputs.version }}"
+          export VERSION
 
           yq -o=json '.services' platform/release.yaml | \
           jq -r 'to_entries[] | "\(.key) \(.value)"' | \
-          while read NAME IMAGE; do
+          while read -r NAME IMAGE; do
             echo "Releasing $NAME -> $IMAGE"
 
             cosign verify \
@@ -73,17 +79,21 @@ jobs:
           set -euo pipefail
 
           VERSION="${{ steps.manifest.outputs.version }}"
+          export VERSION
 
-          echo "Creating bundle directory"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+            echo "ERROR: VERSION is empty/null"
+            exit 1
+          fi
+
           rm -rf bundle
           mkdir -p bundle
           cp -r docker bundle/docker
 
-          echo "Rewriting image references to :$VERSION"
-
-          find bundle/docker -type f -name "*.yml" | while read FILE; do
+          find bundle/docker -type f -name "*.yml" | while read -r FILE; do
             echo "Processing $FILE"
 
+            # Rebuild image as repo:VERSION, stripping any existing tag and/or @sha256 digest
             yq -i '
               (.services[]?.image |=
                 (
@@ -94,15 +104,22 @@ jobs:
             ' "$FILE"
           done
 
-          echo "Creating archive"
+          # Validate: fail if any image ends with ":" (missing tag) after rewrite
+          BAD=$(grep -R "image:.*:$" -n bundle/docker || true)
+          if [ -n "$BAD" ]; then
+            echo "ERROR: Some images are missing tags after rewrite:"
+            echo "$BAD"
+            exit 1
+          fi
+
           ARCHIVE="herringbone-docker-${VERSION}.tar.gz"
           tar -czf "$ARCHIVE" -C bundle/docker .
-
           echo "ARCHIVE_NAME=$ARCHIVE" >> $GITHUB_ENV
           echo "Archive created: $ARCHIVE"
 
       - name: Create platform git tag if missing
         run: |
+          set -euo pipefail
           VERSION="${{ steps.manifest.outputs.version }}"
 
           if git rev-parse "$VERSION" >/dev/null 2>&1; then
