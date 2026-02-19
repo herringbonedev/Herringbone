@@ -13,16 +13,24 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository using bot token
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.HERRINGBONE_ACTIONS_BOT }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "herringbone-actions-bot"
+          git config user.email "actions@herringbone.dev"
+          git remote set-url origin https://x-access-token:${{ secrets.HERRINGBONE_ACTIONS_BOT }}@github.com/${{ github.repository }}
 
       - name: Install tools
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
 
-          # Deterministic yq v4 (do NOT use snap)
+          # Deterministic yq v4
           sudo wget -q https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
           sudo chmod +x /usr/local/bin/yq
           yq --version
@@ -42,10 +50,12 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="$(yq -r '.version' platform/release.yaml)"
+
           if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
-            echo "ERROR: platform/release.yaml .version is empty/null"
+            echo "ERROR: platform/release.yaml .version is empty"
             exit 1
           fi
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Releasing version: $VERSION"
 
@@ -81,11 +91,6 @@ jobs:
           VERSION="${{ steps.manifest.outputs.version }}"
           export VERSION
 
-          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
-            echo "ERROR: VERSION is empty/null"
-            exit 1
-          fi
-
           rm -rf bundle
           mkdir -p bundle
           cp -r docker bundle/docker
@@ -93,7 +98,6 @@ jobs:
           find bundle/docker -type f -name "*.yml" | while read -r FILE; do
             echo "Processing $FILE"
 
-            # Rebuild image as repo:VERSION, stripping any existing tag and/or @sha256 digest
             yq -i '
               (.services[]?.image |=
                 (
@@ -104,20 +108,21 @@ jobs:
             ' "$FILE"
           done
 
-          # Validate: fail if any image ends with ":" (missing tag) after rewrite
+          # Safety check
           BAD=$(grep -R "image:.*:$" -n bundle/docker || true)
           if [ -n "$BAD" ]; then
-            echo "ERROR: Some images are missing tags after rewrite:"
+            echo "ERROR: Some images missing tags after rewrite:"
             echo "$BAD"
             exit 1
           fi
 
           ARCHIVE="herringbone-docker-${VERSION}.tar.gz"
           tar -czf "$ARCHIVE" -C bundle/docker .
+
           echo "ARCHIVE_NAME=$ARCHIVE" >> $GITHUB_ENV
           echo "Archive created: $ARCHIVE"
 
-      - name: Create platform git tag if missing
+      - name: Create git tag if missing
         run: |
           set -euo pipefail
           VERSION="${{ steps.manifest.outputs.version }}"
@@ -135,6 +140,8 @@ jobs:
           tag_name: ${{ steps.manifest.outputs.version }}
           name: Platform ${{ steps.manifest.outputs.version }}
           files: ${{ env.ARCHIVE_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.HERRINGBONE_ACTIONS_BOT }}
 
       - name: Done
         run: |
