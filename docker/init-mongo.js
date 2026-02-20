@@ -7,7 +7,7 @@ const defaultScopes = [
   // Log ingestion
   { scope: "logs:ingest", description: "Ingest raw logs", tier: "free" },
   { scope: "logs:read", description: "Read logs", tier: "free" },
-  { scope: "logs:delete", description: "Delete logs", tier: "enterprise" },
+  { scope: "logs:delete", description: "Delete logs", tier: "free" },
 
   // Parser
   { scope: "parser:cards:read", description: "Read parse cards", tier: "free" },
@@ -36,7 +36,7 @@ const defaultScopes = [
   // Search
   { scope: "search:query", description: "Execute search queries", tier: "free" },
   { scope: "search:saved:read", description: "Read saved searches", tier: "free" },
-  { scope: "search:saved:write", description: "Create or update saved searches", tier: "enterprise" },
+  { scope: "search:saved:write", description: "Create or update saved searches", tier: "free" },
 
 ];
 
