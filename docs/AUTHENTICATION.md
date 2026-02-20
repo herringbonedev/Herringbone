@@ -19,7 +19,7 @@ Simply requires a user to be logged in with a valid token.
 Ensures the user has the correct role.
 
 Available roles:
-```json
+```bash
 analyst
 admin
 ```
