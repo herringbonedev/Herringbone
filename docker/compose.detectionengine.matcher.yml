@@ -5,8 +5,8 @@ services:
     restart: unless-stopped
     networks:
       - herringbone
-    ports:
-      - "7003:7003"
+    expose:
+      - "7003"
     read_only: true
     tmpfs:
       - /tmp

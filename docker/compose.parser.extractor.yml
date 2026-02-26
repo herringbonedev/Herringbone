@@ -5,8 +5,8 @@ services:
     restart: unless-stopped
     networks:
       - herringbone
-    ports:
-      - "7006:7006"
+    expose:
+      - "7006"
     working_dir: /app-root
     environment:
       PYTHONPATH: /app-root:/python-packages:/modules
