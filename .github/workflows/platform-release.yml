@@ -82,7 +82,7 @@ jobs:
             docker push "$BASE:$VERSION"
           done
 
-      - name: Prepare docker bundle (skip compose.mongo.yml)
+      - name: Prepare docker bundle (skip compose.mongo.yml & compose.proxy.yml)
         run: |
           set -euo pipefail
 
@@ -93,19 +93,22 @@ jobs:
           mkdir -p bundle
           cp -r docker bundle/docker
 
-          # Rewrite all compose files EXCEPT compose.mongo.yml
-          find bundle/docker -type f -name "*.yml" ! -name "compose.mongo.yml" | while read -r FILE; do
-            echo "Processing $FILE"
+          # Rewrite all compose files EXCEPT compose.mongo.yml and compose.proxy.yml
+          find bundle/docker -type f -name "*.yml" \
+            ! -name "compose.mongo.yml" \
+            ! -name "compose.proxy.yml" \
+            | while read -r FILE; do
+              echo "Processing $FILE"
 
-            yq -i '
-              (.services[]?.image |=
-                (
-                  capture("^(?<repo>[^:@]+)(:(?<tag>[^@]+))?(@sha256:.*)?$")
-                  | .repo + ":" + strenv(VERSION)
+              yq -i '
+                (.services[]?.image |=
+                  (
+                    capture("^(?<repo>[^:@]+)(:(?<tag>[^@]+))?(@sha256:.*)?$")
+                    | .repo + ":" + strenv(VERSION)
+                  )
                 )
-              )
-            ' "$FILE"
-          done
+              ' "$FILE"
+            done
 
           # Safety check: fail if any image accidentally lost tag
           BAD=$(grep -R "image:.*:$" -n bundle/docker || true)
