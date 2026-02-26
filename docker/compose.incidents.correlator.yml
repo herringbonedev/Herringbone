@@ -5,8 +5,8 @@ services:
     restart: unless-stopped
     networks:
       - herringbone
-    ports:
-      - "7012:7012"
+    expose:
+      - "7012"
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}

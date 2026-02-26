@@ -8,8 +8,8 @@ services:
         condition: service_healthy
     networks:
       - herringbone
-    ports:
-      - "7010:7010"
+    expose:
+      - "7010"
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}

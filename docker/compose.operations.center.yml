@@ -1,6 +1,6 @@
 services:
   operations-center:
-    image: quay.io/herringbone/operations-center:sha-480427e1@sha256:35ca3a0ef5f88e10304227d1fe7e3388dceccfb5f820c68017642d3ef9f309ba
+    image: quay.io/herringbone/operations-center:sha-e479af44@sha256:d14c38be66b929123204bf009702267c145e474f406ba0b70816f65bb853b6f0
     container_name: operations-center
     restart: unless-stopped
 
@@ -9,8 +9,8 @@ services:
     networks:
       - herringbone
 
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
 
     read_only: true
     tmpfs:

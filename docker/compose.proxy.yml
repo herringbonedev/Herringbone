@@ -1,0 +1,15 @@
+services:
+  herringbone-proxy:
+    image: nginx:alpine
+    container_name: herringbone-proxy
+    restart: unless-stopped
+    networks:
+      - herringbone
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+
+networks:
+  herringbone:
+    name: herringbone_net

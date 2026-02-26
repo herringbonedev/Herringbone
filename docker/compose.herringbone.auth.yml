@@ -9,8 +9,8 @@ services:
         condition: service_healthy
     networks:
       - herringbone
-    ports:
-      - "7001:7001"
+    expose:
+      - "7001"
     environment:
       # Mongo
       MONGO_HOST: ${MONGO_HOST}
