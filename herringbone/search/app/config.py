@@ -9,7 +9,6 @@ ALLOWED_COLLECTIONS = {
     "incidents",
     "detections",
     "parse_results",
-    "enrichment_results",
 }
 
 SORTABLE_FIELDS = {

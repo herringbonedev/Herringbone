@@ -1,6 +1,8 @@
 from datetime import datetime
 from fastapi import HTTPException
 from typing import Optional, Dict, Any, List
+from bson import ObjectId
+import re
 
 
 def parse_iso(ts: str) -> datetime:
@@ -27,6 +29,36 @@ def _split_csv(v: Optional[str]) -> List[str]:
     return [x for x in parts if x]
 
 
+def _cast_value(value: str) -> Any:
+    """
+    Smart casting:
+    - ObjectId
+    - int
+    - bool
+    - fallback to string
+    """
+    if value is None:
+        return value
+
+    # Try ObjectId
+    if ObjectId.is_valid(value):
+        return ObjectId(value)
+
+    # Try int
+    try:
+        return int(value)
+    except Exception:
+        pass
+
+    # Try bool
+    if value.lower() == "true":
+        return True
+    if value.lower() == "false":
+        return False
+
+    return value
+
+
 def build_range_filters(
     collection: str,
     filter_query: Dict[str, Any],
@@ -39,10 +71,13 @@ def build_range_filters(
     filter_min: Optional[int] = None,
     filter_max: Optional[int] = None,
     filter_in: Optional[str] = None,
+    filter_value: Optional[str] = None,
 ) -> Dict[str, Any]:
-    
-    # generic field filter
+
+    # Generic Field Filters
     if filter_field:
+
+        # RANGE (numeric fields)
         if filter_kind == "range":
             r: Dict[str, Any] = {}
             if filter_min is not None:
@@ -52,15 +87,44 @@ def build_range_filters(
             if r:
                 filter_query[filter_field] = r
 
+        # IN (comma-separated list)
         elif filter_kind == "in":
             values = _split_csv(filter_in)
             if values:
-                filter_query[filter_field] = {"$in": values}
+                filter_query[filter_field] = {
+                    "$in": [_cast_value(v) for v in values]
+                }
+
+        # EXACT MATCH
+        elif filter_kind == "eq":
+            if filter_value is not None:
+                filter_query[filter_field] = _cast_value(filter_value)
+
+        # CONTAINS (case-insensitive)
+        elif filter_kind == "contains":
+            if filter_value:
+                safe_value = re.escape(filter_value)
+                filter_query[filter_field] = {
+                    "$regex": safe_value,
+                    "$options": "i"
+                }
+
+        # PREFIX (starts with)
+        elif filter_kind == "prefix":
+            if filter_value:
+                safe_value = re.escape(filter_value)
+                filter_query[filter_field] = {
+                    "$regex": f"^{safe_value}",
+                    "$options": "i"
+                }
 
         elif filter_kind is not None:
-            raise HTTPException(400, "filter_kind must be 'range' or 'in'")
+            raise HTTPException(
+                400,
+                "filter_kind must be one of: range, in, eq, contains, prefix"
+            )
 
-    # time range
+    # Time Range Filter
     if from_ts or to_ts:
         field = default_time_field(collection)
         r: Dict[str, Any] = {}
