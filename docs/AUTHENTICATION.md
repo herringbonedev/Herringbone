@@ -6,6 +6,12 @@ Every API route must utilize an available dependency found in the `auth` module.
 ./modules/modules/auth
 ```
 
+## Enterprise extensions
+
+The `herringbone-auth` service is used as the base image for `herringbone-auth-e` which is the enterprise
+version of authentication. To make these two work seemlessly an optional can fail import block is included
+in `main.py`.
+
 ## User dependencies
 
 These dependencies are for routes that are intended to be interacted with solely by a user.
