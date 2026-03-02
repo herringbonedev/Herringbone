@@ -1,7 +1,6 @@
 from fastapi import FastAPI
-from app.routers import auth
 from fastapi.middleware.cors import CORSMiddleware
-
+from app.routers import auth
 
 app = FastAPI()
 
@@ -13,4 +12,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Core router
 app.include_router(auth.router)
+
+# Enterprise extensions
+try:
+    from app.enterprise import register_enterprise
+    register_enterprise(app)
+except ImportError:
+    pass
