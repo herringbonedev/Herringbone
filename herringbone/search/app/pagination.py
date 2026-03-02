@@ -17,7 +17,7 @@ def apply_after(filter_query: Dict[str, Any], after_oid: Optional[ObjectId]) -> 
         return filter_query
 
     if "_id" in filter_query:
-        raise HTTPException(status_code=400, detail="Do not include _id in q when using after")
+        raise HTTPException(status_code=400, detail="Do not include _id in query when using after")
     
     filter_query["_id"] = {"$lt": after_oid}
 
