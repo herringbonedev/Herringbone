@@ -6,12 +6,11 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-# Make app/ importable so incidentset's `from schema import IncidentSchema` works.
+# Make app/ importable
 APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "app"))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
-# Silence datetime deprecations in tests only
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from routers import incidentset  # noqa: E402
@@ -20,6 +19,7 @@ from routers import incidentset  # noqa: E402
 class _FakeUpdateResult:
     def __init__(self):
         self.raw_result = {"ok": 1}
+        self.modified_count = 1
 
 
 class _FakeCollection:
@@ -87,21 +87,30 @@ def fake_mongo():
 
 
 @pytest.fixture
-def app(fake_mongo):
+def fake_identity():
+    return {
+        "type": "user",
+        "id": "test-user",
+        "email": "test@example.com",
+        "scopes": [
+            "incidents:read",
+            "incidents:write",
+        ],
+        "context_id": "default",
+    }
+
+
+@pytest.fixture
+def app(fake_mongo, fake_identity):
     app = FastAPI()
     app.include_router(incidentset.router)
 
-    # --- Mongo override ---
+    # Mongo override
     app.dependency_overrides[incidentset.get_mongo] = lambda: fake_mongo
 
-    # --- Auth overrides (IMPORTANT) ---
-    # These must override the *variables*, not service_or_role(...)
-    app.dependency_overrides[incidentset.incident_writer] = (
-        lambda: {"scope": "incidents:write", "roles": ["admin"]}
-    )
-    app.dependency_overrides[incidentset.incident_reader] = (
-        lambda: {"scope": "incidents:read", "roles": ["admin"]}
-    )
+    # Auth overrides (must return identity objects)
+    app.dependency_overrides[incidentset.incident_writer] = lambda: fake_identity
+    app.dependency_overrides[incidentset.incident_reader] = lambda: fake_identity
 
     return app
 
