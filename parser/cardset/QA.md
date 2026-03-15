@@ -49,14 +49,14 @@ Tests do not require Docker.
 ## Dependencies
 
 - Runtime dependencies are defined in `requirements.txt` and `requirements-internal.txt`
-- Shared internal modules are provided at runtime
-- QA tooling is sourced from the repository root
+- Shared internal modules are provided at runtime.
+- QA tooling is sourced from the repository root.
 
 ## Current Status
 
-- Structural QA complete
-- Service is importable and testable
-- No behavioral or contract tests implemented yet
+- Structural QA complete.
+- Service is importable and testable.
+- No behavioral or contract tests implemented yet.
 
 ## Ownership
 
