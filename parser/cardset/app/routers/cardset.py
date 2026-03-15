@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from datetime import datetime, UTC
 import os
 import json
@@ -8,14 +8,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.schema import CardSchema
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.mix import service_or_user
-from modules.auth.user import require_role
+from modules.auth.auth import require_scopes
+from modules.audit.logger import AuditLogger
 
-
-cardset_write_user = require_role(["admin", "analyst"])
-cardset_admin_user = require_role(["admin"])
-cardset_read_any = service_or_user("parser:cards:read")
-
+cardset_write = require_scopes("parser:cards:write")
+cardset_read = require_scopes("parser:cards:read")
 
 router = APIRouter(
     prefix="/parser/cardset",
@@ -23,6 +20,7 @@ router = APIRouter(
 )
 
 validator = CardSchema()
+audit = AuditLogger()
 
 
 class SelectorModel(BaseModel):
@@ -87,21 +85,40 @@ def cards_collection():
 @router.post("/insert_card", response_model=InsertCardResponse)
 async def insert_card(
     card: CardModel,
+    request: Request,
+    identity=Depends(cardset_write),
     mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
 
     payload = card.model_dump()
-    
+
     payload["selector_type"] = payload["selector"]["type"]
     payload["selector_value"] = payload["selector"]["value"]
 
     result = validator(payload)
 
     if not result.get("valid"):
+        audit.log(
+            event="card_insert_failed",
+            severity="WARNING",
+            identity=identity,
+            request=request,
+            target=payload.get("name"),
+            result="failure",
+            metadata={"error": result.get("error")},
+        )
         raise HTTPException(status_code=400, detail=f"Schema validation failed: {result.get('error')}")
 
     existing = mongo.find_one(cards_collection(), {"selector": payload.get("selector")})
     if existing:
+        audit.log(
+            event="card_insert_duplicate",
+            severity="WARNING",
+            identity=identity,
+            request=request,
+            target=payload.get("name"),
+            result="failure",
+        )
         return {"ok": False, "message": "Card with this selector already exists."}
 
     payload["last_updated"] = datetime.now(UTC)
@@ -109,7 +126,25 @@ async def insert_card(
     try:
         mongo.insert_one(cards_collection(), payload)
     except Exception as e:
+        audit.log(
+            event="card_insert_failed",
+            severity="ERROR",
+            identity=identity,
+            request=request,
+            target=payload.get("name"),
+            result="failure",
+            metadata={"error": str(e)},
+        )
         raise HTTPException(status_code=500, detail=f"Insert failed: {e}")
+
+    audit.log(
+        event="card_inserted",
+        severity="INFO",
+        identity=identity,
+        request=request,
+        target=payload.get("name"),
+        metadata={"selector": payload.get("selector")},
+    )
 
     return {"ok": True, "message": "Valid card. Inserted into database."}
 
@@ -117,7 +152,8 @@ async def insert_card(
 @router.post("/pull_cards", response_model=PullCardsResponse)
 async def pull_cards(
     body: PullCardsRequest,
-    auth=Depends(cardset_read_any),
+    request: Request,
+    identity=Depends(cardset_read),
     mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
 
@@ -126,6 +162,13 @@ async def pull_cards(
     limit = body.limit
 
     if not isinstance(sel_type, str) or not isinstance(sel_value, str):
+        audit.log(
+            event="card_query_invalid_selector",
+            severity="WARNING",
+            identity=identity,
+            request=request,
+            result="failure",
+        )
         raise HTTPException(status_code=400, detail="Type and value must be strings")
 
     query = {
@@ -137,7 +180,23 @@ async def pull_cards(
     try:
         docs = mongo.find(cards_collection(), query, limit=limit)
     except Exception as e:
+        audit.log(
+            event="card_query_failed",
+            severity="ERROR",
+            identity=identity,
+            request=request,
+            result="failure",
+            metadata={"error": str(e)},
+        )
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
+
+    audit.log(
+        event="card_query",
+        severity="INFO",
+        identity=identity,
+        request=request,
+        metadata={"selector_type": sel_type, "selector_value": sel_value, "count": len(docs)},
+    )
 
     return JSONResponse(
         content={
@@ -150,14 +209,31 @@ async def pull_cards(
 
 @router.get("/pull_all_cards")
 async def pull_all_cards(
-    auth=Depends(cardset_read_any),
+    request: Request,
+    identity=Depends(cardset_read),
     mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
 
     try:
         docs = mongo.find(cards_collection(), {"deleted": {"$ne": True}})
     except Exception as e:
+        audit.log(
+            event="card_query_all_failed",
+            severity="ERROR",
+            identity=identity,
+            request=request,
+            result="failure",
+            metadata={"error": str(e)},
+        )
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
+
+    audit.log(
+        event="card_query_all",
+        severity="INFO",
+        identity=identity,
+        request=request,
+        metadata={"count": len(docs)},
+    )
 
     return JSONResponse(
         content={
@@ -171,6 +247,8 @@ async def pull_all_cards(
 @router.post("/delete_cards", response_model=DeleteCardsResponse)
 async def delete_cards(
     body: DeleteCardsRequest,
+    request: Request,
+    identity=Depends(cardset_write),
     mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
 
@@ -178,6 +256,13 @@ async def delete_cards(
     sel_value = body.selector_value
 
     if not isinstance(sel_type, str) or not isinstance(sel_value, str):
+        audit.log(
+            event="card_delete_invalid_selector",
+            severity="WARNING",
+            identity=identity,
+            request=request,
+            result="failure",
+        )
         raise HTTPException(status_code=400, detail="Type and value must be strings")
 
     try:
@@ -187,7 +272,23 @@ async def delete_cards(
             {"deleted": True, "deleted_at": datetime.now(UTC)},
         )
     except Exception as e:
+        audit.log(
+            event="card_delete_failed",
+            severity="ERROR",
+            identity=identity,
+            request=request,
+            result="failure",
+            metadata={"error": str(e)},
+        )
         raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
+
+    audit.log(
+        event="card_deleted",
+        severity="INFO",
+        identity=identity,
+        request=request,
+        metadata={"selector_type": sel_type, "selector_value": sel_value},
+    )
 
     return {"ok": True, "deleted": 1 if res else 0}
 
@@ -195,7 +296,8 @@ async def delete_cards(
 @router.post("/update_card", response_model=UpdateCardResponse)
 async def update_card(
     new_card: CardModel,
-    user=Depends(cardset_admin_user),
+    request: Request,
+    identity=Depends(cardset_write),
     mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
 
@@ -203,12 +305,28 @@ async def update_card(
     result = validator(payload)
 
     if not result.get("valid"):
+        audit.log(
+            event="card_update_failed",
+            severity="WARNING",
+            identity=identity,
+            request=request,
+            target=payload.get("name"),
+            result="failure",
+            metadata={"error": result.get("error")},
+        )
         raise HTTPException(status_code=400, detail=f"Schema validation failed: {result.get('error')}")
 
     sel = payload.get("selector") or {}
     sel_type, sel_value = sel.get("type"), sel.get("value")
 
     if not isinstance(sel_type, str) or not isinstance(sel_value, str):
+        audit.log(
+            event="card_update_invalid_selector",
+            severity="WARNING",
+            identity=identity,
+            request=request,
+            result="failure",
+        )
         raise HTTPException(status_code=400, detail="selector.type and selector.value must be strings")
 
     filter_query = {"selector.type": sel_type, "selector.value": sel_value}
@@ -225,7 +343,24 @@ async def update_card(
             clean_codec=False,
         )
     except Exception as e:
+        audit.log(
+            event="card_update_failed",
+            severity="ERROR",
+            identity=identity,
+            request=request,
+            result="failure",
+            metadata={"error": str(e)},
+        )
         raise HTTPException(status_code=500, detail=f"Update failed: {e}")
+
+    audit.log(
+        event="card_updated",
+        severity="INFO",
+        identity=identity,
+        request=request,
+        target=payload.get("name"),
+        metadata={"selector": payload.get("selector")},
+    )
 
     return {
         "ok": True,
