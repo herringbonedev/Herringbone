@@ -24,9 +24,13 @@ def test_parse_sudo_session_opened(client):
 
     body = r.json()
     assert body == {
+        "selector": {
+            "type": "raw",
+            "value": " session opened for user ",
+        },
         "results": {
             "pam_service": "sudo:session",
             "pam_user": "root",
             "by_user": "1000",
-        }
+        },
     }

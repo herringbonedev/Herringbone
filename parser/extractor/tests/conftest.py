@@ -6,7 +6,6 @@ from app.main import app
 from app.routers.extractor import extractor_call_scope
 
 
-# Mongo container (integration only)
 @pytest.fixture(scope="session")
 def mongo_container():
     container = MongoDbContainer("mongo:7")
@@ -23,17 +22,17 @@ def integration_mongo_env(mongo_container):
     yield
 
 
-# Smart client fixture
 @pytest.fixture
 def client(request, mongo_container):
     is_integration = request.node.get_closest_marker("integration") is not None
 
-    # Always bypass extractor auth
     app.dependency_overrides[extractor_call_scope] = lambda: {
-        "scope": "extractor:call"
+        "type": "service",
+        "service": "test-extractor",
+        "service_id": "svc-test",
+        "scopes": ["extractor:call"],
     }
 
-    # Real Mongo only for integration tests
     if is_integration:
         request.getfixturevalue("integration_mongo_env")
 
