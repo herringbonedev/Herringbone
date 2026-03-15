@@ -47,6 +47,26 @@ def get_audit_logger():
     return AuditLogger(get_mongo())
 
 
+def validate_admin_scope_assignment(requested_scopes, caller_scopes):
+    if "*" in requested_scopes or "platform:admin" in requested_scopes:
+        if "*" not in caller_scopes and "platform:admin" not in caller_scopes:
+            raise HTTPException(
+                status_code=403,
+                detail="Only platform admins can assign platform admin scopes",
+            )
+
+    if "org:admin" in requested_scopes:
+        if (
+            "*" not in caller_scopes
+            and "platform:admin" not in caller_scopes
+            and "org:admin" not in caller_scopes
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Only org admins or platform admins can assign org admin",
+            )
+
+
 def load_bootstrap_token() -> Optional[str]:
     path = os.environ.get("BOOTSTRAP_TOKEN_FILE")
 
@@ -80,14 +100,6 @@ async def register_user(
         provided = request.headers.get("x-bootstrap-token")
 
         if not expected or not provided or provided != expected:
-            audit.log(
-                event="user_register_denied",
-                request=request,
-                identity=identity,
-                target=payload.email,
-                result="failure",
-                metadata={"reason": "invalid_bootstrap_token"},
-            )
             raise HTTPException(
                 status_code=403,
                 detail="Bootstrap token required for first user",
@@ -95,48 +107,23 @@ async def register_user(
 
     else:
         if identity is None:
-            audit.log(
-                event="user_register_denied",
-                request=request,
-                identity=identity,
-                target=payload.email,
-                result="failure",
-                metadata={"reason": "authentication_required"},
-            )
             raise HTTPException(status_code=401, detail="Authentication required")
 
         caller_scopes = identity.get("scopes", [])
 
         if "*" not in caller_scopes and "platform:admin" not in caller_scopes:
-            audit.log(
-                event="user_register_denied",
-                request=request,
-                identity=identity,
-                target=payload.email,
-                result="failure",
-                metadata={"reason": "admin_required"},
-            )
             raise HTTPException(
                 status_code=403,
                 detail="Only platform admins can create users",
             )
 
     if mongo.find_one("users", {"email": payload.email}):
-        audit.log(
-            event="user_register_denied",
-            request=request,
-            identity=identity,
-            target=payload.email,
-            result="failure",
-            metadata={"reason": "user_already_exists"},
-        )
         raise HTTPException(status_code=400, detail="User already exists")
 
     user_count = len(mongo.find("users", {}))
 
     if user_count == 0:
         scopes = ["*"]
-        event_name = "bootstrap_admin_created"
     else:
         requested_scopes = payload.scopes or [
             "logs:read",
@@ -146,23 +133,9 @@ async def register_user(
 
         caller_scopes = identity.get("scopes", []) if identity else []
 
-        if "platform:admin" in requested_scopes or "*" in requested_scopes:
-            if "*" not in caller_scopes and "platform:admin" not in caller_scopes:
-                audit.log(
-                    event="user_register_denied",
-                    request=request,
-                    identity=identity,
-                    target=payload.email,
-                    result="failure",
-                    metadata={"reason": "admin_escalation_denied"},
-                )
-                raise HTTPException(
-                    status_code=403,
-                    detail="Only platform admins can create another platform admin",
-                )
+        validate_admin_scope_assignment(requested_scopes, caller_scopes)
 
         scopes = requested_scopes
-        event_name = "user_created"
 
     user_doc = {
         "email": payload.email,
@@ -172,17 +145,6 @@ async def register_user(
     }
 
     user_id = mongo.insert_one("users", user_doc)
-
-    audit.log(
-        event=event_name,
-        request=request,
-        identity=identity,
-        target=payload.email,
-        metadata={
-            "user_id": str(user_id),
-            "assigned_scopes": scopes,
-        },
-    )
 
     return {
         "ok": True,
@@ -201,44 +163,13 @@ async def login_user(
 
     user = mongo.find_one("users", {"email": payload.email})
 
-    if not user:
-        audit.log(
-            event="user_login_denied",
-            request=request,
-            target=payload.email,
-            result="failure",
-            severity="ERROR",
-            metadata={"reason": "invalid_credentials"},
-        )
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    if not verify_password(payload.password, user["password_hash"]):
-        audit.log(
-            event="user_login_denied",
-            request=request,
-            target=payload.email,
-            result="failure",
-            severity="ERROR",
-            metadata={"reason": "invalid_credentials"},
-        )
+    if not user or not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_access_token(
         user_id=str(user["_id"]),
         email=user["email"],
         scopes=user.get("scopes", []),
-    )
-
-    audit.log(
-        event="user_login",
-        request=request,
-        identity={
-            "sub": str(user["_id"]),
-            "email": user["email"],
-            "scopes": user.get("scopes", []),
-        },
-        target=user["email"],
-        metadata={"token_type": "user"},
     )
 
     return {
@@ -256,13 +187,6 @@ async def list_users(
     mongo = get_mongo()
     users = mongo.find("users", {})
 
-    audit.log(
-        event="users_listed",
-        request=request,
-        identity=identity,
-        metadata={"count": len(users)},
-    )
-
     return {
         "count": len(users),
         "users": [
@@ -279,7 +203,7 @@ async def list_users(
 async def update_user_scopes(
     payload: UserScopesUpdateRequest,
     request: Request,
-    identity=admin,
+    identity=Depends(get_identity),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
     mongo = get_mongo()
@@ -287,47 +211,16 @@ async def update_user_scopes(
     target = mongo.find_one("users", {"email": payload.email})
 
     if not target:
-        audit.log(
-            event="user_scope_update_denied",
-            request=request,
-            identity=identity,
-            target=payload.email,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "user_not_found"},
-        )
         raise HTTPException(status_code=404, detail="User not found")
 
     caller_scopes = identity.get("scopes", [])
 
-    if "platform:admin" in payload.scopes or "*" in payload.scopes:
-        if "*" not in caller_scopes and "platform:admin" not in caller_scopes:
-            audit.log(
-                event="user_scope_update_denied",
-                request=request,
-                identity=identity,
-                target=payload.email,
-                result="failure",
-                severity="CRITICAL",
-                metadata={"reason": "admin_escalation_denied"},
-            )
-            raise HTTPException(
-                status_code=403,
-                detail="Only platform admins can grant platform admin",
-            )
+    validate_admin_scope_assignment(payload.scopes, caller_scopes)
 
     mongo.update_one(
         "users",
         {"_id": target["_id"]},
         {"$set": {"scopes": payload.scopes}},
-    )
-
-    audit.log(
-        event="user_scopes_updated",
-        request=request,
-        identity=identity,
-        target=payload.email,
-        metadata={"assigned_scopes": payload.scopes},
     )
 
     return {
@@ -349,26 +242,9 @@ async def delete_user(
     target = mongo.find_one("users", {"email": payload.email})
 
     if not target:
-        audit.log(
-            event="user_delete_denied",
-            request=request,
-            identity=identity,
-            target=payload.email,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "user_not_found"},
-        )
         raise HTTPException(status_code=404, detail="User not found")
 
     mongo.delete_one("users", {"_id": target["_id"]})
-
-    audit.log(
-        event="user_deleted",
-        request=request,
-        identity=identity,
-        target=payload.email,
-        metadata={"user_id": str(target["_id"])},
-    )
 
     return {
         "ok": True,
@@ -384,13 +260,6 @@ async def list_scopes(
 ):
     mongo = get_mongo()
     scopes = mongo.find("scopes", {})
-
-    audit.log(
-        event="scopes_listed",
-        request=request,
-        identity=identity,
-        metadata={"count": len(scopes)},
-    )
 
     return {
         "scopes": [
@@ -410,15 +279,6 @@ async def register_service(
     mongo = get_mongo()
 
     if mongo.find_one("service_accounts", {"service_name": payload.service_name}):
-        audit.log(
-            event="service_register_denied",
-            request=request,
-            identity=identity,
-            target=payload.service_name,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "service_already_exists"},
-        )
         raise HTTPException(status_code=400, detail="Service already exists")
 
     svc_doc = {
@@ -430,17 +290,6 @@ async def register_service(
     }
 
     svc_id = mongo.insert_one("service_accounts", svc_doc)
-
-    audit.log(
-        event="service_registered",
-        request=request,
-        identity=identity,
-        target=payload.service_name,
-        metadata={
-            "service_id": str(svc_id),
-            "assigned_scopes": payload.scopes,
-        },
-    )
 
     return {
         "ok": True,
@@ -458,13 +307,6 @@ async def list_services(
     mongo = get_mongo()
     services = mongo.find("service_accounts", {})
 
-    audit.log(
-        event="services_listed",
-        request=request,
-        identity=identity,
-        metadata={"count": len(services)},
-    )
-
     return {
         "count": len(services),
         "services": [
@@ -478,6 +320,37 @@ async def list_services(
             }
             for s in services
         ],
+    }
+
+
+@router.post("/services/scopes/set")
+async def set_service_scopes(
+    payload: ServiceScopeUpdateRequest,
+    request: Request,
+    identity=Depends(get_identity),
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    mongo = get_mongo()
+
+    svc = mongo.find_one("service_accounts", {"service_name": payload.service_name})
+
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    caller_scopes = identity.get("scopes", [])
+
+    validate_admin_scope_assignment(payload.scopes, caller_scopes)
+
+    mongo.update_one(
+        "service_accounts",
+        {"_id": svc["_id"]},
+        {"$set": {"scopes": payload.scopes}},
+    )
+
+    return {
+        "ok": True,
+        "service": payload.service_name,
+        "scopes": payload.scopes,
     }
 
 
@@ -496,29 +369,12 @@ async def create_service_token_api(
     )
 
     if not svc:
-        audit.log(
-            event="service_token_create_denied",
-            request=request,
-            identity=identity,
-            target=payload.service,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "service_not_found_or_disabled"},
-        )
         raise HTTPException(status_code=404, detail="Service not found or disabled")
 
     token = create_service_token(
         service_id=str(svc["_id"]),
         service_name=svc["service_name"],
         scopes=payload.scopes,
-    )
-
-    audit.log(
-        event="service_token_created",
-        request=request,
-        identity=identity,
-        target=payload.service,
-        metadata={"assigned_scopes": payload.scopes},
     )
 
     return {
@@ -539,73 +395,13 @@ async def delete_service(
     svc = mongo.find_one("service_accounts", {"service_name": service_name})
 
     if not svc:
-        audit.log(
-            event="service_delete_denied",
-            request=request,
-            identity=identity,
-            target=service_name,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "service_not_found"},
-        )
         raise HTTPException(status_code=404, detail="Service not found")
 
     mongo.delete_one("service_accounts", {"_id": svc["_id"]})
 
-    audit.log(
-        event="service_deleted",
-        request=request,
-        identity=identity,
-        target=service_name,
-        metadata={"service_id": str(svc["_id"])},
-    )
-
     return {
         "ok": True,
         "deleted": service_name,
-    }
-
-
-@router.post("/services/scopes/remove")
-async def remove_service_scopes(
-    payload: ServiceScopeUpdateRequest,
-    request: Request,
-    identity=admin,
-    audit: AuditLogger = Depends(get_audit_logger),
-):
-    mongo = get_mongo()
-
-    svc = mongo.find_one("service_accounts", {"service_name": payload.service_name})
-
-    if not svc:
-        audit.log(
-            event="service_scope_remove_denied",
-            request=request,
-            identity=identity,
-            target=payload.service_name,
-            result="failure",
-            metadata={"reason": "service_not_found"},
-        )
-        raise HTTPException(status_code=404, detail="Service not found")
-
-    mongo.update_one(
-        "service_accounts",
-        {"_id": svc["_id"]},
-        {"$pull": {"scopes": {"$in": payload.scopes}}},
-    )
-
-    audit.log(
-        event="service_scopes_removed",
-        request=request,
-        identity=identity,
-        target=payload.service_name,
-        metadata={"removed_scopes": payload.scopes},
-    )
-
-    return {
-        "ok": True,
-        "service": payload.service_name,
-        "removed": payload.scopes,
     }
 
 
