@@ -15,6 +15,10 @@ services:
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: "incidents"
+      # Context
+      HERRINGBONE_SERVICE: incidents-incidentset
+      HERRINGBONE_UNIT: incidents
+      HERRINGBONE_ELEMENT: incidentset
     read_only: true
     tmpfs:
       - /tmp

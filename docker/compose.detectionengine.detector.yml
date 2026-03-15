@@ -18,6 +18,10 @@ services:
       DETECTIONS_COLLECTION_NAME: "detections"
       MATCHER_API: "http://detectionengine-matcher:7003/detectionengine/matcher/find_match"
       ORCHESTRATOR_URL: "http://incidents-orchestrator:7013/incidents/orchestrator/process_detection"
+      # Context
+      HERRINGBONE_SERVICE: detectionengine-detector
+      HERRINGBONE_UNIT: detectionengine
+      HERRINGBONE_ELEMENT: detector
     read_only: true
     tmpfs:
       - /tmp

@@ -15,6 +15,10 @@ services:
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: "rules"
+      # Context
+      HERRINGBONE_SERVICE: detectionengine-ruleset
+      HERRINGBONE_UNIT: detectionengine
+      HERRINGBONE_ELEMENT: ruleset
     read_only: true
     tmpfs:
       - /tmp

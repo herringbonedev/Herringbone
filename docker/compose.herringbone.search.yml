@@ -17,6 +17,10 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
+      # Context
+      HERRINGBONE_SERVICE: herringbone-search
+      HERRINGBONE_UNIT: herringbone
+      HERRINGBONE_ELEMENT: search
     read_only: true
     tmpfs:
       - /tmp

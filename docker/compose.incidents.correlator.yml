@@ -16,6 +16,10 @@ services:
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: "incidents"
       EVENTS_API_BASE: "http://herringbone-logs:7010/herringbone/logs/events"
+      # Context
+      HERRINGBONE_SERVICE: incidents-correlator
+      HERRINGBONE_UNIT: incidents
+      HERRINGBONE_ELEMENT: correlator
     read_only: true
     tmpfs:
       - /tmp

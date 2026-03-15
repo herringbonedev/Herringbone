@@ -6,6 +6,12 @@ services:
 
     profiles: ["ops"]
 
+    environment:
+      # Context
+      HERRINGBONE_SERVICE: operations-center
+      HERRINGBONE_UNIT: operations-center
+      HERRINGBONE_ELEMENT: ui
+
     networks:
       - herringbone
 

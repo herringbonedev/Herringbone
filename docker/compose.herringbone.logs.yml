@@ -18,6 +18,10 @@ services:
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: events
+      # Context
+      HERRINGBONE_SERVICE: herringbone-logs
+      HERRINGBONE_UNIT: herringbone
+      HERRINGBONE_ELEMENT: logs
     read_only: true
     tmpfs:
       - /tmp

@@ -7,6 +7,11 @@ services:
       - herringbone
     expose:
       - "7003"
+    environment:
+      # Context
+      HERRINGBONE_SERVICE: detectionengine-matcher
+      HERRINGBONE_UNIT: detectionengine
+      HERRINGBONE_ELEMENT: matcher
     read_only: true
     tmpfs:
       - /tmp
