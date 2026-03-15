@@ -48,9 +48,21 @@ def override_mongo(fake_mongo):
 @pytest.fixture
 def app():
     app = FastAPI()
+    
+    app.dependency_overrides[logs.events_get_auth] = lambda: {
+        "type": "service",
+        "service": "test",
+        "scopes": ["events:get"],
+        "context_id": "default",
+    }
 
-    app.dependency_overrides[logs.events_get_auth.dependency] = lambda: {"sub": "test"}
-    app.dependency_overrides[logs.user_auth.dependency] = lambda: {"sub": "test"}
+    app.dependency_overrides[logs.dashboard_auth] = lambda: {
+        "type": "user",
+        "user_id": "test",
+        "email": "test@test.com",
+        "scopes": ["dashboard:read"],
+        "context_id": "default",
+    }
 
     app.include_router(logs.router)
     return app

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, Request
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from datetime import datetime, timedelta, UTC
@@ -6,13 +6,15 @@ from bson import ObjectId
 import os
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.user import get_current_user
-from modules.auth.mix import service_or_user
+from modules.auth.auth import require_scopes
+from modules.audit.logger import AuditLogger
 
 router = APIRouter(prefix="/herringbone/logs", tags=["logs"])
 
-events_get_auth = Depends(service_or_user("events:get"))
-user_auth = Depends(get_current_user)
+events_get_auth = require_scopes("events:get")
+dashboard_auth = require_scopes("dashboard:read")
+
+audit = AuditLogger()
 
 
 def get_mongo():
@@ -56,9 +58,11 @@ def merge_parse_results(mongo, event_ids):
 
 @router.get("/events")
 def list_events(
+    request: Request,
     n: int = Query(25, ge=1, le=500),
-    auth=events_get_auth,
+    identity=Depends(events_get_auth),
 ):
+
     mongo = get_mongo()
 
     events = mongo.find_sorted(
@@ -86,14 +90,23 @@ def list_events(
         e["state"] = state_map.get(eid, {})
         e["parsed"] = parsed_map.get(eid, {})
 
+    audit.log(
+        event="events_list_accessed",
+        identity=identity,
+        request=request,
+        metadata={"count": len(events)},
+    )
+
     return JSONResponse(content=encode(events))
 
 
 @router.get("/events/{event_id}")
 def get_event(
     event_id: str,
-    auth=events_get_auth,
+    request: Request,
+    identity=Depends(events_get_auth),
 ):
+
     mongo = get_mongo()
 
     oid = ObjectId(event_id)
@@ -115,11 +128,22 @@ def get_event(
     parsed_map = merge_parse_results(mongo, [oid])
     event["parsed"] = parsed_map.get(oid, {})
 
+    audit.log(
+        event="event_lookup",
+        identity=identity,
+        request=request,
+        target=str(event_id),
+    )
+
     return JSONResponse(content=encode(event))
 
 
 @router.get("/dashboard/summary")
-def dashboard_summary(user=user_auth):
+def dashboard_summary(
+    request: Request,
+    identity=Depends(dashboard_auth),
+):
+
     mongo = get_mongo()
     now = datetime.now(UTC)
     since = now - timedelta(hours=24)
@@ -152,6 +176,12 @@ def dashboard_summary(user=user_auth):
         else:
             undetected += 1
 
+    audit.log(
+        event="dashboard_summary_accessed",
+        identity=identity,
+        request=request,
+    )
+
     return {
         "events_24h": events_24h,
         "detected": detected,
@@ -163,9 +193,11 @@ def dashboard_summary(user=user_auth):
 
 @router.get("/dashboard/recent-events")
 def dashboard_recent_events(
+    request: Request,
     n: int = Query(10, ge=1, le=50),
-    user=user_auth,
+    identity=Depends(dashboard_auth),
 ):
+
     mongo = get_mongo()
 
     events = mongo.find_sorted(
@@ -198,14 +230,22 @@ def dashboard_recent_events(
             "error": s.get("error"),
         })
 
+    audit.log(
+        event="dashboard_recent_events",
+        identity=identity,
+        request=request,
+    )
+
     return encode(out)
 
 
 @router.get("/dashboard/recent-detections")
 def dashboard_recent_detections(
+    request: Request,
     n: int = Query(10, ge=1, le=50),
-    user=user_auth,
+    identity=Depends(dashboard_auth),
 ):
+
     mongo = get_mongo()
 
     detections = mongo.find_sorted(
@@ -213,6 +253,12 @@ def dashboard_recent_detections(
         filter_query={"detection": True},
         sort=[("inserted_at", -1)],
         limit=n,
+    )
+
+    audit.log(
+        event="dashboard_recent_detections",
+        identity=identity,
+        request=request,
     )
 
     return encode([
@@ -227,9 +273,11 @@ def dashboard_recent_detections(
 
 @router.get("/dashboard/recent-incidents")
 def recent_incidents(
+    request: Request,
     n: int = Query(10, ge=1, le=50),
-    user=user_auth,
+    identity=Depends(dashboard_auth),
 ):
+
     mongo = get_mongo()
 
     incidents = mongo.find_sorted(
@@ -250,14 +298,22 @@ def recent_incidents(
             "created_at": i.get("created_at"),
         })
 
+    audit.log(
+        event="dashboard_recent_incidents",
+        identity=identity,
+        request=request,
+    )
+
     return JSONResponse(content=encode(results))
 
 
 @router.get("/dashboard/incidents-throughput")
 def incidents_throughput(
+    request: Request,
     days: int = Query(7, ge=1, le=30),
-    user=user_auth,
+    identity=Depends(dashboard_auth),
 ):
+
     mongo = get_mongo()
 
     since = datetime.now(UTC) - timedelta(days=days)
@@ -286,6 +342,12 @@ def incidents_throughput(
         {"ts": day, **counts}
         for day, counts in sorted(buckets.items())
     ]
+
+    audit.log(
+        event="dashboard_incidents_throughput",
+        identity=identity,
+        request=request,
+    )
 
     return JSONResponse(content=encode(result))
 
