@@ -1,8 +1,10 @@
-from passlib.context import CryptContext
+import base64
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
+
 from jose import jwt
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 USER_JWT_SECRET_PATH = "/run/secrets/jwt_secret"
 SERVICE_JWT_PRIVATE_KEY_PATH = "/run/secrets/service_jwt_private_key"
@@ -10,6 +12,48 @@ SERVICE_JWT_PRIVATE_KEY_PATH = "/run/secrets/service_jwt_private_key"
 _user_jwt_secret: str | None = None
 _service_private_key: str | None = None
 
+
+# ============================
+# Password hashing (PBKDF2-HMAC-SHA256)
+# NIST / FIPS compatible
+# ============================
+
+PBKDF2_ITERATIONS = 310000
+SALT_SIZE = 16
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_bytes(SALT_SIZE)
+
+    dk = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode(),
+        salt,
+        PBKDF2_ITERATIONS,
+    )
+
+    return base64.b64encode(salt + dk).decode()
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    decoded = base64.b64decode(password_hash)
+
+    salt = decoded[:SALT_SIZE]
+    stored_hash = decoded[SALT_SIZE:]
+
+    new_hash = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode(),
+        salt,
+        PBKDF2_ITERATIONS,
+    )
+
+    return secrets.compare_digest(stored_hash, new_hash)
+
+
+# ============================
+# Secret loading
+# ============================
 
 def _load_secret_file(path: str) -> str:
     try:
@@ -39,22 +83,20 @@ def get_user_jwt_secret() -> str:
     return _user_jwt_secret
 
 
-def hash_password(password: str) -> str:
-    return _pwd.hash(password)
+def create_access_token(
+    user_id: str,
+    email: str,
+    scopes: list[str],
+) -> str:
 
-
-def verify_password(password: str, password_hash: str) -> bool:
-    return _pwd.verify(password, password_hash)
-
-
-def create_access_token(user_id: str, email: str, role: str) -> str:
     now = datetime.now(timezone.utc)
 
     payload = {
         "sub": user_id,
         "email": email,
-        "role": role,
+        "scope": scopes,
         "typ": "user",
+        "context_id": "default",
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=USER_JWT_EXPIRE_MINUTES)).timestamp()),
     }
@@ -82,6 +124,7 @@ def create_service_token(
     service_name: str,
     scopes: list[str],
 ) -> str:
+
     now = datetime.now(timezone.utc)
 
     payload = {
@@ -91,6 +134,7 @@ def create_service_token(
         "scope": scopes,
         "typ": "service",
         "aud": "herringbone-services",
+        "context_id": "default",
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=SERVICE_JWT_EXPIRE_MINUTES)).timestamp()),
     }

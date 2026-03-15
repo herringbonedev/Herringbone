@@ -38,6 +38,12 @@ const defaultScopes = [
   { scope: "search:saved:read", description: "Read saved searches", tier: "free" },
   { scope: "search:saved:write", description: "Create or update saved searches", tier: "free" },
 
+  // Users
+  { scope: "platform:admin", description: "Execute search queries", tier: "free" },
+  { scope: "org:admin", description: "Execute search queries", tier: "enterprise" },
+  { scope: "platform:analyst", description: "Execute search queries", tier: "free" },
+  { scope: "org:analyst", description: "Execute search queries", tier: "enterprise" },
+
 ];
 
 defaultScopes.forEach(s => {

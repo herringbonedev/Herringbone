@@ -1,7 +1,7 @@
 services:
   herringbone-auth:
     container_name: herringbone-auth
-    image: quay.io/herringbone/herringbone-auth:fd61d6c0@sha256:7d065ece2ba09d35897fd2cbfee42dfa5359edfe35e6277036e25ccae8469502
+    image: docker-herringbone-auth
     user: "65532:65532"
     restart: unless-stopped
     depends_on:
@@ -25,6 +25,10 @@ services:
       SERVICE_JWT_PUBLIC_KEY_FILE: /run/secrets/service_jwt_public_key
       # Bootstrap token
       BOOTSTRAP_TOKEN_FILE: /run/secrets/bootstrap_token
+      # Context
+      HERRINGBONE_SERVICE: herringbone-auth
+      HERRINGBONE_UNIT: herringbone
+      HERRINGBONE_ELEMENT: auth
     secrets:
       - jwt_secret
       - service_jwt_private_key
