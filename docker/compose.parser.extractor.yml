@@ -10,6 +10,10 @@ services:
     working_dir: /app-root
     environment:
       PYTHONPATH: /app-root:/python-packages:/modules
+      # Context
+      HERRINGBONE_SERVICE: parser-extractor
+      HERRINGBONE_UNIT: parser
+      HERRINGBONE_ELEMENT: extractor
     read_only: true
     tmpfs:
       - /tmp
