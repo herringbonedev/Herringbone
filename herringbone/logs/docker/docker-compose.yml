@@ -26,7 +26,7 @@ services:
 
     build:
       context: ../../..
-      dockerfile: docker/Dockerfile
+      dockerfile: herringbone/logs/docker/Dockerfile
 
     restart: unless-stopped
 
