@@ -6,7 +6,7 @@ services:
 
     build:
       context: ../../..
-      dockerfile: docker/Dockerfile
+      dockerfile: herringbone/matcher/docker/Dockerfile
 
     restart: unless-stopped
 
