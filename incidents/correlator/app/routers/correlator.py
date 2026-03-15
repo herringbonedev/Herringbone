@@ -1,20 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.service import require_service_scope
+from modules.auth.auth import require_scopes
+from modules.audit.logger import AuditLogger
 import os
 import json
 import requests
 
 
-correlate_required = require_service_scope("incidents:correlate")
-
+correlate_required = require_scopes("incidents:correlate")
 
 router = APIRouter(
     prefix="/incidents/correlator",
     tags=["correlator"],
 )
+
+audit = AuditLogger()
 
 
 def get_mongo():
@@ -80,14 +82,21 @@ def extract_correlate_values(event: dict, correlate_on: list[str]):
 
 @router.post("/correlate")
 async def correlate(
-    payload: dict, 
+    payload: dict,
+    request: Request,
     mongo=Depends(get_mongo),
-    service=Depends(correlate_required)
+    identity=Depends(correlate_required),
 ):
-    print("[*] Correlator invoked")
-    print(json.dumps(payload, indent=2, default=str))
 
     if "rule_id" not in payload:
+        audit.log(
+            event="correlator_invalid_request",
+            identity=identity,
+            request=request,
+            result="failure",
+            severity="WARNING",
+            metadata={"reason": "missing_rule_id"},
+        )
         raise HTTPException(status_code=400, detail="Missing rule_id")
 
     rule_id = str(payload["rule_id"])
@@ -104,15 +113,28 @@ async def correlate(
     if ObjectId.is_valid(rule_id):
         rule_clauses.append({"rule_id": ObjectId(rule_id)})
 
-    # -------------------------
-    # Hard correlation path
-    # -------------------------
     if correlate_on:
+
         if not event_id:
+            audit.log(
+                event="correlator_no_event_for_correlation",
+                identity=identity,
+                request=request,
+                metadata={"rule_id": rule_id},
+            )
             return {"action": "create", "correlation_identity": {}}
 
         event = fetch_event(event_id)
+
         if not isinstance(event, dict):
+            audit.log(
+                event="correlator_event_fetch_failed",
+                identity=identity,
+                request=request,
+                result="failure",
+                severity="WARNING",
+                metadata={"event_id": event_id},
+            )
             return {"action": "create", "correlation_identity": {}}
 
         correlation_identity, correlation_filters = extract_correlate_values(
@@ -120,6 +142,12 @@ async def correlate(
         )
 
         if not correlation_filters:
+            audit.log(
+                event="correlator_no_correlation_values",
+                identity=identity,
+                request=request,
+                metadata={"rule_id": rule_id},
+            )
             return {"action": "create", "correlation_identity": {}}
 
         query = {
@@ -137,22 +165,44 @@ async def correlate(
                 limit=1,
             )
         except Exception as e:
+            audit.log(
+                event="correlator_query_failed",
+                identity=identity,
+                request=request,
+                result="failure",
+                severity="ERROR",
+                metadata={"error": str(e)},
+            )
             raise HTTPException(status_code=500, detail=str(e))
 
         if candidates:
+            incident_id = str(candidates[0]["_id"])
+
+            audit.log(
+                event="correlator_attach_incident",
+                identity=identity,
+                request=request,
+                target=incident_id,
+                metadata={"rule_id": rule_id},
+            )
+
             return {
                 "action": "attach",
-                "incident_id": str(candidates[0]["_id"]),
+                "incident_id": incident_id,
             }
+
+        audit.log(
+            event="correlator_create_incident",
+            identity=identity,
+            request=request,
+            metadata={"rule_id": rule_id},
+        )
 
         return {
             "action": "create",
             "correlation_identity": correlation_identity,
         }
 
-    # -------------------------
-    # Rule-only correlation
-    # -------------------------
     query = {
         "status": {"$in": ["open", "investigating"]},
         "state.last_updated": {"$gte": window_start},
@@ -167,12 +217,37 @@ async def correlate(
             limit=1,
         )
     except Exception as e:
+        audit.log(
+            event="correlator_query_failed",
+            identity=identity,
+            request=request,
+            result="failure",
+            severity="ERROR",
+            metadata={"error": str(e)},
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
     if candidates:
+        incident_id = str(candidates[0]["_id"])
+
+        audit.log(
+            event="correlator_attach_incident",
+            identity=identity,
+            request=request,
+            target=incident_id,
+            metadata={"rule_id": rule_id},
+        )
+
         return {
             "action": "attach",
-            "incident_id": str(candidates[0]["_id"]),
+            "incident_id": incident_id,
         }
+
+    audit.log(
+        event="correlator_create_incident",
+        identity=identity,
+        request=request,
+        metadata={"rule_id": rule_id},
+    )
 
     return {"action": "create"}

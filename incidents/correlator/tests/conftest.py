@@ -6,7 +6,6 @@ from starlette.testclient import TestClient
 from app.routers import correlator
 
 
-# Silence datetime.utcnow() deprecation in tests ONLY
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
@@ -27,17 +26,23 @@ def fake_mongo():
 
 
 @pytest.fixture
-def app(fake_mongo):
+def fake_identity():
+    return {
+        "type": "service",
+        "service": "test-correlator",
+        "service_id": "svc-test",
+        "scopes": ["incidents:correlate"],
+        "context_id": "default",
+    }
+
+
+@pytest.fixture
+def app(fake_mongo, fake_identity):
     app = FastAPI()
     app.include_router(correlator.router)
 
-    # override mongo
     app.dependency_overrides[correlator.get_mongo] = lambda: fake_mongo
-
-    # override auth ONLY
-    app.dependency_overrides[correlator.correlate_required] = (
-        lambda: {"scope": "incidents:correlate"}
-    )
+    app.dependency_overrides[correlator.correlate_required] = lambda: fake_identity
 
     return app
 
