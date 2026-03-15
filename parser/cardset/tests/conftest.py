@@ -9,12 +9,10 @@ from pymongo.errors import OperationFailure
 from app.main import app
 from app.routers.cardset import (
     get_mongo,
-    cardset_write_user,
-    cardset_admin_user,
-    cardset_read_any,
+    cardset_write,
+    cardset_read,
 )
 
-# Fake mongo for non-integration tests
 class FakeMongo:
     def find_one(self, *args, **kwargs):
         return None
@@ -33,20 +31,29 @@ def override_mongo():
     return FakeMongo()
 
 
-# Fake auth dependencies
-def fake_admin_user():
-    return {"user": "admin", "roles": ["admin"]}
+def fake_write_identity():
+    return {
+        "type": "user",
+        "id": "test-user",
+        "email": "test@local",
+        "scopes": [
+            "parser:cards:write",
+            "parser:cards:read",
+        ],
+    }
 
 
-def fake_analyst_user():
-    return {"user": "analyst", "roles": ["analyst"]}
+def fake_read_identity():
+    return {
+        "type": "service",
+        "service": "test-service",
+        "service_id": "svc-test",
+        "scopes": [
+            "parser:cards:read",
+        ],
+    }
 
 
-def fake_service():
-    return {"service": "test", "scopes": ["parser:cards:read"]}
-
-
-# Real Mongo container for integration tests
 @pytest.fixture(scope="session")
 def mongo_container():
     container = MongoDbContainer("mongo:7")
@@ -55,7 +62,6 @@ def mongo_container():
     container.stop()
 
 
-# Wire Mongo env for integration without double-auth and with correct authSource behavior
 @pytest.fixture(scope="session")
 def integration_mongo_env(mongo_container):
     url = mongo_container.get_connection_url()
@@ -66,7 +72,6 @@ def integration_mongo_env(mongo_container):
     hb_user = "herringbone_test"
     hb_pass = "herringbone_test"
 
-    # If container uses auth, create a db-scoped user so authSource defaults correctly
     if parsed.username and parsed.password:
         admin_uri = f"mongodb://{parsed.username}:{parsed.password}@{host}/admin"
         client = MongoClient(admin_uri, serverSelectionTimeoutMS=5000)
@@ -85,6 +90,7 @@ def integration_mongo_env(mongo_container):
                     raise
         finally:
             client.close()
+
         os.environ["MONGO_USER"] = hb_user
         os.environ["MONGO_PASS"] = hb_pass
     else:
@@ -98,14 +104,12 @@ def integration_mongo_env(mongo_container):
     yield
 
 
-# Marker-aware client fixture
 @pytest.fixture
 def client(request, mongo_container):
     is_integration = request.node.get_closest_marker("integration") is not None
 
-    app.dependency_overrides[cardset_write_user] = fake_analyst_user
-    app.dependency_overrides[cardset_admin_user] = fake_admin_user
-    app.dependency_overrides[cardset_read_any] = fake_service
+    app.dependency_overrides[cardset_write] = fake_write_identity
+    app.dependency_overrides[cardset_read] = fake_read_identity
 
     if is_integration:
         request.getfixturevalue("integration_mongo_env")
