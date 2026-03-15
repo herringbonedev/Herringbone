@@ -17,6 +17,10 @@ services:
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
       COLLECTION_NAME: "parse_cards"
+      # Context
+      HERRINGBONE_SERVICE: parser-cardset
+      HERRINGBONE_UNIT: parser
+      HERRINGBONE_ELEMENT: cardset
     read_only: true
     tmpfs:
       - /tmp

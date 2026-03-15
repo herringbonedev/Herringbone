@@ -15,9 +15,9 @@ against silent schema drift in its public API.
 
 ### Unit - Boot Test
 
-- Validates the service imports cleanly
-- Enforces correct Python packaging and imports
-- Catches missing dependencies and circular imports
+- Validates the service imports cleanly.
+- Enforces correct Python packaging and imports.
+- Catches missing dependencies and circular imports.
 
 Location:
 ```
