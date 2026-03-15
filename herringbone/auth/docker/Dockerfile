@@ -1,29 +1,25 @@
 # ---------- Builder Stage ----------
-FROM python:3.11-slim AS builder
+FROM cgr.dev/chainguard/python:latest-dev AS builder
 
 WORKDIR /app-root
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
- && rm -rf /var/lib/apt/lists/*
 
 # copy requirements
 COPY herringbone/auth/requirements.txt /tmp/requirements.txt
 
-# copy shared modules (packaged via pyproject.toml)
+# copy shared modules
 COPY modules /modules
 
 # install dependencies + internal modules
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt && \
-    pip install --no-cache-dir --target=/python-packages /modules
+RUN python -m pip install --upgrade pip setuptools wheel && \
+    python -m pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt && \
+    python -m pip install --no-cache-dir --target=/python-packages /modules
 
 # copy application code
 COPY herringbone/auth/app /app-root/app
 
 
 # ---------- Runtime Stage ----------
-FROM gcr.io/distroless/python3-debian12
+FROM cgr.dev/chainguard/python:latest
 
 WORKDIR /app-root
 
@@ -35,7 +31,6 @@ USER 65532:65532
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app-root:/python-packages
 
-
 EXPOSE 7001
 
-ENTRYPOINT ["python3","-m","uvicorn","app.main:app","--host","0.0.0.0","--port","7001"]
+ENTRYPOINT ["python","-m","uvicorn","app.main:app","--host","0.0.0.0","--port","7001"]

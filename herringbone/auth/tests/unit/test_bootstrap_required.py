@@ -1,4 +1,4 @@
-from routers.auth import is_bootstrap_required
+from app.routers.auth import is_bootstrap_required
 
 
 def test_bootstrap_required_when_no_users(fake_mongo):

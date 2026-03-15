@@ -6,11 +6,8 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, EmailStr, Field
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.user import (
-    require_admin,
-    get_current_user,
-    get_current_user_optional,
-)
+from modules.auth.auth import require_scopes, get_identity
+
 from app.security import (
     hash_password,
     verify_password,
@@ -20,9 +17,8 @@ from app.security import (
 
 router = APIRouter(prefix="/herringbone/auth", tags=["auth"])
 
-user_auth = Depends(get_current_user)
-user_optional_auth = Depends(get_current_user_optional)
-admin_auth = Depends(require_admin)
+identity = Depends(get_identity)
+admin = Depends(require_scopes("platform:admin"))
 
 
 def get_mongo():
@@ -76,11 +72,6 @@ class ServiceScopeUpdateRequest(BaseModel):
     scopes: list[str]
 
 
-class UserRoleUpdateRequest(BaseModel):
-    email: EmailStr
-    role: str
-
-
 class UserDeleteRequest(BaseModel):
     email: EmailStr
 
@@ -89,7 +80,7 @@ class UserDeleteRequest(BaseModel):
 async def register_user(
     payload: RegisterRequest,
     request: Request,
-    current_user: dict | None = user_optional_auth,
+    identity: dict | None = Depends(get_identity),
 ):
     mongo = get_mongo()
 
@@ -105,28 +96,38 @@ async def register_user(
                 detail="Bootstrap token required for first user",
             )
     else:
-        if not current_user:
+        if identity is None:
             raise HTTPException(status_code=401, detail="Authentication required")
 
-        if current_user.get("role") != "admin":
+        scopes = identity.get("scopes", [])
+
+        if "*" not in scopes and "platform:admin" not in scopes:
             raise HTTPException(status_code=403, detail="Admin privileges required")
 
     if mongo.find_one("users", {"email": payload.email}):
         raise HTTPException(status_code=400, detail="User already exists")
 
     user_count = len(mongo.find("users", {}))
-    role = "admin" if user_count == 0 else "analyst"
+
+    if user_count == 0:
+        scopes = ["*"]
+    else:
+        scopes = [
+            "logs:read",
+            "search:query",
+            "incidents:read",
+        ]
 
     user_doc = {
         "email": payload.email,
         "password_hash": hash_password(payload.password),
-        "role": role,
+        "scopes": scopes,
         "created_at": datetime.now(UTC),
     }
 
     user_id = mongo.insert_one("users", user_doc)
 
-    if role == "admin":
+    if user_count == 0:
         try:
             mongo.insert_one(
                 "audit_log",
@@ -140,7 +141,11 @@ async def register_user(
         except Exception:
             pass
 
-    return {"ok": True, "user_id": str(user_id), "role": role}
+    return {
+        "ok": True,
+        "user_id": str(user_id),
+        "scopes": scopes,
+    }
 
 
 @router.post("/login")
@@ -157,25 +162,31 @@ async def login_user(payload: LoginRequest):
     token = create_access_token(
         user_id=str(user["_id"]),
         email=user["email"],
-        role=user["role"],
+        scopes=user.get("scopes", []),
     )
 
     return {"access_token": token, "token_type": "bearer"}
 
 
 @router.get("/users")
-async def list_users(user=user_auth):
+async def list_users(identity=Depends(get_identity)):
     mongo = get_mongo()
     users = mongo.find("users", {})
 
     return {
         "count": len(users),
-        "users": [{"email": u.get("email"), "role": u.get("role")} for u in users],
+        "users": [
+            {
+                "email": u.get("email"),
+                "scopes": u.get("scopes", []),
+            }
+            for u in users
+        ],
     }
 
 
 @router.get("/scopes")
-async def list_scopes(user=user_auth):
+async def list_scopes(identity=Depends(get_identity)):
     mongo = get_mongo()
     scopes = mongo.find("scopes", {})
 
@@ -188,7 +199,10 @@ async def list_scopes(user=user_auth):
 
 
 @router.post("/services/register")
-async def register_service(payload: ServiceRegisterRequest, user=admin_auth):
+async def register_service(
+    payload: ServiceRegisterRequest,
+    identity=admin,
+):
     mongo = get_mongo()
 
     if mongo.find_one("service_accounts", {"service_name": payload.service_name}):
@@ -212,7 +226,7 @@ async def register_service(payload: ServiceRegisterRequest, user=admin_auth):
 
 
 @router.get("/services")
-async def list_services(user=admin_auth):
+async def list_services(identity=Depends(get_identity)):
     mongo = get_mongo()
     services = mongo.find("service_accounts", {})
 
@@ -235,7 +249,7 @@ async def list_services(user=admin_auth):
 @router.post("/service-token")
 async def create_service_token_api(
     payload: ServiceTokenRequest,
-    user=admin_auth,
+    identity=admin,
 ):
     mongo = get_mongo()
 
@@ -257,7 +271,10 @@ async def create_service_token_api(
 
 
 @router.delete("/services/{service_name}")
-async def delete_service(service_name: str, user=admin_auth):
+async def delete_service(
+    service_name: str,
+    identity=admin,
+):
     mongo = get_mongo()
 
     svc = mongo.find_one("service_accounts", {"service_name": service_name})
@@ -271,7 +288,7 @@ async def delete_service(service_name: str, user=admin_auth):
 @router.post("/services/scopes/remove")
 async def remove_service_scopes(
     payload: ServiceScopeUpdateRequest,
-    user=admin_auth,
+    identity=admin,
 ):
     mongo = get_mongo()
 
@@ -288,44 +305,16 @@ async def remove_service_scopes(
     return {"ok": True, "service": payload.service_name, "removed": payload.scopes}
 
 
-@router.post("/users/role")
-async def change_user_role(payload: UserRoleUpdateRequest, user=admin_auth):
-    mongo = get_mongo()
-
-    target = mongo.find_one("users", {"email": payload.email})
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if target.get("role") == "admin" and payload.role != "admin":
-        admins = mongo.find("users", {"role": "admin"})
-        if len(admins) <= 1:
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot remove role from last admin user",
-            )
-
-    mongo.update_one(
-        "users",
-        {"_id": target["_id"]},
-        {"$set": {"role": payload.role}},
-    )
-
-    return {"ok": True, "email": payload.email, "role": payload.role}
-
-
 @router.delete("/users")
-async def delete_user(payload: UserDeleteRequest, user=admin_auth):
+async def delete_user(
+    payload: UserDeleteRequest,
+    identity=admin,
+):
     mongo = get_mongo()
 
     target = mongo.find_one("users", {"email": payload.email})
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
-
-    if target.get("role") == "admin":
-        raise HTTPException(
-            status_code=400,
-            detail="Admin users cannot be deleted",
-        )
 
     mongo.delete_one("users", {"_id": target["_id"]})
     return {"ok": True, "deleted": payload.email}

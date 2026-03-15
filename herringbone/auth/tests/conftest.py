@@ -1,36 +1,47 @@
-import os
 import sys
 import types
 import pytest
-from fastapi import FastAPI
-from starlette.testclient import TestClient
+from fastapi.testclient import TestClient
 
-# -----------------------------
-# Ensure bootstrap token exists
-# -----------------------------
-os.environ.setdefault("BOOTSTRAP_TOKEN", "test")
 
-# -----------------------------
-# MOCK security module EARLY
-# -----------------------------
-security_mock = types.ModuleType("security")
-security_mock.hash_password = lambda p: "hashed-password"
-security_mock.verify_password = lambda p, h: True
-security_mock.create_access_token = lambda **kw: "access-token"
-security_mock.create_service_token = lambda **kw: "service-token"
+# ----------------------------
+# Mock security module early
+# ----------------------------
 
-sys.modules["security"] = security_mock
+security = types.ModuleType("app.security")
 
-APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "app"))
-if APP_DIR not in sys.path:
-    sys.path.insert(0, APP_DIR)
+security.hash_password = lambda p: f"hashed-{p}"
+security.verify_password = lambda p, h: h == f"hashed-{p}"
 
-from routers import auth  # noqa: E402
+def create_access_token(**kwargs):
+    return "test-access-token"
 
+def create_service_token(**kwargs):
+    return "test-service-token"
+
+security.create_access_token = create_access_token
+security.create_service_token = create_service_token
+
+sys.modules["app.security"] = security
+
+
+# ----------------------------
+# Import app AFTER mocking
+# ----------------------------
+
+from app.main import app
+from modules.auth import auth
+import app.routers.auth as auth_router
+
+
+# ----------------------------
+# Fake Mongo
+# ----------------------------
 
 class FakeMongo:
+
     def __init__(self):
-        self.data = {
+        self.collections = {
             "users": [],
             "service_accounts": [],
             "scopes": [],
@@ -38,77 +49,100 @@ class FakeMongo:
         }
 
     def find(self, collection, query):
-        return self.data.get(collection, [])
+        return list(self.collections.get(collection, []))
 
     def find_one(self, collection, query):
-        for doc in self.data.get(collection, []):
+        for doc in self.collections.get(collection, []):
             if all(doc.get(k) == v for k, v in query.items()):
                 return doc
         return None
 
     def insert_one(self, collection, doc):
-        doc = dict(doc)
-        doc["_id"] = f"{collection}-id"
-        self.data.setdefault(collection, []).append(doc)
+        doc = doc.copy()
+        doc["_id"] = str(len(self.collections[collection]) + 1)
+        self.collections[collection].append(doc)
         return doc["_id"]
 
     def delete_one(self, collection, query):
-        self.data[collection] = [
-            d for d in self.data.get(collection, []) if d.get("_id") != query.get("_id")
-        ]
+        items = self.collections.get(collection, [])
+        for i, doc in enumerate(items):
+            if all(doc.get(k) == v for k, v in query.items()):
+                items.pop(i)
+                return True
+        return False
 
     def update_one(self, collection, query, update):
         doc = self.find_one(collection, query)
         if not doc:
             return
-        if "$set" in update:
-            for k, v in update["$set"].items():
-                doc[k] = v
+
         if "$pull" in update:
-            for k, v in update["$pull"].items():
-                doc[k] = [x for x in doc.get(k, []) if x not in v.get("$in", [])]
+            for field, rule in update["$pull"].items():
+                if field in doc and "$in" in rule:
+                    doc[field] = [x for x in doc[field] if x not in rule["$in"]]
 
     def open_mongo_connection(self):
         return None, self
 
-    def list_collection_names(self):
-        return list(self.data.keys())
-
     def close_mongo_connection(self):
         pass
 
+    def list_collection_names(self):
+        return list(self.collections.keys())
+
+
+# ----------------------------
+# Mongo fixture
+# ----------------------------
 
 @pytest.fixture
-def fake_mongo():
-    return FakeMongo()
+def fake_mongo(monkeypatch):
+
+    mongo = FakeMongo()
+
+    # Override the router's get_mongo()
+    monkeypatch.setattr(auth_router, "get_mongo", lambda: mongo)
+
+    # Disable bootstrap token requirement
+    monkeypatch.setattr(auth_router, "load_bootstrap_token", lambda: "test")
+
+    return mongo
 
 
-@pytest.fixture(autouse=True)
-def override_mongo(fake_mongo):
-    auth.get_mongo = lambda: fake_mongo
+# ----------------------------
+# Identity fixtures
+# ----------------------------
+
+@pytest.fixture
+def admin_identity():
+    return {
+        "email": "admin@test.com",
+        "scopes": ["*"],
+    }
 
 
 @pytest.fixture
-def app():
-    app = FastAPI()
-
-    app.dependency_overrides[auth.user_auth.dependency] = lambda: {
-        "email": "admin@test.com",
-        "role": "admin",
-    }
-    app.dependency_overrides[auth.user_optional_auth.dependency] = lambda: {
-        "email": "admin@test.com",
-        "role": "admin",
-    }
-    app.dependency_overrides[auth.admin_auth.dependency] = lambda: {
-        "email": "admin@test.com",
-        "role": "admin",
+def user_identity():
+    return {
+        "email": "user@test.com",
+        "scopes": [
+            "logs:read",
+            "search:query",
+            "incidents:read",
+        ],
     }
 
-    app.include_router(auth.router)
-    return app
 
+# ----------------------------
+# Test client
+# ----------------------------
 
 @pytest.fixture
-def client(app):
-    return TestClient(app)
+def client(fake_mongo, admin_identity):
+
+    app.dependency_overrides[auth.get_identity] = lambda: admin_identity
+
+    with TestClient(app) as c:
+        yield c
+
+    app.dependency_overrides.clear()
