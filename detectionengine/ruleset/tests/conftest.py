@@ -39,6 +39,10 @@ class FakeMongo:
                 return
         self.rules.append({**query, **doc})
 
+    def delete_one(self, collection, query):
+        oid = query.get("_id")
+        self.rules = [r for r in self.rules if r.get("_id") != oid]
+
 
 @pytest.fixture
 def fake_mongo():
@@ -49,12 +53,19 @@ def override_mongo(fake_mongo):
     return fake_mongo
 
 
-# Fake auth payload
-def fake_auth():
+# Fake identity payload for auth dependencies
+def fake_identity():
     return {
-        "service": "test",
-        "scopes": ["rules:read", "rules:write"],
+        "type": "service",
+        "service": "test-service",
+        "service_id": "svc-test",
+        "scopes": [
+            "rules:read",
+            "rules:write",
+            "rules:admin",
+        ],
         "roles": ["admin"],
+        "context_id": "default",
     }
 
 
@@ -74,15 +85,20 @@ def integration_mongo_env(mongo_container):
 
     host = f"{parsed.hostname}:{parsed.port}"
     db_name = "herringbone"
+
     hb_user = "herringbone_test"
     hb_pass = "herringbone_test"
 
     if parsed.username and parsed.password:
         admin_uri = f"mongodb://{parsed.username}:{parsed.password}@{host}/admin"
+
         client = MongoClient(admin_uri, serverSelectionTimeoutMS=5000)
+
         try:
             client.admin.command("ping")
+
             db = client[db_name]
+
             try:
                 db.command(
                     "createUser",
@@ -93,6 +109,7 @@ def integration_mongo_env(mongo_container):
             except OperationFailure as e:
                 if getattr(e, "code", None) != 51003:
                     raise
+
         finally:
             client.close()
 
@@ -111,11 +128,15 @@ def integration_mongo_env(mongo_container):
 # Marker-aware FastAPI client
 @pytest.fixture
 def client(request, mongo_container, fake_mongo):
+
     is_integration = request.node.get_closest_marker("integration") is not None
 
-    app.dependency_overrides[ruleset_write] = lambda: fake_auth()
-    app.dependency_overrides[ruleset_read] = lambda: fake_auth()
-    app.dependency_overrides[ruleset_admin] = lambda: fake_auth()
+    identity = fake_identity()
+
+    # override auth dependencies
+    app.dependency_overrides[ruleset_write] = lambda: identity
+    app.dependency_overrides[ruleset_read] = lambda: identity
+    app.dependency_overrides[ruleset_admin] = lambda: identity
 
     if is_integration:
         request.getfixturevalue("integration_mongo_env")
@@ -126,4 +147,3 @@ def client(request, mongo_container, fake_mongo):
         yield client
 
     app.dependency_overrides.clear()
-
