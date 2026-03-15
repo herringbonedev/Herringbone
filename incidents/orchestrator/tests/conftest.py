@@ -9,14 +9,23 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 @pytest.fixture
-def app(monkeypatch):
+def fake_identity():
+    return {
+        "type": "service",
+        "service": "test-orchestrator",
+        "service_id": "svc-test",
+        "scopes": ["incidents:orchestrate"],
+        "context_id": "default",
+    }
+
+
+@pytest.fixture
+def app(monkeypatch, fake_identity):
     app = FastAPI()
     app.include_router(orchestrator.router)
 
-    # override auth
-    app.dependency_overrides[orchestrator.orchestrator_run] = (
-        lambda: {"scope": "incidents:orchestrate"}
-    )
+    # override auth dependency
+    app.dependency_overrides[orchestrator.orchestrator_run] = lambda: fake_identity
 
     # mock service token
     monkeypatch.setattr(orchestrator, "_service_token_cache", "token")
