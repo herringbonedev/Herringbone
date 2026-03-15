@@ -33,7 +33,6 @@ services:
 
   parser-enrichment:
     container_name: parser-enrichment
-
     build:
       context: ../../..
       dockerfile: parser/enrichment/docker/Dockerfile
