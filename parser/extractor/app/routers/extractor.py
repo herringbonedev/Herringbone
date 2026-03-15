@@ -1,31 +1,38 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional, Union
 from app.parser import CardParser
 import json
 
-from modules.auth.service import get_current_service, require_service_scope
+from modules.auth.auth import require_scopes
+from modules.audit.logger import AuditLogger
 
-extractor_call_scope = require_service_scope("extractor:call")
+extractor_call_scope = require_scopes("extractor:call")
 
 router = APIRouter(
     prefix="/parser/extractor",
     tags=["extractor"],
 )
 
+audit = AuditLogger()
+
+
 class Selector(BaseModel):
     type: str
     value: str
+
 
 class Card(BaseModel):
     selector: Selector
     regex: Optional[List[Dict[str, str]]] = Field(default=None)
     jsonp: Optional[List[Dict[str, str]]] = Field(default=None)
 
+
 class ExtractRequest(BaseModel):
     card: Card
     input: Union[str, Dict[str, Any]]
+
 
 class ExtractResponse(BaseModel):
     selector: Dict[str, str]
@@ -40,13 +47,13 @@ class ExtractResponse(BaseModel):
 )
 async def parse(
     payload: ExtractRequest,
-    service=Depends(extractor_call_scope),
+    request: Request,
+    identity=Depends(extractor_call_scope),
 ):
     card = payload.card.model_dump()
     input_data = payload.input
     selector = card["selector"]
     results: Dict[str, Any] = {}
-    print(f"[→] Using card: {str(card)} to parse {str(input_data)}")
 
     if card.get("regex"):
         regex_parser = CardParser("regex")
@@ -60,8 +67,16 @@ async def parse(
         except Exception as e:
             results["jsonp_error"] = f"Invalid JSON input or evaluation error: {e}"
 
-    print(results)
-    return JSONResponse(content={"results": results}, status_code=200)
+    audit.log(
+        event="extractor_parse",
+        severity="INFO",
+        identity=identity,
+        request=request,
+        target=f"{selector.get('type')}:{selector.get('value')}",
+        metadata={"fields": list(results.keys())},
+    )
+
+    return JSONResponse(content={"selector": selector, "results": results}, status_code=200)
 
 
 @router.get("/readyz")
