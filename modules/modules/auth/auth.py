@@ -4,6 +4,9 @@ from fastapi.security.utils import get_authorization_scheme_param
 from jose import jwt
 import uuid
 
+from modules.audit.logger import AuditLogger
+
+
 JWT_ALG_USER = "HS256"
 JWT_ALG_SERVICE = "RS256"
 
@@ -60,6 +63,8 @@ def service_auth_headers():
 
 def decode_token(token):
 
+    audit = AuditLogger()
+
     try:
         payload = jwt.decode(
             token,
@@ -68,7 +73,8 @@ def decode_token(token):
         )
 
         if payload.get("typ") == "user":
-            return {
+
+            identity = {
                 "type": "user",
                 "id": payload.get("sub"),
                 "email": payload.get("email"),
@@ -76,8 +82,22 @@ def decode_token(token):
                 "context_id": payload.get("context_id", "default"),
             }
 
-    except Exception:
-        pass
+            audit.log(
+                event="auth_user_token_valid",
+                identity=identity,
+                metadata={"token_type": "user"},
+            )
+
+            return identity
+
+    except Exception as e:
+
+        audit.log(
+            event="auth_user_token_invalid",
+            result="failure",
+            severity="WARNING",
+            metadata={"error": str(e)},
+        )
 
     try:
         payload = jwt.decode(
@@ -88,7 +108,8 @@ def decode_token(token):
         )
 
         if payload.get("typ") == "service":
-            return {
+
+            identity = {
                 "type": "service",
                 "service": payload.get("service"),
                 "service_id": payload.get("sub"),
@@ -96,8 +117,28 @@ def decode_token(token):
                 "context_id": payload.get("context_id", "default"),
             }
 
-    except Exception:
-        pass
+            audit.log(
+                event="auth_service_token_valid",
+                identity=identity,
+                metadata={"token_type": "service"},
+            )
+
+            return identity
+
+    except Exception as e:
+
+        audit.log(
+            event="auth_service_token_invalid",
+            result="failure",
+            severity="WARNING",
+            metadata={"error": str(e)},
+        )
+
+    audit.log(
+        event="auth_token_rejected",
+        result="failure",
+        severity="WARNING",
+    )
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -134,6 +175,8 @@ def require_scopes(scope_sets):
 
     def checker(identity: dict = Depends(get_identity)):
 
+        audit = AuditLogger()
+
         scopes = set(identity.get("scopes", []))
 
         if "*" in scopes:
@@ -142,6 +185,14 @@ def require_scopes(scope_sets):
         for scope_set in scope_sets:
             if all(scope in scopes for scope in scope_set):
                 return identity
+
+        audit.log(
+            event="auth_scope_denied",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={"required_scopes": scope_sets},
+        )
 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
