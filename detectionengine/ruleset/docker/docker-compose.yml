@@ -28,7 +28,7 @@ services:
 
     build:
       context: ../../..
-      dockerfile: docker/Dockerfile
+      dockerfile: detectionengine/ruleset/docker/Dockerfile
 
     restart: unless-stopped
 

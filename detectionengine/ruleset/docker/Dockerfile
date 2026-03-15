@@ -1,11 +1,11 @@
 # ---------- Builder Stage ----------
-FROM python:3.11-slim AS builder
+FROM cgr.dev/chainguard/python:latest-dev AS builder
+
+USER root
 
 WORKDIR /app-root
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
- && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /python-packages
 
 # copy requirements
 COPY detectionengine/ruleset/requirements.txt /tmp/requirements.txt
@@ -14,16 +14,16 @@ COPY detectionengine/ruleset/requirements.txt /tmp/requirements.txt
 COPY modules /modules
 
 # install dependencies + internal modules
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt && \
-    pip install --no-cache-dir --target=/python-packages /modules
+RUN python -m pip install --upgrade pip setuptools wheel && \
+    python -m pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt && \
+    python -m pip install --no-cache-dir --target=/python-packages /modules
 
 # copy application code
 COPY detectionengine/ruleset/app /app-root/app
 
 
 # ---------- Runtime Stage ----------
-FROM gcr.io/distroless/python3-debian12
+FROM cgr.dev/chainguard/python:latest
 
 WORKDIR /app-root
 
@@ -37,4 +37,4 @@ ENV PYTHONUNBUFFERED=1 \
 
 EXPOSE 7002
 
-ENTRYPOINT ["python3","-m","uvicorn","app.main:app","--host","0.0.0.0","--port","7002","--log-level","info"]
+ENTRYPOINT ["python","-m","uvicorn","app.main:app","--host","0.0.0.0","--port","7002","--log-level","info"]
