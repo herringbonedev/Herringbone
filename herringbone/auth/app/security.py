@@ -96,6 +96,7 @@ def create_access_token(
         "email": email,
         "scope": scopes,
         "typ": "user",
+        "context_id": "default",
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=USER_JWT_EXPIRE_MINUTES)).timestamp()),
     }
@@ -133,6 +134,7 @@ def create_service_token(
         "scope": scopes,
         "typ": "service",
         "aud": "herringbone-services",
+        "context_id": "default",
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=SERVICE_JWT_EXPIRE_MINUTES)).timestamp()),
     }

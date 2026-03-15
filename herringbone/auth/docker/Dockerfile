@@ -1,7 +1,11 @@
 # ---------- Builder Stage ----------
 FROM cgr.dev/chainguard/python:latest-dev AS builder
 
+USER root
+
 WORKDIR /app-root
+
+RUN mkdir -p /python-packages
 
 # copy requirements
 COPY herringbone/auth/requirements.txt /tmp/requirements.txt
@@ -9,12 +13,12 @@ COPY herringbone/auth/requirements.txt /tmp/requirements.txt
 # copy shared modules
 COPY modules /modules
 
-# install dependencies + internal modules
+# install dependencies
 RUN python -m pip install --upgrade pip setuptools wheel && \
     python -m pip install --no-cache-dir --target=/python-packages -r /tmp/requirements.txt && \
     python -m pip install --no-cache-dir --target=/python-packages /modules
 
-# copy application code
+# copy application
 COPY herringbone/auth/app /app-root/app
 
 

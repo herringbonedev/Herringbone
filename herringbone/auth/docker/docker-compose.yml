@@ -1,5 +1,5 @@
 secrets:
-  user_jwt_secret:
+  jwt_secret:
     file: ./user_jwt_secret.txt
   service_jwt_private_key:
     file: ./service_jwt_private.pem
@@ -22,6 +22,10 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
       MONGO_INITDB_DATABASE: ${AUTH_DB}
+      # Context
+      HERRINGBONE_SERVICE: herringbone-auth
+      HERRINGBONE_UNIT: herringbone
+      HERRINGBONE_ELEMENT: auth
 
     volumes:
       - mongo_data:/data/db
@@ -38,7 +42,7 @@ services:
 
     build:
       context: ../../..
-      dockerfile: docker/Dockerfile
+      dockerfile: herringbone/auth/docker/Dockerfile
 
     restart: unless-stopped
 

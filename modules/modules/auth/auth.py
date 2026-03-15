@@ -1,6 +1,8 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.security.utils import get_authorization_scheme_param
 from jose import jwt
+import uuid
 
 JWT_ALG_USER = "HS256"
 JWT_ALG_SERVICE = "RS256"
@@ -71,6 +73,7 @@ def decode_token(token):
                 "id": payload.get("sub"),
                 "email": payload.get("email"),
                 "scopes": payload.get("scope", []),
+                "context_id": payload.get("context_id", "default"),
             }
 
     except Exception:
@@ -90,6 +93,7 @@ def decode_token(token):
                 "service": payload.get("service"),
                 "service_id": payload.get("sub"),
                 "scopes": payload.get("scope", []),
+                "context_id": payload.get("context_id", "default"),
             }
 
     except Exception:
@@ -103,6 +107,24 @@ def decode_token(token):
 
 def get_identity(token: str = Depends(oauth2_scheme)):
     return decode_token(token)
+
+
+async def get_identity_optional(request: Request):
+
+    auth_header = request.headers.get("Authorization")
+
+    if not auth_header:
+        return None
+
+    scheme, token = get_authorization_scheme_param(auth_header)
+
+    if scheme.lower() != "bearer" or not token:
+        return None
+
+    try:
+        return decode_token(token)
+    except HTTPException:
+        return None
 
 
 def require_scopes(scope_sets):
@@ -127,3 +149,17 @@ def require_scopes(scope_sets):
         )
 
     return checker
+
+
+def get_context(identity=Depends(get_identity)):
+
+    context_id = "default"
+
+    if identity:
+        context_id = identity.get("context_id", "default")
+
+    return {
+        "context_id": context_id,
+        "identity": identity,
+        "trace_id": str(uuid.uuid4()),
+    }
