@@ -4,7 +4,7 @@ The Herringbone Auth API provides authentication, user management, service ident
 
 The service issues JWT tokens for users and services and enforces scope based permissions.
 
-Base path
+Base route:
 
 /herringbone/auth
 
