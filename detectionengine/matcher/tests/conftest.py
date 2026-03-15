@@ -2,13 +2,28 @@ import sys
 import importlib
 from pathlib import Path
 
-# Ensure repo root is on path
+
+# Ensure repository root is on sys.path
 ROOT = Path(__file__).resolve().parents[3]
+
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# Alias top-level `matchengine` to the real module location
-if "matchengine" not in sys.modules:
-    sys.modules["matchengine"] = importlib.import_module(
-        "detectionengine.matcher.app.matchengine"
-    )
+
+def _alias_module(alias: str, target: str):
+    """
+    Register a module alias so `import alias` resolves to `target`.
+    Safe to call multiple times.
+    """
+    if alias in sys.modules:
+        return
+
+    module = importlib.import_module(target)
+    sys.modules[alias] = module
+
+
+# Alias top-level module names used by legacy imports
+_alias_module(
+    "matchengine",
+    "detectionengine.matcher.app.matchengine",
+)
