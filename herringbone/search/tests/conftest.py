@@ -17,9 +17,26 @@ from routers import search  # noqa: E402
 
 
 @pytest.fixture
-def app():
+def fake_identity():
+    return {
+        "type": "service",
+        "service": "test",
+        "service_id": "svc-test",
+        "scopes": ["search:query", "search:schema"],
+        "context_id": "default",
+    }
+
+
+@pytest.fixture
+def app(fake_identity):
     app = FastAPI()
+
+    # override new auth dependencies
+    app.dependency_overrides[search.search_query_auth] = lambda: fake_identity
+    app.dependency_overrides[search.search_schema_auth] = lambda: fake_identity
+
     app.include_router(search.router)
+
     return app
 
 

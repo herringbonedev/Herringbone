@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Query, HTTPException, Depends
+from fastapi import APIRouter, Query, HTTPException, Depends, Request
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from bson import ObjectId
 import os
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.user import get_current_user
+from modules.auth.auth import require_scopes
+from modules.audit.logger import AuditLogger
+
 from app.service import search_collection_service, get_collection_fields
 
 from app.config import (
@@ -19,6 +21,11 @@ from app.config import (
 )
 
 router = APIRouter(prefix="/herringbone/search", tags=["search"])
+
+search_query_auth = require_scopes("search:query")
+search_schema_auth = require_scopes("search:schema")
+
+audit = AuditLogger()
 
 
 def get_mongo():
@@ -67,6 +74,7 @@ class SearchParams:
 @router.get("/{collection}")
 def search_collection(
     collection: str,
+    request: Request,
     limit: int = Query(50, ge=1, le=MAX_LIMIT),
     q: Optional[str] = Query(None),
     after: Optional[str] = Query(None),
@@ -79,8 +87,9 @@ def search_collection(
     filter_in: Optional[str] = Query(None),
     sort: Optional[str] = Query(None),
     order: str = Query("desc", pattern="^(asc|desc)$"),
-    user=Depends(get_current_user),
+    identity=Depends(search_query_auth),
 ):
+
     if collection not in ALLOWED_COLLECTIONS:
         raise HTTPException(status_code=400, detail="Collection not allowed")
 
@@ -107,9 +116,29 @@ def search_collection(
             collection=collection,
             params=params,
         )
+
+        audit.log(
+            event="search_query",
+            identity=identity,
+            request=request,
+            target=collection,
+            metadata={"limit": limit, "q": q},
+        )
+
     except HTTPException:
         raise
     except Exception as e:
+
+        audit.log(
+            event="search_query_failed",
+            identity=identity,
+            request=request,
+            target=collection,
+            result="failure",
+            metadata={"error": str(e)},
+            severity="ERROR",
+        )
+
         raise HTTPException(status_code=500, detail=str(e))
 
     return {
@@ -125,8 +154,10 @@ def search_collection(
 @router.get("/{collection}/fields")
 def list_collection_fields(
     collection: str,
-    user=Depends(get_current_user),
+    request: Request,
+    identity=Depends(search_schema_auth),
 ):
+
     if collection not in ALLOWED_COLLECTIONS:
         raise HTTPException(status_code=400, detail="Collection not allowed")
 
@@ -134,7 +165,26 @@ def list_collection_fields(
 
     try:
         fields = get_collection_fields(mongo, collection)
+
+        audit.log(
+            event="search_fields_accessed",
+            identity=identity,
+            request=request,
+            target=collection,
+        )
+
     except Exception as e:
+
+        audit.log(
+            event="search_fields_failed",
+            identity=identity,
+            request=request,
+            target=collection,
+            result="failure",
+            metadata={"error": str(e)},
+            severity="ERROR",
+        )
+
         raise HTTPException(status_code=500, detail=str(e))
 
     return {
@@ -173,6 +223,7 @@ def _normalize_example(v: Any):
 
 
 def _record_scalar(entry: Dict[str, Any], v: Any, t: str):
+
     ex = _normalize_example(v)
 
     if len(entry["examples"]) < 3:
@@ -183,6 +234,7 @@ def _record_scalar(entry: Dict[str, Any], v: Any, t: str):
 
 
 def _walk_fields(obj: Any, prefix: str, depth: int, out: Dict[str, Dict[str, Any]]):
+
     if depth > MAX_SCHEMA_DEPTH:
         return
 
@@ -195,6 +247,7 @@ def _walk_fields(obj: Any, prefix: str, depth: int, out: Dict[str, Dict[str, Any
         return
 
     for k, v in obj.items():
+
         if not isinstance(k, str):
             continue
 
@@ -216,8 +269,8 @@ def _walk_fields(obj: Any, prefix: str, depth: int, out: Dict[str, Dict[str, Any
 
         elif t == "array":
             for item in v[:5]:
-                it = _infer_type(item)
 
+                it = _infer_type(item)
                 entry["types"].add(it)
 
                 if it in ("string", "number", "bool", "datetime", "objectid"):
@@ -233,8 +286,10 @@ def _walk_fields(obj: Any, prefix: str, depth: int, out: Dict[str, Dict[str, Any
 @router.get("/{collection}/schema")
 def get_collection_schema(
     collection: str,
-    user=Depends(get_current_user),
+    request: Request,
+    identity=Depends(search_schema_auth),
 ):
+
     if collection not in ALLOWED_COLLECTIONS:
         raise HTTPException(status_code=400, detail="Collection not allowed")
 
@@ -248,6 +303,17 @@ def get_collection_schema(
             limit=MAX_SCHEMA_SAMPLE,
         )
     except Exception as e:
+
+        audit.log(
+            event="search_schema_failed",
+            identity=identity,
+            request=request,
+            target=collection,
+            result="failure",
+            metadata={"error": str(e)},
+            severity="ERROR",
+        )
+
         raise HTTPException(status_code=500, detail=str(e))
 
     out: Dict[str, Dict[str, Any]] = {}
@@ -256,6 +322,7 @@ def get_collection_schema(
         _walk_fields(d, "", 0, out)
 
     fields: List[Dict[str, Any]] = []
+
     for meta in out.values():
         fields.append({
             "path": meta["path"],
@@ -265,6 +332,14 @@ def get_collection_schema(
         })
 
     fields.sort(key=lambda x: x["path"])
+
+    audit.log(
+        event="search_schema_accessed",
+        identity=identity,
+        request=request,
+        target=collection,
+        metadata={"fields": len(fields)},
+    )
 
     return {
         "collection": collection,
