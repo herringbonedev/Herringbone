@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/parser-extractor
-    newTag: febc6c1d
-    digest: sha256:cecb2e3cadf98577e56d413effe5ae51d4b20dc22ede17277023415ca7594d66
+    newTag: 0e98c8bc
+    digest: sha256:b31d7239b4d1c2c9bae0699fa5619a00b093f09d02f06677156d8cb7e19a7f9d
