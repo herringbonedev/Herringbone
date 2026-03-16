@@ -1,4 +1,4 @@
-version: alpha-0.2.4
+version: alpha-0.3.0
 services:
   herringbone-logs: quay.io/herringbone/herringbone-logs:5b72b9c1@sha256:f4129285efb0bbdd668d222ba9db667abb9787ee571275686f39ebb0684ac1c1
   herringbone-search: quay.io/herringbone/herringbone-search:231bf61b@sha256:3e81d9f8673b8d7f527f0d276fb14322234f59df2fa862646c9d526148df1e97
@@ -13,4 +13,4 @@ services:
   incidents-orchestrator: quay.io/herringbone/incidents-orchestrator:11e33c9a@sha256:b5f584adc8dc0c2b7872c87cbf97c571e601ce995a07b91b38aefcb4baf6906a
   incidents-incidentset: quay.io/herringbone/incidents-incidentset:cec08f94@sha256:73c1f4ed4540da1780d7f44d29d819d5d6ece54dd4b6d96cdf05f70ca17e0e55
   logingestion-receiver: quay.io/herringbone/receiver:60bb7f73@sha256:dcf179943207c6f269940eb8266c871002ee562265289eca1c86f829ab2b2d6f
-  operations-center: quay.io/herringbone/operations-center:sha-7fd30643@sha256:e8ec31cfd63471be8970628f42d3f5d616e23bc92d3c67ab10abfae7dedeba6c
+  operations-center: quay.io/herringbone/operations-center:sha-208d18ac@sha256:c2d0db26739ac60cefa17ac93c39c7d5683d65807fbd67e3541b11c7da7d7f81
