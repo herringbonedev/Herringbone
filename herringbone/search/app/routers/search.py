@@ -5,7 +5,7 @@ from bson import ObjectId
 import os
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.auth import require_scopes
+from modules.auth.auth import require_scopes, get_context
 from modules.audit.logger import AuditLogger
 
 from app.service import search_collection_service, get_collection_fields
@@ -20,7 +20,11 @@ from app.config import (
     ALLOWED_OPERATORS,
 )
 
-router = APIRouter(prefix="/herringbone/search", tags=["search"])
+router = APIRouter(
+    prefix="/herringbone/search",
+    tags=["search"],
+    dependencies=[Depends(get_context)]
+)
 
 search_query_auth = require_scopes("search:query")
 search_schema_auth = require_scopes("search:schema")

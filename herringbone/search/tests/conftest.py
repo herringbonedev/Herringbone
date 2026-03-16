@@ -6,6 +6,8 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+from modules.auth.auth import get_identity
+
 # Make app/ importable so `from service import ...` works
 APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "app"))
 if APP_DIR not in sys.path:
@@ -31,7 +33,10 @@ def fake_identity():
 def app(fake_identity):
     app = FastAPI()
 
-    # override new auth dependencies
+    # override root auth dependency
+    app.dependency_overrides[get_identity] = lambda: fake_identity
+
+    # override route-level scope dependencies
     app.dependency_overrides[search.search_query_auth] = lambda: fake_identity
     app.dependency_overrides[search.search_schema_auth] = lambda: fake_identity
 
