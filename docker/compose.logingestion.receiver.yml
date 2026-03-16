@@ -1,7 +1,7 @@
 services:
   logingestion-receiver:
     container_name: logingestion-receiver
-    image: quay.io/herringbone/receiver:2468d53a@sha256:6f271a924100ea9d5492c59b9554db68cd73f2cdc5274db534ef3447537ef11d
+    image: quay.io/herringbone/receiver:a6ea709b@sha256:a92b9a01b94aa4dbd1d26acf3775acc03fc47b28cfccdf5897df4c8b01d43858
     restart: unless-stopped
     depends_on:
       - mongodb
