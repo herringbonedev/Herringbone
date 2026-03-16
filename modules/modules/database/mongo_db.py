@@ -33,8 +33,6 @@ def with_connection(method):
 
         except errors.PyMongoError as e:
             raise RuntimeError(f"MongoDB operation failed: {e}") from e
-        finally:
-            self.close_mongo_connection()
 
     return wrapper
 
