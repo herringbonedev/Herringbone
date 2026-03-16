@@ -5,7 +5,7 @@ from typing import Dict, Any
 
 from app.matchengine import MatchEngine
 
-from modules.auth.auth import require_scopes
+from modules.auth.auth import require_scopes, get_context
 from modules.audit.logger import AuditLogger
 
 
@@ -14,6 +14,7 @@ run_matchengine = require_scopes("detectionengine:run")
 router = APIRouter(
     prefix="/detectionengine/matcher",
     tags=["matcher"],
+    dependencies=[Depends(get_context)],
 )
 
 matchengine = MatchEngine()

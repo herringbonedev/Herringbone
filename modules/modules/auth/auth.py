@@ -16,6 +16,8 @@ SERVICE_TOKEN_PATH = "/run/secrets/service_token"
 
 SERVICE_AUD = "herringbone-services"
 
+DEFAULT_CONTEXT = "default"
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/herringbone/auth/login")
 
 _user_secret = None
@@ -61,6 +63,28 @@ def service_auth_headers():
     return {"Authorization": f"Bearer {get_service_token()}"}
 
 
+def _normalize_identity(payload, identity_type):
+
+    context_id = payload.get("context_id") or DEFAULT_CONTEXT
+
+    identity = {
+        "type": identity_type,
+        "scopes": payload.get("scope", []),
+        "context_id": context_id,
+        "token_id": payload.get("jti"),
+    }
+
+    if identity_type == "user":
+        identity["id"] = payload.get("sub")
+        identity["email"] = payload.get("email")
+
+    if identity_type == "service":
+        identity["service"] = payload.get("service")
+        identity["service_id"] = payload.get("sub")
+
+    return identity
+
+
 def decode_token(token):
 
     audit = AuditLogger()
@@ -74,13 +98,7 @@ def decode_token(token):
 
         if payload.get("typ") == "user":
 
-            identity = {
-                "type": "user",
-                "id": payload.get("sub"),
-                "email": payload.get("email"),
-                "scopes": payload.get("scope", []),
-                "context_id": payload.get("context_id", "default"),
-            }
+            identity = _normalize_identity(payload, "user")
 
             audit.log(
                 event="auth_user_token_valid",
@@ -109,13 +127,7 @@ def decode_token(token):
 
         if payload.get("typ") == "service":
 
-            identity = {
-                "type": "service",
-                "service": payload.get("service"),
-                "service_id": payload.get("sub"),
-                "scopes": payload.get("scope", []),
-                "context_id": payload.get("context_id", "default"),
-            }
+            identity = _normalize_identity(payload, "service")
 
             audit.log(
                 event="auth_service_token_valid",
@@ -202,12 +214,25 @@ def require_scopes(scope_sets):
     return checker
 
 
-def get_context(identity=Depends(get_identity)):
+def resolve_context(request: Request, identity):
 
-    context_id = "default"
+    header_context = request.headers.get("X-Herringbone-Org")
 
-    if identity:
-        context_id = identity.get("context_id", "default")
+    if header_context:
+        return header_context
+
+    if identity and identity.get("context_id"):
+        return identity["context_id"]
+
+    return DEFAULT_CONTEXT
+
+
+def get_context(
+    request: Request,
+    identity=Depends(get_identity),
+):
+
+    context_id = resolve_context(request, identity)
 
     return {
         "context_id": context_id,

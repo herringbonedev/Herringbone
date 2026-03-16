@@ -1,17 +1,23 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from detectionengine.matcher.app.routers.matcher import router, run_matchengine
+from modules.auth.auth import get_identity
+from detectionengine.matcher.app.routers.matcher import router
 
 
 def test_find_match_happy_path():
     app = FastAPI()
-    
-    app.dependency_overrides[run_matchengine] = lambda: {
-        "scope": "detectionengine:run"
+
+    app.dependency_overrides[get_identity] = lambda: {
+        "type": "service",
+        "service": "test",
+        "service_id": "matcher-test",
+        "scopes": ["detectionengine:run"],
+        "context_id": "default",
     }
 
     app.include_router(router)
+
     client = TestClient(app)
 
     r = client.post(
