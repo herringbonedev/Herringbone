@@ -3,6 +3,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+from modules.auth.auth import get_identity
 from app.routers import orchestrator
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -24,7 +25,10 @@ def app(monkeypatch, fake_identity):
     app = FastAPI()
     app.include_router(orchestrator.router)
 
-    # override auth dependency
+    # root auth override (needed for require_context)
+    app.dependency_overrides[get_identity] = lambda: fake_identity
+
+    # router auth dependency
     app.dependency_overrides[orchestrator.orchestrator_run] = lambda: fake_identity
 
     # mock service token

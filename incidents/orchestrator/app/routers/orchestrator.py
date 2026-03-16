@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
-from modules.auth.auth import require_scopes
+from modules.auth.auth import require_scopes, get_context
 from modules.audit.logger import AuditLogger
 import requests
 import os
@@ -10,6 +10,7 @@ orchestrator_run = require_scopes("incidents:orchestrate")
 router = APIRouter(
     prefix="/incidents/orchestrator",
     tags=["orchestrator"],
+    dependencies=[Depends(get_context)],
 )
 
 audit = AuditLogger()
