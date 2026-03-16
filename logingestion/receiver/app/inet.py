@@ -51,6 +51,7 @@ def worker():
             else:
 
                 event_id = mongo.insert_event({
+                    "context_id": os.environ.get("CONTEXT_ID", "default"),
                     "raw": data,
                     "source": {
                         "address": addr,
