@@ -5,6 +5,8 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+from modules.auth.auth import get_identity
+
 APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "app"))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
@@ -48,13 +50,23 @@ def override_mongo(fake_mongo):
 @pytest.fixture
 def app():
     app = FastAPI()
-    
-    app.dependency_overrides[logs.events_get_auth] = lambda: {
+
+    identity = {
         "type": "service",
         "service": "test",
-        "scopes": ["events:get"],
+        "service_id": "svc-test",
+        "scopes": [
+            "events:get",
+            "dashboard:read",
+        ],
         "context_id": "default",
     }
+
+    # root auth dependency
+    app.dependency_overrides[get_identity] = lambda: identity
+
+    # route-specific RBAC overrides
+    app.dependency_overrides[logs.events_get_auth] = lambda: identity
 
     app.dependency_overrides[logs.dashboard_auth] = lambda: {
         "type": "user",

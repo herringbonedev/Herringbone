@@ -6,10 +6,14 @@ from bson import ObjectId
 import os
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.auth import require_scopes
+from modules.auth.auth import require_scopes, get_context
 from modules.audit.logger import AuditLogger
 
-router = APIRouter(prefix="/herringbone/logs", tags=["logs"])
+router = APIRouter(
+    prefix="/herringbone/logs",
+    tags=["logs"],
+    dependencies=[Depends(get_context)]
+)
 
 events_get_auth = require_scopes("events:get")
 dashboard_auth = require_scopes("dashboard:read")
