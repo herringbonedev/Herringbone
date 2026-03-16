@@ -3,6 +3,7 @@ import warnings
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+from modules.auth.auth import get_identity
 from app.routers import correlator
 
 
@@ -41,6 +42,10 @@ def app(fake_mongo, fake_identity):
     app = FastAPI()
     app.include_router(correlator.router)
 
+    # root auth override
+    app.dependency_overrides[get_identity] = lambda: fake_identity
+
+    # service dependencies
     app.dependency_overrides[correlator.get_mongo] = lambda: fake_mongo
     app.dependency_overrides[correlator.correlate_required] = lambda: fake_identity
 

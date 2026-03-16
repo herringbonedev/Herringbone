@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.auth import require_scopes
+from modules.auth.auth import require_scopes, get_context
 from modules.audit.logger import AuditLogger
 import os
 import json
@@ -14,6 +14,7 @@ correlate_required = require_scopes("incidents:correlate")
 router = APIRouter(
     prefix="/incidents/correlator",
     tags=["correlator"],
+    dependencies=[Depends(get_context)],
 )
 
 audit = AuditLogger()
