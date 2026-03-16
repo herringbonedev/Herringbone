@@ -13,9 +13,9 @@ from app.routers.ruleset import (
     ruleset_read,
     ruleset_admin,
 )
+from modules.auth.auth import get_identity
 
 
-# Fake Mongo for component tests
 class FakeMongo:
     def __init__(self):
         self.rules = []
@@ -53,7 +53,6 @@ def override_mongo(fake_mongo):
     return fake_mongo
 
 
-# Fake identity payload for auth dependencies
 def fake_identity():
     return {
         "type": "service",
@@ -69,7 +68,6 @@ def fake_identity():
     }
 
 
-# Real Mongo (integration tests)
 @pytest.fixture(scope="session")
 def mongo_container():
     container = MongoDbContainer("mongo:7")
@@ -125,15 +123,13 @@ def integration_mongo_env(mongo_container):
     yield
 
 
-# Marker-aware FastAPI client
 @pytest.fixture
 def client(request, mongo_container, fake_mongo):
-
     is_integration = request.node.get_closest_marker("integration") is not None
 
     identity = fake_identity()
 
-    # override auth dependencies
+    app.dependency_overrides[get_identity] = lambda: identity
     app.dependency_overrides[ruleset_write] = lambda: identity
     app.dependency_overrides[ruleset_read] = lambda: identity
     app.dependency_overrides[ruleset_admin] = lambda: identity

@@ -7,7 +7,7 @@ import os
 import json
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.auth import require_scopes
+from modules.auth.auth import require_scopes, get_context
 from modules.audit.logger import AuditLogger
 
 from app.schema import RuleSchema
@@ -20,6 +20,7 @@ ruleset_admin = require_scopes("rules:admin")
 router = APIRouter(
     prefix="/detectionengine/ruleset",
     tags=["ruleset"],
+    dependencies=[Depends(get_context)],
 )
 
 validator = RuleSchema()
