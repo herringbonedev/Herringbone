@@ -1,19 +1,18 @@
 import os
-import secrets
 from datetime import datetime, UTC
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from starlette.requests import Request
-from bson import ObjectId
 
 from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.auth import (
-    require_scopes,
-    get_identity,
-    get_identity_optional,
-    get_context,
+    require_scopes, 
+    get_identity, 
+    get_identity_optional, 
+    get_context
 )
+
 from modules.audit import AuditLogger
 
 from app.security import (
@@ -37,14 +36,6 @@ router = APIRouter(prefix="/herringbone/auth", tags=["auth"])
 
 identity = Depends(get_identity)
 admin = Depends(require_scopes("platform:admin"))
-
-
-# -----------------------------
-# Helpers
-# -----------------------------
-
-def generate_ingestion_key():
-    return "hb_ingest_" + secrets.token_hex(16)
 
 
 def get_mongo():
@@ -98,10 +89,6 @@ def is_bootstrap_required(mongo: HerringboneMongoDatabase) -> bool:
     except Exception:
         return True
 
-
-# -----------------------------
-# User APIs
-# -----------------------------
 
 @router.post("/register")
 async def register_user(
@@ -197,9 +184,240 @@ async def login_user(
     }
 
 
-# -----------------------------
-# Ingestion Keys (Context Scoped)
-# -----------------------------
+@router.get("/users")
+async def list_users(
+    request: Request,
+    identity=Depends(get_identity),
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    mongo = get_mongo()
+    users = mongo.find("users", {})
+
+    return {
+        "count": len(users),
+        "users": [
+            {
+                "email": u.get("email"),
+                "scopes": u.get("scopes", []),
+            }
+            for u in users
+        ],
+    }
+
+
+@router.post("/users/scopes")
+async def update_user_scopes(
+    payload: UserScopesUpdateRequest,
+    request: Request,
+    identity=Depends(get_identity),
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    mongo = get_mongo()
+
+    target = mongo.find_one("users", {"email": payload.email})
+
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    caller_scopes = identity.get("scopes", [])
+
+    validate_admin_scope_assignment(payload.scopes, caller_scopes)
+
+    mongo.update_one(
+        "users",
+        {"_id": target["_id"]},
+        {"$set": {"scopes": payload.scopes}},
+    )
+
+    return {
+        "ok": True,
+        "email": payload.email,
+        "scopes": payload.scopes,
+    }
+
+
+@router.delete("/users")
+async def delete_user(
+    payload: UserDeleteRequest,
+    request: Request,
+    identity=admin,
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    mongo = get_mongo()
+
+    target = mongo.find_one("users", {"email": payload.email})
+
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    mongo.delete_one("users", {"_id": target["_id"]})
+
+    return {
+        "ok": True,
+        "deleted": payload.email,
+    }
+
+
+@router.get("/scopes")
+async def list_scopes(
+    request: Request,
+    identity=Depends(get_identity),
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    mongo = get_mongo()
+    scopes = mongo.find("scopes", {})
+
+    return {
+        "count": len(scopes),
+        "scopes": [
+            {
+                "scope": s.get("scope"),
+                "category": s.get("category"),
+                "action": s.get("action"),
+                "description": s.get("description", ""),
+                "tier": s.get("tier", "free"),
+                "ui_group": s.get("ui_group", "General"),
+                "order": s.get("order", 0),
+            }
+            for s in scopes
+        ]
+    }
+
+
+@router.post("/services/register")
+async def register_service(
+    payload: ServiceRegisterRequest,
+    request: Request,
+    identity=admin,
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    mongo = get_mongo()
+
+    if mongo.find_one("service_accounts", {"service_name": payload.service_name}):
+        raise HTTPException(status_code=400, detail="Service already exists")
+
+    svc_doc = {
+        "service_name": payload.service_name,
+        "service_id": payload.service_name,
+        "scopes": payload.scopes,
+        "enabled": True,
+        "created_at": datetime.now(UTC),
+    }
+
+    svc_id = mongo.insert_one("service_accounts", svc_doc)
+
+    return {
+        "ok": True,
+        "service_id": str(svc_id),
+        "service_name": payload.service_name,
+    }
+
+
+@router.get("/services")
+async def list_services(
+    request: Request,
+    identity=Depends(get_identity),
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    mongo = get_mongo()
+    services = mongo.find("service_accounts", {})
+
+    return {
+        "count": len(services),
+        "services": [
+            {
+                "id": str(s.get("_id")),
+                "service_name": s.get("service_name"),
+                "service_id": s.get("service_id"),
+                "scopes": s.get("scopes", []),
+                "enabled": s.get("enabled", True),
+                "created_at": s.get("created_at"),
+            }
+            for s in services
+        ],
+    }
+
+
+@router.post("/services/scopes/set")
+async def set_service_scopes(
+    payload: ServiceScopeUpdateRequest,
+    request: Request,
+    identity=Depends(get_identity),
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    mongo = get_mongo()
+
+    svc = mongo.find_one("service_accounts", {"service_name": payload.service_name})
+
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    caller_scopes = identity.get("scopes", [])
+
+    validate_admin_scope_assignment(payload.scopes, caller_scopes)
+
+    mongo.update_one(
+        "service_accounts",
+        {"_id": svc["_id"]},
+        {"$set": {"scopes": payload.scopes}},
+    )
+
+    return {
+        "ok": True,
+        "service": payload.service_name,
+        "scopes": payload.scopes,
+    }
+
+
+@router.post("/service-token")
+async def create_service_token_api(
+    payload: ServiceTokenRequest,
+    request: Request,
+    identity=admin,
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    mongo = get_mongo()
+
+    svc = mongo.find_one(
+        "service_accounts",
+        {"service_name": payload.service, "enabled": True},
+    )
+
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found or disabled")
+
+    token = create_service_token(
+        service_id=str(svc["_id"]),
+        service_name=svc["service_name"],
+        scopes=payload.scopes,
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+    }
+
+
+@router.delete("/services/{service_name}")
+async def delete_service(
+    service_name: str,
+    request: Request,
+    identity=admin,
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    mongo = get_mongo()
+
+    svc = mongo.find_one("service_accounts", {"service_name": service_name})
+
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    mongo.delete_one("service_accounts", {"_id": svc["_id"]})
+
+    return {
+        "ok": True,
+        "deleted": service_name,
+    }
 
 @router.post("/ingestion-keys")
 async def create_ingestion_key_api(
@@ -268,43 +486,6 @@ async def revoke_ingestion_key(
 
     return {"ok": True}
 
-
-# -----------------------------
-# Service APIs
-# -----------------------------
-
-@router.post("/services/register")
-async def register_service(
-    payload: ServiceRegisterRequest,
-    request: Request,
-    identity=admin,
-    audit: AuditLogger = Depends(get_audit_logger),
-):
-    mongo = get_mongo()
-
-    if mongo.find_one("service_accounts", {"service_name": payload.service_name}):
-        raise HTTPException(status_code=400, detail="Service already exists")
-
-    svc_doc = {
-        "service_name": payload.service_name,
-        "service_id": payload.service_name,
-        "scopes": payload.scopes,
-        "enabled": True,
-        "created_at": datetime.now(UTC),
-    }
-
-    svc_id = mongo.insert_one("service_accounts", svc_doc)
-
-    return {
-        "ok": True,
-        "service_id": str(svc_id),
-        "service_name": payload.service_name,
-    }
-
-
-# -----------------------------
-# Health
-# -----------------------------
 
 @router.get("/healthz")
 async def healthz():
