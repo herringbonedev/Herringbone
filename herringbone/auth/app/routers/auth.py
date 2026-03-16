@@ -262,8 +262,17 @@ async def list_scopes(
     scopes = mongo.find("scopes", {})
 
     return {
+        "count": len(scopes),
         "scopes": [
-            {"scope": s.get("scope"), "tier": s.get("tier", "free")}
+            {
+                "scope": s.get("scope"),
+                "category": s.get("category"),
+                "action": s.get("action"),
+                "description": s.get("description", ""),
+                "tier": s.get("tier", "free"),
+                "ui_group": s.get("ui_group", "General"),
+                "order": s.get("order", 0),
+            }
             for s in scopes
         ]
     }

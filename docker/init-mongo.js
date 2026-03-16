@@ -1,64 +1,249 @@
-db = db.getSiblingDB("herringbone");
+db = db.getSiblingDB("herringbone")
 
-db.scopes.createIndex({ scope: 1 }, { unique: true });
+db.scopes.createIndex({ scope: 1 }, { unique: true })
 
-export const defaultScopes = [
+const defaultScopes = [
 
-  // Logs
-  { scope: "logs:ingest",  description: "Ingest raw logs into the platform", tier: "free" },
-  { scope: "logs:read",    description: "Read ingested logs",                tier: "free" },
-  { scope: "logs:delete",  description: "Delete logs",                       tier: "free" },
+  {
+    scope: "logs:ingest",
+    category: "logs",
+    action: "ingest",
+    description: "Ingest raw logs into the platform",
+    tier: "free",
+    ui_group: "Log Management",
+    order: 1
+  },
+  {
+    scope: "logs:read",
+    category: "logs",
+    action: "read",
+    description: "Read ingested logs",
+    tier: "free",
+    ui_group: "Log Management",
+    order: 2
+  },
+  {
+    scope: "logs:delete",
+    category: "logs",
+    action: "delete",
+    description: "Delete logs",
+    tier: "free",
+    ui_group: "Log Management",
+    order: 3
+  },
 
-  // Parser
-  { scope: "parser:cards:read",    description: "View parser cards",                 tier: "free" },
-  { scope: "parser:cards:write",   description: "Create or modify parser cards",     tier: "free" },
-  { scope: "parser:results:read",  description: "Read parser results",               tier: "free" },
-  { scope: "parser:results:write", description: "Write parser results",              tier: "free" },
+  {
+    scope: "parser:cards:read",
+    category: "parser",
+    action: "read",
+    description: "View parser cards",
+    tier: "free",
+    ui_group: "Parser",
+    order: 1
+  },
+  {
+    scope: "parser:cards:write",
+    category: "parser",
+    action: "write",
+    description: "Create or modify parser cards",
+    tier: "free",
+    ui_group: "Parser",
+    order: 2
+  },
 
-  // Extractor
-  { scope: "extractor:call", description: "Call the extractor service", tier: "free" },
+  {
+    scope: "parser:results:read",
+    category: "parser",
+    action: "read",
+    description: "Read parser results",
+    tier: "free",
+    ui_group: "Parser",
+    order: 3
+  },
 
-  // Detection Engine
-  { scope: "detections:rules:read",  description: "View detection rules",            tier: "free" },
-  { scope: "detections:rules:write", description: "Create or modify detection rules", tier: "free" },
-  { scope: "detections:run",         description: "Execute the detection engine",    tier: "free" },
-  { scope: "detections:read",        description: "Read generated detections",       tier: "free" },
-  { scope: "detections:write",       description: "Write detection results",         tier: "free" },
+  {
+    scope: "parser:results:write",
+    category: "parser",
+    action: "write",
+    description: "Write parser results",
+    tier: "free",
+    ui_group: "Parser",
+    order: 4
+  },
 
-  // Incidents
-  { scope: "incidents:read",        description: "View incidents",             tier: "free" },
-  { scope: "incidents:write",       description: "Create or update incidents", tier: "free" },
-  { scope: "incidents:assign",      description: "Assign incidents to users",  tier: "free" },
-  { scope: "incidents:close",       description: "Close incidents",            tier: "free" },
-  { scope: "incidents:orchestrate", description: "Run incident orchestrations", tier: "free" },
-  { scope: "incidents:correlate",   description: "Run correlation analysis",   tier: "free" },
+  {
+    scope: "extractor:call",
+    category: "extractor",
+    action: "call",
+    description: "Call the extractor service",
+    tier: "free",
+    ui_group: "Extractor",
+    order: 1
+  },
 
-  // Search
-  { scope: "search:query",       description: "Execute search queries",        tier: "free" },
-  { scope: "search:saved:read",  description: "View saved searches",           tier: "free" },
-  { scope: "search:saved:write", description: "Create or update saved searches", tier: "free" },
+  {
+    scope: "detections:rules:read",
+    category: "detections",
+    action: "read",
+    description: "View detection rules",
+    tier: "free",
+    ui_group: "Detection Engine",
+    order: 1
+  },
+  {
+    scope: "detections:rules:write",
+    category: "detections",
+    action: "write",
+    description: "Create or modify detection rules",
+    tier: "free",
+    ui_group: "Detection Engine",
+    order: 2
+  },
+  {
+    scope: "detections:run",
+    category: "detections",
+    action: "run",
+    description: "Execute the detection engine",
+    tier: "free",
+    ui_group: "Detection Engine",
+    order: 3
+  },
+  {
+    scope: "detections:read",
+    category: "detections",
+    action: "read",
+    description: "Read generated detections",
+    tier: "free",
+    ui_group: "Detection Engine",
+    order: 4
+  },
+  {
+    scope: "detections:write",
+    category: "detections",
+    action: "write",
+    description: "Write detection results",
+    tier: "free",
+    ui_group: "Detection Engine",
+    order: 5
+  },
 
-  // Dashboards
-  { scope: "dashboard:read", description: "View dashboards", tier: "free" },
+  {
+    scope: "incidents:read",
+    category: "incidents",
+    action: "read",
+    description: "View incidents",
+    tier: "free",
+    ui_group: "Incidents",
+    order: 1
+  },
+  {
+    scope: "incidents:write",
+    category: "incidents",
+    action: "write",
+    description: "Create or update incidents",
+    tier: "free",
+    ui_group: "Incidents",
+    order: 2
+  },
+  {
+    scope: "incidents:assign",
+    category: "incidents",
+    action: "assign",
+    description: "Assign incidents",
+    tier: "free",
+    ui_group: "Incidents",
+    order: 3
+  },
+  {
+    scope: "incidents:close",
+    category: "incidents",
+    action: "close",
+    description: "Close incidents",
+    tier: "free",
+    ui_group: "Incidents",
+    order: 4
+  },
 
-  // Platform Roles
-  { scope: "platform:admin",   description: "Full platform administration", tier: "free" },
-  { scope: "platform:analyst", description: "Platform analyst permissions", tier: "free" },
+  {
+    scope: "search:query",
+    category: "search",
+    action: "query",
+    description: "Execute search queries",
+    tier: "free",
+    ui_group: "Search",
+    order: 1
+  },
 
-  // Organization Roles
-  { scope: "org:admin",   description: "Organization administrator", tier: "enterprise" },
-  { scope: "org:analyst", description: "Organization analyst",       tier: "enterprise" },
+  {
+    scope: "dashboard:read",
+    category: "dashboard",
+    action: "read",
+    description: "View dashboards",
+    tier: "free",
+    ui_group: "Dashboards",
+    order: 1
+  },
 
-];
+  {
+    scope: "platform:admin",
+    category: "platform",
+    action: "admin",
+    description: "Full platform administration",
+    tier: "free",
+    ui_group: "Platform",
+    order: 1
+  },
+  {
+    scope: "platform:analyst",
+    category: "platform",
+    action: "analyst",
+    description: "Platform analyst permissions",
+    tier: "free",
+    ui_group: "Platform",
+    order: 2
+  },
 
-defaultScopes.forEach(s => {
-  const exists = db.scopes.findOne({ scope: s.scope });
-  if (!exists) {
-    db.scopes.insertOne({
-      ...s,
-      created_at: new Date(),
-    });
+  {
+    scope: "org:admin",
+    category: "org",
+    action: "admin",
+    description: "Organization administrator",
+    tier: "enterprise",
+    ui_group: "Organization",
+    order: 1
+  },
+  {
+    scope: "org:analyst",
+    category: "org",
+    action: "analyst",
+    description: "Organization analyst",
+    tier: "enterprise",
+    ui_group: "Organization",
+    order: 2
   }
-});
 
-print("Seeded scopes collection");
+]
+
+defaultScopes.forEach(scope => {
+
+  db.scopes.updateOne(
+    { scope: scope.scope },
+    {
+      $set: {
+        category: scope.category,
+        action: scope.action,
+        description: scope.description,
+        tier: scope.tier,
+        ui_group: scope.ui_group,
+        order: scope.order
+      },
+      $setOnInsert: {
+        created_at: new Date()
+      }
+    },
+    { upsert: true }
+  )
+
+})
+
+print("Scopes seeded or updated")
