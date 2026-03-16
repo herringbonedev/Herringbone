@@ -6,12 +6,15 @@ from urllib.parse import urlparse
 from pymongo import MongoClient
 from pymongo.errors import OperationFailure
 
+from modules.auth.auth import get_identity
+
 from app.main import app
 from app.routers.cardset import (
     get_mongo,
     cardset_write,
     cardset_read,
 )
+
 
 class FakeMongo:
     def find_one(self, *args, **kwargs):
@@ -40,6 +43,7 @@ def fake_write_identity():
             "parser:cards:write",
             "parser:cards:read",
         ],
+        "context_id": "default",
     }
 
 
@@ -51,6 +55,7 @@ def fake_read_identity():
         "scopes": [
             "parser:cards:read",
         ],
+        "context_id": "default",
     }
 
 
@@ -75,9 +80,11 @@ def integration_mongo_env(mongo_container):
     if parsed.username and parsed.password:
         admin_uri = f"mongodb://{parsed.username}:{parsed.password}@{host}/admin"
         client = MongoClient(admin_uri, serverSelectionTimeoutMS=5000)
+
         try:
             client.admin.command("ping")
             db = client[db_name]
+
             try:
                 db.command(
                     "createUser",
@@ -88,6 +95,7 @@ def integration_mongo_env(mongo_container):
             except OperationFailure as e:
                 if getattr(e, "code", None) != 51003:
                     raise
+
         finally:
             client.close()
 
@@ -106,8 +114,13 @@ def integration_mongo_env(mongo_container):
 
 @pytest.fixture
 def client(request, mongo_container):
+
     is_integration = request.node.get_closest_marker("integration") is not None
 
+    # root auth override (required for require_context)
+    app.dependency_overrides[get_identity] = fake_read_identity
+
+    # router auth dependencies
     app.dependency_overrides[cardset_write] = fake_write_identity
     app.dependency_overrides[cardset_read] = fake_read_identity
 

@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.schema import CardSchema
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.auth import require_scopes
+from modules.auth.auth import require_scopes, get_context
 from modules.audit.logger import AuditLogger
 
 cardset_write = require_scopes("parser:cards:write")
@@ -17,6 +17,7 @@ cardset_read = require_scopes("parser:cards:read")
 router = APIRouter(
     prefix="/parser/cardset",
     tags=["cardset"],
+    dependencies=[Depends(get_context)],
 )
 
 validator = CardSchema()
