@@ -2,6 +2,8 @@ import os
 import pytest
 from testcontainers.mongodb import MongoDbContainer
 from fastapi.testclient import TestClient
+
+from modules.auth.auth import get_identity
 from app.main import app
 from app.routers.extractor import extractor_call_scope
 
@@ -26,12 +28,19 @@ def integration_mongo_env(mongo_container):
 def client(request, mongo_container):
     is_integration = request.node.get_closest_marker("integration") is not None
 
-    app.dependency_overrides[extractor_call_scope] = lambda: {
+    fake_identity = {
         "type": "service",
         "service": "test-extractor",
         "service_id": "svc-test",
         "scopes": ["extractor:call"],
+        "context_id": "default",
     }
+
+    # root auth override (needed for require_context)
+    app.dependency_overrides[get_identity] = lambda: fake_identity
+
+    # scope dependency override
+    app.dependency_overrides[extractor_call_scope] = lambda: fake_identity
 
     if is_integration:
         request.getfixturevalue("integration_mongo_env")
