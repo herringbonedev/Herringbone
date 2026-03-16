@@ -1,7 +1,7 @@
 services:
   herringbone-auth:
     container_name: herringbone-auth
-    image: quay.io/herringbone/herringbone-auth:6d5efdcb@sha256:a5c155d98fc8fe9527072a80b8ba3ec92b1b77dc173f4b73c2975f70ed79d627
+    image: quay.io/herringbone/herringbone-auth:74015b75@sha256:06a3828b5eace3ea3d5840f90f00905e32b4a88f6d896bb49241d9e761a95e68
     user: "65532:65532"
     restart: unless-stopped
     depends_on:
