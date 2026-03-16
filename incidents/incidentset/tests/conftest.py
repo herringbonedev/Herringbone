@@ -6,6 +6,8 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+from modules.auth.auth import get_identity
+
 # Make app/ importable
 APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "app"))
 if APP_DIR not in sys.path:
@@ -105,10 +107,13 @@ def app(fake_mongo, fake_identity):
     app = FastAPI()
     app.include_router(incidentset.router)
 
+    # root auth override
+    app.dependency_overrides[get_identity] = lambda: fake_identity
+
     # Mongo override
     app.dependency_overrides[incidentset.get_mongo] = lambda: fake_mongo
 
-    # Auth overrides (must return identity objects)
+    # Auth overrides
     app.dependency_overrides[incidentset.incident_writer] = lambda: fake_identity
     app.dependency_overrides[incidentset.incident_reader] = lambda: fake_identity
 

@@ -6,7 +6,7 @@ from bson import ObjectId
 from bson.json_util import dumps
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.auth import require_scopes
+from modules.auth.auth import require_scopes, get_context
 from modules.audit.logger import AuditLogger
 
 from app.schema import IncidentSchema
@@ -22,6 +22,7 @@ incident_reader = require_scopes("incidents:read")
 router = APIRouter(
     prefix="/incidents/incidentset",
     tags=["incidentset"],
+    dependencies=[Depends(get_context)],
 )
 
 validator = IncidentSchema()
