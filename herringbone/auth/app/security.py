@@ -140,3 +140,40 @@ def create_service_token(
     }
 
     return jwt.encode(payload, get_service_private_key(), algorithm=SERVICE_JWT_ALG)
+
+
+# ============================
+# Ingestion Keys
+# ============================
+
+INGESTION_KEY_PREFIX = "hb_ingest_"
+INGESTION_KEY_BYTES = 32
+
+
+def generate_ingestion_key() -> str:
+    """
+    Generates a secure ingestion key.
+
+    Example:
+        hb_ingest_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    """
+    return f"{INGESTION_KEY_PREFIX}{secrets.token_urlsafe(INGESTION_KEY_BYTES)}"
+
+
+def hash_ingestion_key(key: str) -> str:
+    """
+    Hash ingestion key for storage.
+
+    Uses SHA-256 (fast lookup, acceptable since key is high entropy).
+    """
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def verify_ingestion_key(key: str, key_hash: str) -> bool:
+    """
+    Constant-time comparison of key vs stored hash.
+    """
+    return secrets.compare_digest(
+        hashlib.sha256(key.encode()).hexdigest(),
+        key_hash,
+    )
