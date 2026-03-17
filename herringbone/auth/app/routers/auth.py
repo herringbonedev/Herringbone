@@ -20,6 +20,8 @@ from app.security import (
     verify_password,
     create_access_token,
     create_service_token,
+    generate_ingestion_key,
+    hash_ingestion_key,
 )
 
 from app.schemas import (
@@ -426,10 +428,10 @@ async def create_ingestion_key_api(
 ):
     mongo = get_mongo()
 
-    key = generate_ingestion_key()
+    raw_key = generate_ingestion_key()
 
     doc = {
-        "key": key,
+        "key_hash": hash_ingestion_key(raw_key),
         "context_id": context["context_id"],
         "enabled": True,
         "created_at": datetime.now(UTC),
