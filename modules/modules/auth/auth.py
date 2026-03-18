@@ -64,8 +64,7 @@ def service_auth_headers():
 
 
 def _normalize_identity(payload, identity_type):
-
-    context_id = payload.get("context_id") or DEFAULT_CONTEXT
+    context_id = str(payload.get("context_id") or DEFAULT_CONTEXT)
 
     identity = {
         "type": identity_type,
@@ -86,7 +85,6 @@ def _normalize_identity(payload, identity_type):
 
 
 def decode_token(token):
-
     audit = AuditLogger()
 
     try:
@@ -97,7 +95,6 @@ def decode_token(token):
         )
 
         if payload.get("typ") == "user":
-
             identity = _normalize_identity(payload, "user")
 
             audit.log(
@@ -109,7 +106,6 @@ def decode_token(token):
             return identity
 
     except Exception as e:
-
         audit.log(
             event="auth_user_token_invalid",
             result="failure",
@@ -126,7 +122,6 @@ def decode_token(token):
         )
 
         if payload.get("typ") == "service":
-
             identity = _normalize_identity(payload, "service")
 
             audit.log(
@@ -138,7 +133,6 @@ def decode_token(token):
             return identity
 
     except Exception as e:
-
         audit.log(
             event="auth_service_token_invalid",
             result="failure",
@@ -163,7 +157,6 @@ def get_identity(token: str = Depends(oauth2_scheme)):
 
 
 async def get_identity_optional(request: Request):
-
     auth_header = request.headers.get("Authorization")
 
     if not auth_header:
@@ -181,12 +174,10 @@ async def get_identity_optional(request: Request):
 
 
 def require_scopes(scope_sets):
-
     if isinstance(scope_sets, str):
         scope_sets = [(scope_sets,)]
 
     def checker(identity: dict = Depends(get_identity)):
-
         audit = AuditLogger()
 
         scopes = set(identity.get("scopes", []))
@@ -215,14 +206,13 @@ def require_scopes(scope_sets):
 
 
 def resolve_context(request: Request, identity):
-
     header_context = request.headers.get("X-Herringbone-Org")
 
     if header_context:
-        return header_context
+        return str(header_context)
 
     if identity and identity.get("context_id"):
-        return identity["context_id"]
+        return str(identity["context_id"])
 
     return DEFAULT_CONTEXT
 
@@ -231,7 +221,6 @@ def get_context(
     request: Request,
     identity=Depends(get_identity),
 ):
-
     context_id = resolve_context(request, identity)
 
     return {
