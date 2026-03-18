@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, UTC
 from typing import Optional
+from bson import ObjectId
 
 from fastapi import APIRouter, HTTPException, Depends
 from starlette.requests import Request
@@ -421,6 +422,7 @@ async def delete_service(
         "deleted": service_name,
     }
 
+
 @router.post("/ingestion-keys")
 async def create_ingestion_key_api(
     context=Depends(get_context),
@@ -440,7 +442,7 @@ async def create_ingestion_key_api(
 
     mongo.insert_one("ingestion_keys", doc)
 
-    return {"ok": True, "key": key}
+    return {"ok": True, "key": raw_key}
 
 
 @router.get("/ingestion-keys")
@@ -461,7 +463,9 @@ async def list_ingestion_keys(
             {
                 "id": str(k["_id"]),
                 "enabled": k.get("enabled", True),
-                "created_at": k.get("created_at"),
+                "created_at": k.get("created_at").isoformat()
+                if k.get("created_at")
+                else None,
                 "created_by": k.get("created_by"),
             }
             for k in keys
@@ -477,14 +481,22 @@ async def revoke_ingestion_key(
 ):
     mongo = get_mongo()
 
-    mongo.update_one(
+    try:
+        oid = ObjectId(key_id)
+    except Exception:
+        raise HTTPException(400, "invalid key id")
+
+    result = mongo.update_one(
         "ingestion_keys",
         {
-            "_id": ObjectId(key_id),
+            "_id": oid,
             "context_id": context["context_id"],
         },
         {"$set": {"enabled": False}},
     )
+
+    if result.matched_count == 0:
+        raise HTTPException(404, "key not found")
 
     return {"ok": True}
 
