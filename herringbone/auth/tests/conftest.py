@@ -19,8 +19,16 @@ def create_access_token(**kwargs):
 def create_service_token(**kwargs):
     return "test-service-token"
 
+def generate_ingestion_key():
+    return "test-ingestion-key"
+
+def hash_ingestion_key(k):
+    return f"hashed-{k}"
+
 security.create_access_token = create_access_token
 security.create_service_token = create_service_token
+security.generate_ingestion_key = generate_ingestion_key
+security.hash_ingestion_key = hash_ingestion_key
 
 sys.modules["app.security"] = security
 
