@@ -205,26 +205,90 @@ def require_scopes(scope_sets):
     return checker
 
 
-def resolve_context(request: Request, identity):
-    header_context = request.headers.get("X-Herringbone-Org")
+def resolve_context_id(request: Request, context: dict) -> str:
+    audit = AuditLogger()
 
-    if header_context:
-        return str(header_context)
+    single_tenant = getattr(request.app.state, "single_tenant", True)
 
-    if identity and identity.get("context_id"):
-        return str(identity["context_id"])
+    if single_tenant:
+        audit.log(
+            event="context_resolve_single_tenant",
+            identity=context.get("identity"),
+            metadata={"context_id": DEFAULT_CONTEXT},
+        )
+        return DEFAULT_CONTEXT
 
-    return DEFAULT_CONTEXT
+    context_id = context.get("context_id")
+
+    if not context_id:
+        audit.log(
+            event="context_missing",
+            identity=context.get("identity"),
+            result="failure",
+            severity="WARNING",
+        )
+        raise HTTPException(400, "context header required")
+    
+    try:
+        from app.enterprise.orgs_context import resolve_org_context
+
+        org = resolve_org_context(request, context)
+
+        audit.log(
+            event="context_resolve_success",
+            identity=context.get("identity"),
+            metadata={
+                "context_id": org["context_id"],
+                "slug": org.get("slug"),
+                "role": org.get("role"),
+            },
+        )
+
+        return org["context_id"]
+
+    except HTTPException as e:
+        audit.log(
+            event="context_resolve_failed",
+            identity=context.get("identity"),
+            result="failure",
+            severity="WARNING",
+            metadata={
+                "error": str(e.detail),
+                "context_id": context_id,
+            },
+        )
+        raise
 
 
 def get_context(
     request: Request,
     identity=Depends(get_identity),
 ):
-    context_id = resolve_context(request, identity)
+    audit = AuditLogger()
+
+    header_context = request.headers.get("X-Herringbone-Org")
+    single_tenant = getattr(request.app.state, "single_tenant", True)
+
+    if single_tenant:
+        context_id = DEFAULT_CONTEXT
+    else:
+        context_id = header_context
+
+    trace_id = str(uuid.uuid4())
+
+    audit.log(
+        event="context_received",
+        identity=identity,
+        metadata={
+            "context_id": context_id,
+            "header_context": header_context,
+            "single_tenant": single_tenant,
+            "trace_id": trace_id,
+        },
+    )
 
     return {
         "context_id": context_id,
         "identity": identity,
-        "trace_id": str(uuid.uuid4()),
+        "trace_id": trace_id,
     }

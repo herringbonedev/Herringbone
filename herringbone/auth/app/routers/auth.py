@@ -11,7 +11,8 @@ from modules.auth.auth import (
     require_scopes, 
     get_identity, 
     get_identity_optional, 
-    get_context
+    get_context,
+    resolve_context_id
 )
 
 from modules.audit import AuditLogger
@@ -109,25 +110,46 @@ async def register_user(
         provided = request.headers.get("x-bootstrap-token")
 
         if not expected or not provided or provided != expected:
-            raise HTTPException(
-                status_code=403,
-                detail="Bootstrap token required for first user",
+            audit.log(
+                event="user_register_denied",
+                identity=identity,
+                result="failure",
+                severity="WARNING",
+                metadata={"reason": "invalid_bootstrap_token"},
             )
+            raise HTTPException(403, "Bootstrap token required for first user")
 
     else:
         if identity is None:
-            raise HTTPException(status_code=401, detail="Authentication required")
+            audit.log(
+                event="user_register_denied",
+                result="failure",
+                severity="WARNING",
+                metadata={"reason": "unauthenticated"},
+            )
+            raise HTTPException(401, "Authentication required")
 
         caller_scopes = identity.get("scopes", [])
 
         if "*" not in caller_scopes and "platform:admin" not in caller_scopes:
-            raise HTTPException(
-                status_code=403,
-                detail="Only platform admins can create users",
+            audit.log(
+                event="user_register_denied",
+                identity=identity,
+                result="failure",
+                severity="WARNING",
+                metadata={"reason": "insufficient_scope"},
             )
+            raise HTTPException(403, "Only platform admins can create users")
 
     if mongo.find_one("users", {"email": payload.email}):
-        raise HTTPException(status_code=400, detail="User already exists")
+        audit.log(
+            event="user_register_denied",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={"reason": "user_exists", "email": payload.email},
+        )
+        raise HTTPException(400, "User already exists")
 
     user_count = len(mongo.find("users", {}))
 
@@ -141,7 +163,6 @@ async def register_user(
         ]
 
         caller_scopes = identity.get("scopes", []) if identity else []
-
         validate_admin_scope_assignment(requested_scopes, caller_scopes)
 
         scopes = requested_scopes
@@ -155,11 +176,13 @@ async def register_user(
 
     user_id = mongo.insert_one("users", user_doc)
 
-    return {
-        "ok": True,
-        "user_id": str(user_id),
-        "scopes": scopes,
-    }
+    audit.log(
+        event="user_register_success",
+        identity=identity,
+        metadata={"email": payload.email, "user_id": str(user_id)},
+    )
+
+    return {"ok": True, "user_id": str(user_id), "scopes": scopes}
 
 
 @router.post("/login")
@@ -173,7 +196,13 @@ async def login_user(
     user = mongo.find_one("users", {"email": payload.email})
 
     if not user or not verify_password(payload.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        audit.log(
+            event="user_login_failed",
+            result="failure",
+            severity="WARNING",
+            metadata={"email": payload.email},
+        )
+        raise HTTPException(401, "Invalid credentials")
 
     token = create_access_token(
         user_id=str(user["_id"]),
@@ -181,10 +210,17 @@ async def login_user(
         scopes=user.get("scopes", []),
     )
 
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-    }
+    audit.log(
+        event="user_login_success",
+        identity={
+            "id": str(user["_id"]),
+            "email": user["email"],
+            "scopes": user.get("scopes", []),
+            "type": "user",
+        },
+    )
+
+    return {"access_token": token, "token_type": "bearer"}
 
 
 @router.get("/users")
@@ -232,6 +268,12 @@ async def update_user_scopes(
         {"$set": {"scopes": payload.scopes}},
     )
 
+    audit.log(
+        event="user_scopes_updated",
+        identity=identity,
+        metadata={"email": payload.email, "scopes": payload.scopes},
+    )
+
     return {
         "ok": True,
         "email": payload.email,
@@ -254,6 +296,12 @@ async def delete_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     mongo.delete_one("users", {"_id": target["_id"]})
+
+    audit.log(
+        event="user_deleted",
+        identity=identity,
+        metadata={"email": payload.email},
+    )
 
     return {
         "ok": True,
@@ -309,6 +357,12 @@ async def register_service(
 
     svc_id = mongo.insert_one("service_accounts", svc_doc)
 
+    audit.log(
+        event="service_registered",
+        identity=identity,
+        metadata={"service_name": payload.service_name},
+    )
+
     return {
         "ok": True,
         "service_id": str(svc_id),
@@ -353,6 +407,13 @@ async def set_service_scopes(
     svc = mongo.find_one("service_accounts", {"service_name": payload.service_name})
 
     if not svc:
+        audit.log(
+            event="service_lookup_failed",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={"service_name": payload.service_name},
+        )
         raise HTTPException(status_code=404, detail="Service not found")
 
     caller_scopes = identity.get("scopes", [])
@@ -363,6 +424,12 @@ async def set_service_scopes(
         "service_accounts",
         {"_id": svc["_id"]},
         {"$set": {"scopes": payload.scopes}},
+    )
+
+    audit.log(
+        event="service_scopes_updated",
+        identity=identity,
+        metadata={"service": payload.service_name, "scopes": payload.scopes},
     )
 
     return {
@@ -387,12 +454,25 @@ async def create_service_token_api(
     )
 
     if not svc:
+        audit.log(
+            event="service_lookup_failed",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={"service_name": payload.service_name},
+        )
         raise HTTPException(status_code=404, detail="Service not found or disabled")
 
     token = create_service_token(
         service_id=str(svc["_id"]),
         service_name=svc["service_name"],
         scopes=payload.scopes,
+    )
+
+    audit.log(
+        event="service_token_created",
+        identity=identity,
+        metadata={"service": payload.service, "scopes": payload.scopes},
     )
 
     return {
@@ -413,9 +493,22 @@ async def delete_service(
     svc = mongo.find_one("service_accounts", {"service_name": service_name})
 
     if not svc:
+        audit.log(
+            event="service_lookup_failed",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={"service_name": payload.service_name},
+        )
         raise HTTPException(status_code=404, detail="Service not found")
 
     mongo.delete_one("service_accounts", {"_id": svc["_id"]})
+
+    audit.log(
+        event="service_deleted",
+        identity=identity,
+        metadata={"service_name": service_name},
+    )
 
     return {
         "ok": True,
@@ -425,36 +518,70 @@ async def delete_service(
 
 @router.post("/ingestion-keys")
 async def create_ingestion_key_api(
+    request: Request,
     context=Depends(get_context),
-    identity=Depends(require_scopes("org:admin")),
+    identity=Depends(require_scopes("ingestion:write")),
+    audit: AuditLogger = Depends(get_audit_logger),
 ):
     mongo = get_mongo()
+
+    if identity.get("type") != "user":
+        audit.log(
+            event="ingestion_key_denied",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={"reason": "non_user_identity"},
+        )
+        raise HTTPException(403, "user identity required")
+    
+    context_id = resolve_context_id(request, context)
 
     raw_key = generate_ingestion_key()
 
     doc = {
         "key_hash": hash_ingestion_key(raw_key),
-        "context_id": context["context_id"],
+        "context_id": context_id,
         "enabled": True,
         "created_at": datetime.now(UTC),
-        "created_by": identity.get("email") or identity.get("service"),
+        "created_by": identity.get("email"),
     }
 
     mongo.insert_one("ingestion_keys", doc)
+
+    audit.log(
+        event="ingestion_key_created",
+        identity=identity,
+        metadata={"context_id": context_id},
+    )
 
     return {"ok": True, "key": raw_key}
 
 
 @router.get("/ingestion-keys")
 async def list_ingestion_keys(
+    request: Request,
     context=Depends(get_context),
-    identity=Depends(require_scopes("org:admin")),
+    identity=Depends(require_scopes("ingestion:write")),
+    audit: AuditLogger = Depends(get_audit_logger),
 ):
     mongo = get_mongo()
 
+    if identity.get("type") != "user":
+        audit.log(
+            event="ingestion_key_denied",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={"reason": "non_user_identity"},
+        )
+        raise HTTPException(403, "user identity required")
+    
+    context_id = resolve_context_id(request, context)
+
     keys = mongo.find(
         "ingestion_keys",
-        {"context_id": context["context_id"]},
+        {"context_id": context_id},
     )
 
     return {
@@ -476,10 +603,24 @@ async def list_ingestion_keys(
 @router.delete("/ingestion-keys/{key_id}")
 async def revoke_ingestion_key(
     key_id: str,
+    request: Request,
     context=Depends(get_context),
-    identity=Depends(require_scopes("org:admin")),
+    identity=Depends(require_scopes("ingestion:write")),
+    audit: AuditLogger = Depends(get_audit_logger),
 ):
     mongo = get_mongo()
+
+    if identity.get("type") != "user":
+        audit.log(
+            event="ingestion_key_denied",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={"reason": "non_user_identity"},
+        )
+        raise HTTPException(403, "user identity required")
+    
+    context_id = resolve_context_id(request, context)
 
     try:
         oid = ObjectId(key_id)
@@ -490,13 +631,19 @@ async def revoke_ingestion_key(
         "ingestion_keys",
         {
             "_id": oid,
-            "context_id": context["context_id"],
+            "context_id": context_id,
         },
         {"$set": {"enabled": False}},
     )
 
     if result.matched_count == 0:
         raise HTTPException(404, "key not found")
+    
+    audit.log(
+        event="ingestion_key_revoked",
+        identity=identity,
+        metadata={"key_id": key_id, "context_id": context_id},
+    )
 
     return {"ok": True}
 

@@ -19,5 +19,6 @@ app.include_router(auth.router)
 try:
     from app.enterprise import register_enterprise
     register_enterprise(app)
+    app.state.single_tenant = False
 except ImportError:
-    pass
+    app.state.single_tenant = True
