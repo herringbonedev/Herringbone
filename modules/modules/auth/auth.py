@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from jose import jwt
-import uuid
+import uuid, os
 
 from modules.audit.logger import AuditLogger
 
@@ -36,6 +36,11 @@ def _load_file(path):
         raise RuntimeError(f"Secret file empty: {path}")
 
     return value
+
+
+def is_enterprise_enabled() -> bool:
+    import os
+    return os.environ.get("HB_ENTERPRISE", "false").lower() == "true"
 
 
 def get_user_secret():
@@ -206,16 +211,14 @@ def require_scopes(scope_sets):
 
 
 def resolve_context_id(request: Request, context: dict) -> str:
+    from modules.audit.logger import AuditLogger
+    import os
+
     audit = AuditLogger()
 
-    single_tenant = getattr(request.app.state, "single_tenant", True)
+    enterprise_enabled = os.environ.get("HB_ENTERPRISE", "false").lower() == "true"
 
-    if single_tenant:
-        audit.log(
-            event="context_resolve_single_tenant",
-            identity=context.get("identity"),
-            metadata={"context_id": DEFAULT_CONTEXT},
-        )
+    if not enterprise_enabled:
         return DEFAULT_CONTEXT
 
     context_id = context.get("context_id")
@@ -223,72 +226,65 @@ def resolve_context_id(request: Request, context: dict) -> str:
     if not context_id:
         audit.log(
             event="context_missing",
-            identity=context.get("identity"),
             result="failure",
             severity="WARNING",
         )
         raise HTTPException(400, "context header required")
-    
+
     try:
         from app.enterprise.orgs_context import resolve_org_context
-
-        org = resolve_org_context(request, context)
-
+    except ImportError:
         audit.log(
-            event="context_resolve_success",
-            identity=context.get("identity"),
-            metadata={
-                "context_id": org["context_id"],
-                "slug": org.get("slug"),
-                "role": org.get("role"),
-            },
-        )
-
-        return org["context_id"]
-
-    except HTTPException as e:
-        audit.log(
-            event="context_resolve_failed",
-            identity=context.get("identity"),
+            event="enterprise_module_missing",
             result="failure",
-            severity="WARNING",
-            metadata={
-                "error": str(e.detail),
-                "context_id": context_id,
-            },
+            severity="ERROR",
         )
-        raise
+        raise HTTPException(500, "enterprise module not available")
+
+    org = resolve_org_context(request, context)
+
+    audit.log(
+        event="context_resolved_enterprise",
+        identity=context.get("identity"),
+        metadata={"context_id": org["context_id"]},
+    )
+
+    return org["context_id"]
 
 
 def get_context(
     request: Request,
     identity=Depends(get_identity),
 ):
+    import uuid
+    import os
+    from modules.audit.logger import AuditLogger
+
     audit = AuditLogger()
 
-    header_context = request.headers.get("X-Herringbone-Org")
-    single_tenant = getattr(request.app.state, "single_tenant", True)
+    enterprise_enabled = os.environ.get("HB_ENTERPRISE", "false").lower() == "true"
 
-    if single_tenant:
+    header_context = request.headers.get("X-Herringbone-Org")
+
+    if not enterprise_enabled:
         context_id = DEFAULT_CONTEXT
     else:
         context_id = header_context
 
-    trace_id = str(uuid.uuid4())
+    ctx = {
+        "context_id": context_id,
+        "identity": identity,
+        "trace_id": str(uuid.uuid4()),
+    }
 
     audit.log(
-        event="context_received",
+        event="context_resolved",
         identity=identity,
         metadata={
             "context_id": context_id,
-            "header_context": header_context,
-            "single_tenant": single_tenant,
-            "trace_id": trace_id,
+            "enterprise_enabled": enterprise_enabled,
+            "header_present": bool(header_context),
         },
     )
 
-    return {
-        "context_id": context_id,
-        "identity": identity,
-        "trace_id": trace_id,
-    }
+    return ctx
