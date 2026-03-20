@@ -11,7 +11,8 @@ from modules.auth.auth import (
     require_scopes, 
     get_identity, 
     get_identity_optional, 
-    get_context
+    get_context,
+    resolve_context_id
 )
 
 from modules.audit import AuditLogger
@@ -536,7 +537,7 @@ async def create_ingestion_key_api(
         )
         raise HTTPException(403, "user identity required")
     
-    context_id = context["context_id"]
+    context_id = resolve_context_id(request, context)
 
     raw_key = generate_ingestion_key()
 
@@ -578,7 +579,7 @@ async def list_ingestion_keys(
         )
         raise HTTPException(403, "user identity required")
     
-    context_id = context["context_id"]
+    context_id = resolve_context_id(request, context)
 
     keys = mongo.find(
         "ingestion_keys",
@@ -621,7 +622,7 @@ async def revoke_ingestion_key(
         )
         raise HTTPException(403, "user identity required")
     
-    context_id = context["context_id"]
+    context_id = resolve_context_id(request, context)
 
     try:
         oid = ObjectId(key_id)

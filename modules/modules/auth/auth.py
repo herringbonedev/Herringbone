@@ -2,9 +2,12 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from jose import jwt
-import uuid, os
+from bson import ObjectId
+import uuid
+import os
 
 from modules.audit.logger import AuditLogger
+from modules.database.mongo_db import HerringboneMongoDatabase
 
 
 JWT_ALG_USER = "HS256"
@@ -36,6 +39,17 @@ def _load_file(path):
         raise RuntimeError(f"Secret file empty: {path}")
 
     return value
+
+
+def get_mongo():
+    return HerringboneMongoDatabase(
+        user=os.environ.get("MONGO_USER", "admin"),
+        password=os.environ.get("MONGO_PASS", "secret"),
+        database=os.environ.get("DB_NAME", "herringbone"),
+        host=os.environ.get("MONGO_HOST", "localhost"),
+        port=int(os.environ.get("MONGO_PORT", 27017)),
+        auth_source=os.environ.get("AUTH_DB", "herringbone"),
+    )
 
 
 def is_enterprise_enabled() -> bool:
@@ -107,7 +121,6 @@ def decode_token(token):
                 identity=identity,
                 metadata={"token_type": "user"},
             )
-
             return identity
 
     except Exception as e:
@@ -134,7 +147,6 @@ def decode_token(token):
                 identity=identity,
                 metadata={"token_type": "service"},
             )
-
             return identity
 
     except Exception as e:
@@ -178,44 +190,7 @@ async def get_identity_optional(request: Request):
         return None
 
 
-def require_scopes(scope_sets):
-    if isinstance(scope_sets, str):
-        scope_sets = [(scope_sets,)]
-
-    def checker(identity: dict = Depends(get_identity)):
-        audit = AuditLogger()
-
-        scopes = set(identity.get("scopes", []))
-
-        if "*" in scopes:
-            return identity
-
-        for scope_set in scope_sets:
-            if all(scope in scopes for scope in scope_set):
-                return identity
-
-        audit.log(
-            event="auth_scope_denied",
-            identity=identity,
-            result="failure",
-            severity="WARNING",
-            metadata={
-                "required_scopes": scope_sets,
-                "granted_scopes": list(scopes),
-            },
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions",
-        )
-
-    return checker
-
-
 def resolve_context_id(request: Request, context: dict) -> str:
-    from modules.audit.logger import AuditLogger
-
     audit = AuditLogger()
 
     enterprise_enabled = is_enterprise_enabled()
@@ -245,26 +220,17 @@ def resolve_context_id(request: Request, context: dict) -> str:
         )
         raise HTTPException(403, "service identity cannot use org context")
 
-    try:
-        from app.enterprise.orgs.orgs_context import resolve_org_context
-    except ImportError:
-        audit.log(
-            event="enterprise_module_missing",
-            identity=identity,
-            result="failure",
-            severity="ERROR",
-        )
-        raise HTTPException(500, "enterprise module not available")
+    return str(context_id)
 
-    org = resolve_org_context(request, context)
 
-    audit.log(
-        event="context_resolved_enterprise",
-        identity=identity,
-        metadata={"context_id": org["context_id"]},
-    )
-
-    return org["context_id"]
+def _dedupe_scopes(scopes: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for scope in scopes:
+        if scope and scope not in seen:
+            seen.add(scope)
+            result.append(scope)
+    return result
 
 
 def get_context(
@@ -291,24 +257,153 @@ def get_context(
         "context_id": raw_context_id,
         "identity": identity,
         "trace_id": str(uuid.uuid4()),
+        "global_scopes": list(identity.get("scopes", [])),
+        "org_scopes": [],
+        "role": None,
     }
 
+    ctx["context_id"] = resolve_context_id(request, ctx)
+
+    if identity.get("type") == "service":
+        effective_scopes = _dedupe_scopes(list(identity.get("scopes", [])))
+        effective_identity = dict(identity)
+        effective_identity["scopes"] = effective_scopes
+
+        ctx["scopes"] = effective_scopes
+        ctx["identity"] = effective_identity
+
+        request.state.context_id = ctx["context_id"]
+        request.state.scopes = effective_scopes
+        request.state.identity = effective_identity
+
+        audit.log(
+            event="context_resolved",
+            identity=effective_identity,
+            metadata={
+                "context_id": ctx["context_id"],
+                "enterprise_enabled": enterprise_enabled,
+                "header_present": bool(header_context),
+                "scope_count": len(effective_scopes),
+                "role": None,
+            },
+        )
+
+        return ctx
+
+    if not enterprise_enabled or ctx["context_id"] == DEFAULT_CONTEXT:
+        effective_scopes = _dedupe_scopes(list(identity.get("scopes", [])))
+        effective_identity = dict(identity)
+        effective_identity["scopes"] = effective_scopes
+
+        ctx["scopes"] = effective_scopes
+        ctx["identity"] = effective_identity
+
+        request.state.context_id = ctx["context_id"]
+        request.state.scopes = effective_scopes
+        request.state.identity = effective_identity
+
+        audit.log(
+            event="context_resolved",
+            identity=effective_identity,
+            metadata={
+                "context_id": ctx["context_id"],
+                "enterprise_enabled": enterprise_enabled,
+                "header_present": bool(header_context),
+                "scope_count": len(effective_scopes),
+                "role": None,
+            },
+        )
+
+        return ctx
+
     try:
-        ctx["context_id"] = resolve_context_id(request, ctx)
-    except HTTPException:
-        raise
+        from app.enterprise.orgs.orgs_context import resolve_org_context
+    except ImportError:
+        audit.log(
+            event="enterprise_module_missing",
+            identity=identity,
+            result="failure",
+            severity="ERROR",
+        )
+        raise HTTPException(500, "enterprise module not available")
+
+    org_ctx = resolve_org_context(request=request, context=ctx)
+
+    ctx["context_id"] = org_ctx["context_id"]
+    ctx["role"] = org_ctx.get("role")
+    ctx["org_scopes"] = list(org_ctx.get("org_scopes", []))
+    ctx["slug"] = org_ctx.get("slug")
+
+    effective_scopes = _dedupe_scopes(
+        list(ctx["global_scopes"]) + list(ctx["org_scopes"])
+    )
+
+    effective_identity = dict(identity)
+    effective_identity["scopes"] = effective_scopes
+    effective_identity["global_scopes"] = list(ctx["global_scopes"])
+    effective_identity["org_scopes"] = list(ctx["org_scopes"])
+    effective_identity["context_id"] = ctx["context_id"]
+    effective_identity["org_role"] = ctx["role"]
+
+    ctx["scopes"] = effective_scopes
+    ctx["identity"] = effective_identity
+
+    request.state.context_id = ctx["context_id"]
+    request.state.scopes = effective_scopes
+    request.state.identity = effective_identity
+    request.state.org_role = ctx["role"]
 
     audit.log(
         event="context_resolved",
-        identity=identity,
+        identity=effective_identity,
         metadata={
             "context_id": ctx["context_id"],
             "enterprise_enabled": enterprise_enabled,
             "header_present": bool(header_context),
+            "scope_count": len(effective_scopes),
+            "role": ctx["role"],
         },
     )
 
     return ctx
+
+
+def require_scopes(scope_sets):
+    if isinstance(scope_sets, str):
+        scope_sets = [(scope_sets,)]
+
+    def checker(context: dict = Depends(get_context)):
+        audit = AuditLogger()
+
+        identity = context.get("identity", {})
+        scopes = set(context.get("scopes", []))
+
+        if "*" in scopes:
+            return identity
+
+        for scope_set in scope_sets:
+            if all(scope in scopes for scope in scope_set):
+                return identity
+
+        audit.log(
+            event="auth_scope_denied",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={
+                "required_scopes": scope_sets,
+                "granted_scopes": list(scopes),
+                "context_id": context.get("context_id"),
+                "role": context.get("role"),
+            },
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
+
+    return checker
 
 
 def require_user_identity(identity: dict = Depends(get_identity)):

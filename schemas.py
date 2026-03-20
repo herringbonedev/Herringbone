@@ -35,9 +35,3 @@ class UserDeleteRequest(BaseModel):
 class UserScopesUpdateRequest(BaseModel):
     email: EmailStr
     scopes: list[str]
-
-
-class OrgMemberUpsertRequest(BaseModel):
-    email: EmailStr
-    role: str = "member"
-    scopes: Optional[list[str]] = None
