@@ -241,12 +241,14 @@ async def list_users(
     mongo = get_mongo()
 
     context_id = context.get("context_id")
-    enterprise_enabled = context.get("enterprise_enabled", False)
+
+    # 🔥 CRITICAL FIX: do NOT trust enterprise_enabled flag
+    enterprise_enabled = context_id is not None and context_id != "default"
 
     users = []
     members_by_user = {}
 
-    if not enterprise_enabled or context_id == "default":
+    if not enterprise_enabled:
         users = mongo.find("users", {})
 
     else:
@@ -274,7 +276,7 @@ async def list_users(
             if uid:
                 user_ids.append(uid)
                 members_by_user[uid] = m
-        
+
         object_ids = []
         for uid in user_ids:
             try:
@@ -289,7 +291,7 @@ async def list_users(
             )
         else:
             users = []
-    
+
     result = []
 
     for u in users:
@@ -299,7 +301,7 @@ async def list_users(
         org_scopes = None
         role = None
 
-        if enterprise_enabled and context_id != "default":
+        if enterprise_enabled:
             member = members_by_user.get(user_id)
 
             if member:
@@ -319,7 +321,7 @@ async def list_users(
                 "role": role,
             }
         )
-    
+
     audit.log(
         event="users_list",
         identity=identity,
@@ -354,11 +356,12 @@ async def update_user_scopes(
 
     caller_scopes = identity.get("scopes", [])
     validate_admin_scope_assignment(payload.scopes, caller_scopes)
+    
+    context_id = context.get("context_id")
 
-    context_id = payload.context_id or context.get("context_id")
-    enterprise_enabled = context.get("enterprise_enabled", False)
+    enterprise_enabled = context_id is not None and context_id != "default"
 
-    if not enterprise_enabled or not context_id or context_id == "default":
+    if not enterprise_enabled:
         mongo.update_one(
             "users",
             {"_id": target["_id"]},
