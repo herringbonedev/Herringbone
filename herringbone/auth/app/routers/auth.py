@@ -117,6 +117,7 @@ async def register_user(
                 result="failure",
                 severity="WARNING",
                 metadata={"reason": "invalid_bootstrap_token"},
+                request=request,
             )
             raise HTTPException(403, "Bootstrap token required for first user")
 
@@ -127,6 +128,7 @@ async def register_user(
                 result="failure",
                 severity="WARNING",
                 metadata={"reason": "unauthenticated"},
+                request=request,
             )
             raise HTTPException(401, "Authentication required")
 
@@ -139,6 +141,7 @@ async def register_user(
                 result="failure",
                 severity="WARNING",
                 metadata={"reason": "insufficient_scope"},
+                request=request,
             )
             raise HTTPException(403, "Only platform admins can create users")
 
@@ -149,6 +152,7 @@ async def register_user(
             result="failure",
             severity="WARNING",
             metadata={"reason": "user_exists", "email": payload.email},
+            request=request,
         )
         raise HTTPException(400, "User already exists")
 
@@ -181,6 +185,7 @@ async def register_user(
         event="user_register_success",
         identity=identity,
         metadata={"email": payload.email, "user_id": str(user_id)},
+        request=request,
     )
 
     return {"ok": True, "user_id": str(user_id), "scopes": scopes}
@@ -202,6 +207,7 @@ async def login_user(
             result="failure",
             severity="WARNING",
             metadata={"email": payload.email},
+            request=request,
         )
         raise HTTPException(401, "Invalid credentials")
 
@@ -219,6 +225,7 @@ async def login_user(
             "scopes": user.get("scopes", []),
             "type": "user",
         },
+        request=request,
     )
 
     return {"access_token": token, "token_type": "bearer"}
@@ -277,6 +284,7 @@ async def list_users(
             "context_id": context_id,
             "enterprise_enabled": enterprise_enabled,
         },
+        request=request,
     )
 
     return {
@@ -322,6 +330,7 @@ async def update_user_scopes(
                 "mode": "global",
                 "context_id": "default",
             },
+            request=request,
         )
 
         return {
@@ -353,6 +362,7 @@ async def update_user_scopes(
             "mode": "org",
             "context_id": context_id,
         },
+        request=request,
     )
 
     return {
@@ -382,6 +392,7 @@ async def delete_user(
         event="user_deleted",
         identity=identity,
         metadata={"email": payload.email},
+        request=request,
     )
 
     return {
@@ -442,6 +453,7 @@ async def register_service(
         event="service_registered",
         identity=identity,
         metadata={"service_name": payload.service_name},
+        request=request,
     )
 
     return {
@@ -494,6 +506,7 @@ async def set_service_scopes(
             result="failure",
             severity="WARNING",
             metadata={"service_name": payload.service_name},
+            request=request,
         )
         raise HTTPException(status_code=404, detail="Service not found")
 
@@ -511,6 +524,7 @@ async def set_service_scopes(
         event="service_scopes_updated",
         identity=identity,
         metadata={"service": payload.service_name, "scopes": payload.scopes},
+        request=request,
     )
 
     return {
@@ -541,6 +555,7 @@ async def create_service_token_api(
             result="failure",
             severity="WARNING",
             metadata={"service_name": payload.service},
+            request=request,
         )
         raise HTTPException(status_code=404, detail="Service not found or disabled")
 
@@ -554,6 +569,7 @@ async def create_service_token_api(
         event="service_token_created",
         identity=identity,
         metadata={"service": payload.service, "scopes": payload.scopes},
+        request=request,
     )
 
     return {
@@ -580,6 +596,7 @@ async def delete_service(
             result="failure",
             severity="WARNING",
             metadata={"service_name": service_name},
+            request=request,
         )
         raise HTTPException(status_code=404, detail="Service not found")
 
@@ -589,6 +606,7 @@ async def delete_service(
         event="service_deleted",
         identity=identity,
         metadata={"service_name": service_name},
+        request=request,
     )
 
     return {
@@ -613,6 +631,7 @@ async def create_ingestion_key_api(
             result="failure",
             severity="WARNING",
             metadata={"reason": "non_user_identity"},
+            request=request,
         )
         raise HTTPException(403, "user identity required")
     
@@ -634,6 +653,7 @@ async def create_ingestion_key_api(
         event="ingestion_key_created",
         identity=identity,
         metadata={"context_id": context_id},
+        request=request,
     )
 
     return {"ok": True, "key": raw_key}
@@ -655,6 +675,7 @@ async def list_ingestion_keys(
             result="failure",
             severity="WARNING",
             metadata={"reason": "non_user_identity"},
+            request=request,
         )
         raise HTTPException(403, "user identity required")
     
@@ -698,6 +719,7 @@ async def revoke_ingestion_key(
             result="failure",
             severity="WARNING",
             metadata={"reason": "non_user_identity"},
+            request=request,
         )
         raise HTTPException(403, "user identity required")
     
@@ -724,6 +746,7 @@ async def revoke_ingestion_key(
         event="ingestion_key_revoked",
         identity=identity,
         metadata={"key_id": key_id, "context_id": context_id},
+        request=request,
     )
 
     return {"ok": True}
