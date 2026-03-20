@@ -243,29 +243,73 @@ async def list_users(
     context_id = context.get("context_id")
     enterprise_enabled = context.get("enterprise_enabled", False)
 
-    users = mongo.find("users", {})
+    users = []
+    members_by_user = {}
 
+    if not enterprise_enabled or context_id == "default":
+        users = mongo.find("users", {})
+
+    else:
+        members = mongo.find(
+            "organization_members",
+            {"context_id": context_id},
+        )
+
+        if not members:
+            audit.log(
+                event="users_list",
+                identity=identity,
+                request=request,
+                metadata={
+                    "count": 0,
+                    "context_id": context_id,
+                    "enterprise_enabled": enterprise_enabled,
+                },
+                request=request,
+            )
+            return {"count": 0, "users": []}
+
+        user_ids = []
+        for m in members:
+            uid = m.get("user_id")
+            if uid:
+                user_ids.append(uid)
+                members_by_user[uid] = m
+        
+        object_ids = []
+        for uid in user_ids:
+            try:
+                object_ids.append(ObjectId(uid))
+            except Exception:
+                continue
+
+        if object_ids:
+            users = mongo.find(
+                "users",
+                {"_id": {"$in": object_ids}},
+            )
+        else:
+            users = []
+    
     result = []
 
     for u in users:
         user_id = str(u["_id"])
+
         global_scopes = u.get("scopes", [])
-
         org_scopes = None
+        role = None
 
-        if enterprise_enabled and context_id and context_id != "default":
-            member = mongo.find_one(
-                "organization_members",
-                {
-                    "user_id": user_id,
-                    "context_id": context_id,
-                },
-            )
+        if enterprise_enabled and context_id != "default":
+            member = members_by_user.get(user_id)
 
             if member:
                 org_scopes = member.get("scopes", [])
+                role = member.get("role")
 
-        effective_scopes = org_scopes if org_scopes is not None else global_scopes
+        effective_scopes = (
+            org_scopes if org_scopes is not None else global_scopes
+        )
 
         result.append(
             {
@@ -273,12 +317,14 @@ async def list_users(
                 "scopes": effective_scopes,
                 "global_scopes": global_scopes,
                 "org_scopes": org_scopes,
+                "role": role,
             }
         )
     
     audit.log(
         event="users_list",
         identity=identity,
+        request=request,
         metadata={
             "count": len(result),
             "context_id": context_id,
