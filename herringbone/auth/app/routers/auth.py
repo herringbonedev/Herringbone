@@ -1,4 +1,4 @@
-import os
+import os, secrets
 from datetime import datetime, UTC
 from typing import Optional
 from bson import ObjectId
@@ -101,6 +101,8 @@ async def register_user(
     identity: dict | None = Depends(get_identity_optional),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
+    import secrets
+
     mongo = get_mongo()
 
     bootstrap_required = is_bootstrap_required(mongo)
@@ -109,7 +111,7 @@ async def register_user(
         expected = load_bootstrap_token()
         provided = request.headers.get("x-bootstrap-token")
 
-        if not expected or not provided or provided != expected:
+        if not expected or not provided or not secrets.compare_digest(provided, expected):
             audit.log(
                 event="user_register_denied",
                 identity=identity,
@@ -459,7 +461,7 @@ async def create_service_token_api(
             identity=identity,
             result="failure",
             severity="WARNING",
-            metadata={"service_name": payload.service_name},
+            metadata={"service_name": payload.service},
         )
         raise HTTPException(status_code=404, detail="Service not found or disabled")
 
@@ -498,7 +500,7 @@ async def delete_service(
             identity=identity,
             result="failure",
             severity="WARNING",
-            metadata={"service_name": payload.service_name},
+            metadata={"service_name": service_name},
         )
         raise HTTPException(status_code=404, detail="Service not found")
 

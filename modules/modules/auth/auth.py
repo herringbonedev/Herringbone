@@ -39,7 +39,6 @@ def _load_file(path):
 
 
 def is_enterprise_enabled() -> bool:
-    import os
     return os.environ.get("HB_ENTERPRISE", "false").lower() == "true"
 
 
@@ -69,12 +68,13 @@ def service_auth_headers():
 
 
 def _normalize_identity(payload, identity_type):
-    context_id = str(payload.get("context_id") or DEFAULT_CONTEXT)
+    scopes = payload.get("scope", [])
+    if isinstance(scopes, str):
+        scopes = scopes.split()
 
     identity = {
         "type": identity_type,
-        "scopes": payload.get("scope", []),
-        "context_id": context_id,
+        "scopes": scopes,
         "token_id": payload.get("jti"),
     }
 
@@ -199,7 +199,10 @@ def require_scopes(scope_sets):
             identity=identity,
             result="failure",
             severity="WARNING",
-            metadata={"required_scopes": scope_sets},
+            metadata={
+                "required_scopes": scope_sets,
+                "granted_scopes": list(scopes),
+            },
         )
 
         raise HTTPException(
@@ -212,30 +215,42 @@ def require_scopes(scope_sets):
 
 def resolve_context_id(request: Request, context: dict) -> str:
     from modules.audit.logger import AuditLogger
-    import os
 
     audit = AuditLogger()
 
-    enterprise_enabled = os.environ.get("HB_ENTERPRISE", "false").lower() == "true"
+    enterprise_enabled = is_enterprise_enabled()
 
     if not enterprise_enabled:
         return DEFAULT_CONTEXT
 
     context_id = context.get("context_id")
+    identity = context.get("identity")
 
     if not context_id:
         audit.log(
             event="context_missing",
+            identity=identity,
             result="failure",
             severity="WARNING",
         )
         raise HTTPException(400, "context header required")
+
+    if identity and identity.get("type") == "service":
+        audit.log(
+            event="context_service_forbidden",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={"context_id": context_id},
+        )
+        raise HTTPException(403, "service identity cannot use org context")
 
     try:
         from app.enterprise.orgs_context import resolve_org_context
     except ImportError:
         audit.log(
             event="enterprise_module_missing",
+            identity=identity,
             result="failure",
             severity="ERROR",
         )
@@ -245,7 +260,7 @@ def resolve_context_id(request: Request, context: dict) -> str:
 
     audit.log(
         event="context_resolved_enterprise",
-        identity=context.get("identity"),
+        identity=identity,
         metadata={"context_id": org["context_id"]},
     )
 
@@ -256,35 +271,73 @@ def get_context(
     request: Request,
     identity=Depends(get_identity),
 ):
-    import uuid
-    import os
-    from modules.audit.logger import AuditLogger
-
     audit = AuditLogger()
 
-    enterprise_enabled = os.environ.get("HB_ENTERPRISE", "false").lower() == "true"
-
+    enterprise_enabled = is_enterprise_enabled()
     header_context = request.headers.get("X-Herringbone-Org")
 
-    if not enterprise_enabled:
-        context_id = DEFAULT_CONTEXT
-    else:
-        context_id = header_context
+    if enterprise_enabled and not header_context:
+        audit.log(
+            event="context_missing_header",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+        )
+        raise HTTPException(400, "X-Herringbone-Org header required")
+
+    raw_context_id = header_context if enterprise_enabled else DEFAULT_CONTEXT
 
     ctx = {
-        "context_id": context_id,
+        "context_id": raw_context_id,
         "identity": identity,
         "trace_id": str(uuid.uuid4()),
     }
+
+    try:
+        ctx["context_id"] = resolve_context_id(request, ctx)
+    except HTTPException:
+        raise
 
     audit.log(
         event="context_resolved",
         identity=identity,
         metadata={
-            "context_id": context_id,
+            "context_id": ctx["context_id"],
             "enterprise_enabled": enterprise_enabled,
             "header_present": bool(header_context),
         },
     )
 
     return ctx
+
+
+def require_user_identity(identity: dict = Depends(get_identity)):
+    audit = AuditLogger()
+
+    if not identity:
+        audit.log(
+            event="auth_user_missing",
+            result="failure",
+            severity="WARNING",
+        )
+        raise HTTPException(401, "authentication required")
+
+    if identity.get("type") != "user":
+        audit.log(
+            event="auth_user_required",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+        )
+        raise HTTPException(403, "user identity required")
+
+    if not identity.get("id"):
+        audit.log(
+            event="auth_user_invalid",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+        )
+        raise HTTPException(400, "invalid user identity")
+
+    return identity
