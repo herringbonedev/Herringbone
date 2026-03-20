@@ -246,7 +246,7 @@ def resolve_context_id(request: Request, context: dict) -> str:
         raise HTTPException(403, "service identity cannot use org context")
 
     try:
-        from app.enterprise.orgs_context import resolve_org_context
+        from app.enterprise.orgs.orgs_context import resolve_org_context
     except ImportError:
         audit.log(
             event="enterprise_module_missing",
