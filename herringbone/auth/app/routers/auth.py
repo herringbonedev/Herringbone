@@ -242,7 +242,6 @@ async def list_users(
 
     context_id = context.get("context_id")
 
-    # 🔥 CRITICAL FIX: do NOT trust enterprise_enabled flag
     enterprise_enabled = context_id is not None and context_id != "default"
 
     users = []
@@ -252,9 +251,17 @@ async def list_users(
         users = mongo.find("users", {})
 
     else:
+        try:
+            org_oid = ObjectId(context_id)
+        except Exception:
+            raise HTTPException(400, "invalid context_id")
+
         members = mongo.find(
             "organization_members",
-            {"context_id": context_id},
+            {
+                "org_id": org_oid,
+                "status": "active",
+            },
         )
 
         if not members:
@@ -274,8 +281,10 @@ async def list_users(
         for m in members:
             uid = m.get("user_id")
             if uid:
-                user_ids.append(uid)
-                members_by_user[uid] = m
+                user_id_str = str(m.get("user_id"))
+                if user_id_str:
+                    user_ids.append(m["user_id"])
+                    members_by_user[user_id_str] = m
 
         object_ids = []
         for uid in user_ids:
@@ -356,7 +365,7 @@ async def update_user_scopes(
 
     caller_scopes = identity.get("scopes", [])
     validate_admin_scope_assignment(payload.scopes, caller_scopes)
-    
+
     context_id = context.get("context_id")
 
     enterprise_enabled = context_id is not None and context_id != "default"
@@ -389,8 +398,8 @@ async def update_user_scopes(
     mongo.update_one(
         "organization_members",
         {
-            "user_id": str(target["_id"]),
-            "context_id": context_id,
+            "user_id": target["_id"],
+            "org_id": ObjectId(context_id),
         },
         {
             "$set": {
