@@ -74,9 +74,23 @@ class AuditLogger:
         timestamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
         meta = metadata or {}
-        meta_json = json.dumps(meta)
-        if len(meta_json) > 2048:
+        try:
+            meta_json = json.dumps(meta)
+            if len(meta_json) > 2048:
+                meta = {
+                    "truncated": True,
+                    "original_size": len(meta_json),
+                }
+        except Exception:
             meta = {"truncated": True}
+        
+        context_id = "default"
+
+        if request and hasattr(request.state, "context_id"):
+            context_id = request.state.context_id
+        
+        elif identity:
+            context_id = identity.get("context_id", "default")
 
         record = {
             "timestamp": timestamp,
@@ -90,7 +104,7 @@ class AuditLogger:
             "instance": self.instance,
             "node": self.node,
             "target": target,
-            "context_id": "default",
+            "context_id": context_id,
             "user_id": None,
             "email": None,
             "service_id": None,
@@ -103,8 +117,6 @@ class AuditLogger:
 
         if identity:
 
-            record["context_id"] = identity.get("context_id", "default")
-
             record["user_id"] = identity.get("id") or identity.get("sub")
             record["email"] = identity.get("email")
 
@@ -113,7 +125,7 @@ class AuditLogger:
                 record["service_id"] = identity.get("service_id")
 
             record["scopes"] = identity.get("scopes")
-
+        
         if request:
 
             if request.client:

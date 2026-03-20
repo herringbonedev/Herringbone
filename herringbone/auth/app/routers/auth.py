@@ -228,20 +228,60 @@ async def login_user(
 async def list_users(
     request: Request,
     identity=Depends(get_identity),
+    context=Depends(get_context),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
     mongo = get_mongo()
+
+    context_id = context.get("context_id")
+    enterprise_enabled = context.get("enterprise_enabled", False)
+
     users = mongo.find("users", {})
 
-    return {
-        "count": len(users),
-        "users": [
+    result = []
+
+    for u in users:
+        user_id = str(u["_id"])
+        global_scopes = u.get("scopes", [])
+
+        org_scopes = None
+
+        if enterprise_enabled and context_id and context_id != "default":
+            member = mongo.find_one(
+                "organization_members",
+                {
+                    "user_id": user_id,
+                    "context_id": context_id,
+                },
+            )
+
+            if member:
+                org_scopes = member.get("scopes", [])
+
+        effective_scopes = org_scopes if org_scopes is not None else global_scopes
+
+        result.append(
             {
                 "email": u.get("email"),
-                "scopes": u.get("scopes", []),
+                "scopes": effective_scopes,
+                "global_scopes": global_scopes,
+                "org_scopes": org_scopes,
             }
-            for u in users
-        ],
+        )
+    
+    audit.log(
+        event="users_list",
+        identity=identity,
+        metadata={
+            "count": len(result),
+            "context_id": context_id,
+            "enterprise_enabled": enterprise_enabled,
+        },
+    )
+
+    return {
+        "count": len(result),
+        "users": result,
     }
 
 
@@ -250,6 +290,7 @@ async def update_user_scopes(
     payload: UserScopesUpdateRequest,
     request: Request,
     identity=Depends(get_identity),
+    context=Depends(get_context),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
     mongo = get_mongo()
@@ -260,19 +301,58 @@ async def update_user_scopes(
         raise HTTPException(status_code=404, detail="User not found")
 
     caller_scopes = identity.get("scopes", [])
-
     validate_admin_scope_assignment(payload.scopes, caller_scopes)
 
+    context_id = payload.context_id or context.get("context_id")
+    enterprise_enabled = context.get("enterprise_enabled", False)
+
+    if not enterprise_enabled or not context_id or context_id == "default":
+        mongo.update_one(
+            "users",
+            {"_id": target["_id"]},
+            {"$set": {"scopes": payload.scopes}},
+        )
+
+        audit.log(
+            event="user_scopes_updated",
+            identity=identity,
+            metadata={
+                "email": payload.email,
+                "scopes": payload.scopes,
+                "mode": "global",
+                "context_id": "default",
+            },
+        )
+
+        return {
+            "ok": True,
+            "email": payload.email,
+            "scopes": payload.scopes,
+        }
+    
     mongo.update_one(
-        "users",
-        {"_id": target["_id"]},
-        {"$set": {"scopes": payload.scopes}},
+        "organization_members",
+        {
+            "user_id": str(target["_id"]),
+            "context_id": context_id,
+        },
+        {
+            "$set": {
+                "scopes": payload.scopes,
+            }
+        },
+        upsert=True,
     )
 
     audit.log(
         event="user_scopes_updated",
         identity=identity,
-        metadata={"email": payload.email, "scopes": payload.scopes},
+        metadata={
+            "email": payload.email,
+            "scopes": payload.scopes,
+            "mode": "org",
+            "context_id": context_id,
+        },
     )
 
     return {
