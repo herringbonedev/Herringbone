@@ -242,19 +242,19 @@ def get_context(
     enterprise_enabled = is_enterprise_enabled()
     header_context = request.headers.get("X-Herringbone-Org")
 
-    if enterprise_enabled and not header_context:
-        audit.log(
-            event="context_missing_header_fallback",
-            identity=identity,
-            metadata={
-                "fallback": "default_context"
-            },
-        )
-        raw_context_id = DEFAULT_CONTEXT
+    # ✅ FIXED: correct fallback logic (NO overwrite later)
+    if enterprise_enabled:
+        if not header_context:
+            audit.log(
+                event="context_missing_header_fallback",
+                identity=identity,
+                metadata={"fallback": "default_context"},
+            )
+            raw_context_id = DEFAULT_CONTEXT
+        else:
+            raw_context_id = header_context
     else:
-        raw_context_id = header_context
-
-    raw_context_id = header_context if enterprise_enabled else DEFAULT_CONTEXT
+        raw_context_id = DEFAULT_CONTEXT
 
     ctx = {
         "context_id": raw_context_id,
@@ -267,6 +267,7 @@ def get_context(
 
     ctx["context_id"] = resolve_context_id(request, ctx)
 
+    # ✅ SERVICE TOKENS: bypass org logic entirely
     if identity.get("type") == "service":
         effective_scopes = _dedupe_scopes(list(identity.get("scopes", [])))
         effective_identity = dict(identity)
@@ -293,6 +294,7 @@ def get_context(
 
         return ctx
 
+    # ✅ CORE MODE OR DEFAULT CONTEXT
     if not enterprise_enabled or ctx["context_id"] == DEFAULT_CONTEXT:
         effective_scopes = _dedupe_scopes(list(identity.get("scopes", [])))
         effective_identity = dict(identity)
@@ -319,6 +321,7 @@ def get_context(
 
         return ctx
 
+    # ✅ ENTERPRISE ORG CONTEXT RESOLUTION
     try:
         from app.enterprise.orgs.orgs_context import resolve_org_context
     except ImportError:
@@ -369,7 +372,6 @@ def get_context(
     )
 
     return ctx
-
 
 def require_scopes(scope_sets):
     if isinstance(scope_sets, str):
