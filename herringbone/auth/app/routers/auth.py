@@ -259,7 +259,6 @@ async def list_users(
             audit.log(
                 event="users_list",
                 identity=identity,
-                request=request,
                 metadata={
                     "count": 0,
                     "context_id": context_id,
@@ -324,7 +323,6 @@ async def list_users(
     audit.log(
         event="users_list",
         identity=identity,
-        request=request,
         metadata={
             "count": len(result),
             "context_id": context_id,
