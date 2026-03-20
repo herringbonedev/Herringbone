@@ -395,18 +395,16 @@ async def update_user_scopes(
             "scopes": payload.scopes,
         }
     
-    mongo.update_one(
+    mongo.upsert_one(
         "organization_members",
         {
             "user_id": target["_id"],
             "org_id": ObjectId(context_id),
         },
         {
-            "$set": {
-                "scopes": payload.scopes,
-            }
+            "scopes": payload.scopes,
+            "updated_at": datetime.now(UTC),
         },
-        upsert=True,
     )
 
     audit.log(
