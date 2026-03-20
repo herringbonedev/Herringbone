@@ -244,12 +244,15 @@ def get_context(
 
     if enterprise_enabled and not header_context:
         audit.log(
-            event="context_missing_header",
+            event="context_missing_header_fallback",
             identity=identity,
-            result="failure",
-            severity="WARNING",
+            metadata={
+                "fallback": "default_context"
+            },
         )
-        raise HTTPException(400, "X-Herringbone-Org header required")
+        raw_context_id = DEFAULT_CONTEXT
+    else:
+        raw_context_id = header_context
 
     raw_context_id = header_context if enterprise_enabled else DEFAULT_CONTEXT
 
