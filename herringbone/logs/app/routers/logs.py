@@ -60,23 +60,38 @@ def merge_parse_results(mongo, event_ids):
     return parsed_map
 
 
+def context_filter(context: dict):
+    context_id = context.get("context_id")
+    if context_id and context_id != "default":
+        return {"context_id": context_id}
+    return {}
+
+
 @router.get("/events")
 def list_events(
     request: Request,
     n: int = Query(25, ge=1, le=500),
     identity=Depends(events_get_auth),
+    context=Depends(get_context),
 ):
 
     mongo = get_mongo()
+    base_filter = context_filter(context)
 
     events = mongo.find_sorted(
         collection="events",
-        filter_query={},
+        filter_query=base_filter,
         sort=[("_id", -1)],
         limit=n,
     )
 
     if not events:
+        audit.log(
+            event="events_list_accessed",
+            identity=identity,
+            request=request,
+            metadata={"count": 0, "context_id": context.get("context_id")},
+        )
         return JSONResponse(content=[])
 
     event_ids = [e["_id"] for e in events]
@@ -98,7 +113,7 @@ def list_events(
         event="events_list_accessed",
         identity=identity,
         request=request,
-        metadata={"count": len(events)},
+        metadata={"count": len(events), "context_id": context.get("context_id")},
     )
 
     return JSONResponse(content=encode(events))
@@ -109,6 +124,7 @@ def get_event(
     event_id: str,
     request: Request,
     identity=Depends(events_get_auth),
+    context=Depends(get_context),
 ):
 
     mongo = get_mongo()
@@ -117,10 +133,19 @@ def get_event(
 
     event = mongo.find_one(
         collection="events",
-        filter_query={"_id": oid},
+        filter_query={"_id": oid, **context_filter(context)},
     )
 
     if not event:
+        audit.log(
+            event="event_lookup_failed",
+            identity=identity,
+            request=request,
+            target=str(event_id),
+            result="failure",
+            severity="WARNING",
+            metadata={"context_id": context.get("context_id")},
+        )
         return JSONResponse(status_code=404, content={"detail": "Event not found"})
 
     state = mongo.find_one(
@@ -137,6 +162,7 @@ def get_event(
         identity=identity,
         request=request,
         target=str(event_id),
+        metadata={"context_id": context.get("context_id")},
     )
 
     return JSONResponse(content=encode(event))
@@ -146,21 +172,23 @@ def get_event(
 def dashboard_summary(
     request: Request,
     identity=Depends(dashboard_auth),
+    context=Depends(get_context),
 ):
 
     mongo = get_mongo()
     now = datetime.now(UTC)
     since = now - timedelta(hours=24)
+    base_filter = context_filter(context)
 
     events = mongo.find(
         collection="events",
-        filter_query={"ingested_at": {"$gte": since}},
+        filter_query={**base_filter, "ingested_at": {"$gte": since}},
     )
     events_24h = len(events)
 
     states = mongo.find(
         collection="event_state",
-        filter_query={},
+        filter_query=base_filter,
     )
 
     detected = 0
@@ -184,6 +212,7 @@ def dashboard_summary(
         event="dashboard_summary_accessed",
         identity=identity,
         request=request,
+        metadata={"context_id": context.get("context_id")},
     )
 
     return {
@@ -200,18 +229,26 @@ def dashboard_recent_events(
     request: Request,
     n: int = Query(10, ge=1, le=50),
     identity=Depends(dashboard_auth),
+    context=Depends(get_context),
 ):
 
     mongo = get_mongo()
+    base_filter = context_filter(context)
 
     events = mongo.find_sorted(
         collection="events",
-        filter_query={},
+        filter_query=base_filter,
         sort=[("_id", -1)],
         limit=n,
     )
 
     if not events:
+        audit.log(
+            event="dashboard_recent_events",
+            identity=identity,
+            request=request,
+            metadata={"count": 0, "context_id": context.get("context_id")},
+        )
         return []
 
     event_ids = [e["_id"] for e in events]
@@ -238,6 +275,7 @@ def dashboard_recent_events(
         event="dashboard_recent_events",
         identity=identity,
         request=request,
+        metadata={"count": len(out), "context_id": context.get("context_id")},
     )
 
     return encode(out)
@@ -248,13 +286,14 @@ def dashboard_recent_detections(
     request: Request,
     n: int = Query(10, ge=1, le=50),
     identity=Depends(dashboard_auth),
+    context=Depends(get_context),
 ):
 
     mongo = get_mongo()
 
     detections = mongo.find_sorted(
         collection="detections",
-        filter_query={"detection": True},
+        filter_query={"detection": True, **context_filter(context)},
         sort=[("inserted_at", -1)],
         limit=n,
     )
@@ -263,6 +302,7 @@ def dashboard_recent_detections(
         event="dashboard_recent_detections",
         identity=identity,
         request=request,
+        metadata={"count": len(detections), "context_id": context.get("context_id")},
     )
 
     return encode([
@@ -280,13 +320,14 @@ def recent_incidents(
     request: Request,
     n: int = Query(10, ge=1, le=50),
     identity=Depends(dashboard_auth),
+    context=Depends(get_context),
 ):
 
     mongo = get_mongo()
 
     incidents = mongo.find_sorted(
         collection="incidents",
-        filter_query={},
+        filter_query=context_filter(context),
         sort=[("created_at", -1)],
         limit=n,
     )
@@ -306,6 +347,7 @@ def recent_incidents(
         event="dashboard_recent_incidents",
         identity=identity,
         request=request,
+        metadata={"count": len(results), "context_id": context.get("context_id")},
     )
 
     return JSONResponse(content=encode(results))
@@ -316,6 +358,7 @@ def incidents_throughput(
     request: Request,
     days: int = Query(7, ge=1, le=30),
     identity=Depends(dashboard_auth),
+    context=Depends(get_context),
 ):
 
     mongo = get_mongo()
@@ -324,7 +367,7 @@ def incidents_throughput(
 
     incidents = mongo.find(
         collection="incidents",
-        filter_query={"created_at": {"$gte": since}},
+        filter_query={**context_filter(context), "created_at": {"$gte": since}},
     )
 
     buckets = {}
@@ -351,6 +394,7 @@ def incidents_throughput(
         event="dashboard_incidents_throughput",
         identity=identity,
         request=request,
+        metadata={"count": len(result), "context_id": context.get("context_id")},
     )
 
     return JSONResponse(content=encode(result))
