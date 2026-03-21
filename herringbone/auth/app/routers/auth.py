@@ -20,6 +20,7 @@ from app.security import (
     hash_password,
     verify_password,
     create_access_token,
+    create_context_token,
     create_service_token,
     generate_ingestion_key,
     hash_ingestion_key,
@@ -217,6 +218,16 @@ async def login_user(
         scopes=user.get("scopes", []),
     )
 
+    context_token = create_context_token(
+        user_id=str(user["_id"]),
+        email=user["email"],
+        context_id="default",
+        scopes=user.get("scopes", []),
+        role=None,
+        global_scopes=user.get("scopes", []),
+        org_scopes=[],
+    )
+
     audit.log(
         event="user_login_success",
         identity={
@@ -228,7 +239,64 @@ async def login_user(
         request=request,
     )
 
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": token,
+        "context_token": context_token,
+        "token_type": "bearer",
+    }
+
+
+@router.post("/context-token")
+async def create_context_token_api(
+    request: Request,
+    context=Depends(get_context),
+    identity=Depends(get_identity),
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    if identity.get("type") != "user":
+        audit.log(
+            event="context_token_denied",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={"reason": "non_user_identity"},
+            request=request,
+        )
+        raise HTTPException(403, "user identity required")
+
+    effective_identity = context.get("identity", identity)
+    context_id = context.get("context_id", "default")
+    scopes = context.get("scopes", effective_identity.get("scopes", []))
+    role = context.get("role")
+
+    token = create_context_token(
+        user_id=effective_identity.get("id"),
+        email=effective_identity.get("email"),
+        context_id=context_id,
+        scopes=scopes,
+        role=role,
+        global_scopes=context.get("global_scopes", effective_identity.get("global_scopes", [])),
+        org_scopes=context.get("org_scopes", effective_identity.get("org_scopes", [])),
+    )
+
+    audit.log(
+        event="context_token_created",
+        identity=effective_identity,
+        metadata={
+            "context_id": context_id,
+            "scope_count": len(scopes),
+            "role": role,
+        },
+        request=request,
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "context_id": context_id,
+        "scopes": scopes,
+        "role": role,
+    }
 
 
 @router.get("/users")

@@ -104,6 +104,37 @@ def create_access_token(
     return jwt.encode(payload, get_user_jwt_secret(), algorithm=USER_JWT_ALG)
 
 
+CONTEXT_JWT_EXPIRE_MINUTES = 5
+
+
+def create_context_token(
+    user_id: str,
+    email: str,
+    context_id: str,
+    scopes: list[str],
+    role: str | None = None,
+    global_scopes: list[str] | None = None,
+    org_scopes: list[str] | None = None,
+) -> str:
+
+    now = datetime.now(timezone.utc)
+
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "scope": scopes,
+        "typ": "context",
+        "context_id": context_id,
+        "role": role,
+        "global_scopes": global_scopes or [],
+        "org_scopes": org_scopes or [],
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=CONTEXT_JWT_EXPIRE_MINUTES)).timestamp()),
+    }
+
+    return jwt.encode(payload, get_user_jwt_secret(), algorithm=USER_JWT_ALG)
+
+
 # ============================
 # Service JWT (RS256)
 # ============================

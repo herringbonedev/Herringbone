@@ -2,7 +2,6 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from jose import jwt
-from bson import ObjectId
 import uuid
 import os
 
@@ -81,10 +80,16 @@ def service_auth_headers():
     return {"Authorization": f"Bearer {get_service_token()}"}
 
 
+def _normalize_scope_value(value):
+    if isinstance(value, str):
+        return value.split()
+    if isinstance(value, list):
+        return value
+    return []
+
+
 def _normalize_identity(payload, identity_type):
-    scopes = payload.get("scope", [])
-    if isinstance(scopes, str):
-        scopes = scopes.split()
+    scopes = _normalize_scope_value(payload.get("scope", []))
 
     identity = {
         "type": identity_type,
@@ -103,6 +108,25 @@ def _normalize_identity(payload, identity_type):
     return identity
 
 
+def _normalize_context_identity(payload):
+    scopes = _normalize_scope_value(payload.get("scope", []))
+    global_scopes = _normalize_scope_value(payload.get("global_scopes", []))
+    org_scopes = _normalize_scope_value(payload.get("org_scopes", []))
+
+    return {
+        "type": "user",
+        "scopes": scopes,
+        "token_id": payload.get("jti"),
+        "id": payload.get("sub"),
+        "email": payload.get("email"),
+        "context_id": str(payload.get("context_id") or DEFAULT_CONTEXT),
+        "role": payload.get("role"),
+        "global_scopes": global_scopes,
+        "org_scopes": org_scopes,
+        "token_type": "context",
+    }
+
+
 def decode_token(token):
     audit = AuditLogger()
 
@@ -112,6 +136,20 @@ def decode_token(token):
             get_user_secret(),
             algorithms=[JWT_ALG_USER],
         )
+
+        if payload.get("typ") == "context":
+            identity = _normalize_context_identity(payload)
+
+            audit.log(
+                event="auth_context_token_valid",
+                identity=identity,
+                metadata={
+                    "token_type": "context",
+                    "context_id": identity.get("context_id"),
+                    "role": identity.get("role"),
+                },
+            )
+            return identity
 
         if payload.get("typ") == "user":
             identity = _normalize_identity(payload, "user")
@@ -244,6 +282,71 @@ def get_context(
         request.headers.get("X-Herringbone-Org")
         or request.headers.get("X-Herringbone-Context")
     )
+
+    if identity.get("token_type") == "context":
+        token_context_id = str(identity.get("context_id") or DEFAULT_CONTEXT)
+
+        if not enterprise_enabled and token_context_id != DEFAULT_CONTEXT:
+            audit.log(
+                event="context_token_denied",
+                identity=identity,
+                request=request,
+                result="failure",
+                severity="WARNING",
+                metadata={"reason": "non_default_context_in_core", "context_id": token_context_id},
+            )
+            raise HTTPException(403, "context token not valid for this service")
+
+        if header_context and str(header_context) != token_context_id:
+            audit.log(
+                event="context_token_header_mismatch",
+                identity=identity,
+                request=request,
+                result="failure",
+                severity="WARNING",
+                metadata={
+                    "header_context": str(header_context),
+                    "token_context": token_context_id,
+                },
+            )
+            raise HTTPException(400, "context token does not match requested context")
+
+        effective_scopes = _dedupe_scopes(list(identity.get("scopes", [])))
+        effective_identity = dict(identity)
+        effective_identity["scopes"] = effective_scopes
+        effective_identity["context_id"] = token_context_id
+
+        ctx = {
+            "context_id": token_context_id,
+            "identity": effective_identity,
+            "trace_id": str(uuid.uuid4()),
+            "global_scopes": list(identity.get("global_scopes", [])),
+            "org_scopes": list(identity.get("org_scopes", [])),
+            "role": identity.get("role"),
+            "enterprise_enabled": enterprise_enabled,
+            "scopes": effective_scopes,
+        }
+
+        request.state.context_id = token_context_id
+        request.state.scopes = effective_scopes
+        request.state.identity = effective_identity
+        request.state.org_role = ctx.get("role")
+
+        audit.log(
+            event="context_resolved",
+            identity=effective_identity,
+            request=request,
+            metadata={
+                "context_id": token_context_id,
+                "enterprise_enabled": enterprise_enabled,
+                "header_present": bool(header_context),
+                "scope_count": len(effective_scopes),
+                "role": ctx.get("role"),
+                "token_type": "context",
+            },
+        )
+
+        return ctx
 
     if enterprise_enabled:
         if not header_context:
