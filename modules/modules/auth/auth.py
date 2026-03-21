@@ -240,15 +240,18 @@ def get_context(
     audit = AuditLogger()
 
     enterprise_enabled = is_enterprise_enabled()
-    header_context = request.headers.get("X-Herringbone-Org")
+    header_context = (
+        request.headers.get("X-Herringbone-Org")
+        or request.headers.get("X-Herringbone-Context")
+    )
 
-    # ✅ FIXED: correct fallback logic (NO overwrite later)
     if enterprise_enabled:
         if not header_context:
             audit.log(
                 event="context_missing_header_fallback",
                 identity=identity,
                 metadata={"fallback": "default_context"},
+                request=request,
             )
             raw_context_id = DEFAULT_CONTEXT
         else:
@@ -263,15 +266,16 @@ def get_context(
         "global_scopes": list(identity.get("scopes", [])),
         "org_scopes": [],
         "role": None,
+        "enterprise_enabled": enterprise_enabled,
     }
 
     ctx["context_id"] = resolve_context_id(request, ctx)
 
-    # ✅ SERVICE TOKENS: bypass org logic entirely
     if identity.get("type") == "service":
         effective_scopes = _dedupe_scopes(list(identity.get("scopes", [])))
         effective_identity = dict(identity)
         effective_identity["scopes"] = effective_scopes
+        effective_identity["context_id"] = ctx["context_id"]
 
         ctx["scopes"] = effective_scopes
         ctx["identity"] = effective_identity
@@ -283,6 +287,7 @@ def get_context(
         audit.log(
             event="context_resolved",
             identity=effective_identity,
+            request=request,
             metadata={
                 "context_id": ctx["context_id"],
                 "enterprise_enabled": enterprise_enabled,
@@ -294,11 +299,11 @@ def get_context(
 
         return ctx
 
-    # ✅ CORE MODE OR DEFAULT CONTEXT
     if not enterprise_enabled or ctx["context_id"] == DEFAULT_CONTEXT:
         effective_scopes = _dedupe_scopes(list(identity.get("scopes", [])))
         effective_identity = dict(identity)
         effective_identity["scopes"] = effective_scopes
+        effective_identity["context_id"] = ctx["context_id"]
 
         ctx["scopes"] = effective_scopes
         ctx["identity"] = effective_identity
@@ -310,6 +315,7 @@ def get_context(
         audit.log(
             event="context_resolved",
             identity=effective_identity,
+            request=request,
             metadata={
                 "context_id": ctx["context_id"],
                 "enterprise_enabled": enterprise_enabled,
@@ -321,13 +327,13 @@ def get_context(
 
         return ctx
 
-    # ✅ ENTERPRISE ORG CONTEXT RESOLUTION
     try:
         from app.enterprise.orgs.orgs_context import resolve_org_context
     except ImportError:
         audit.log(
             event="enterprise_module_missing",
             identity=identity,
+            request=request,
             result="failure",
             severity="ERROR",
         )
@@ -340,9 +346,12 @@ def get_context(
     ctx["org_scopes"] = list(org_ctx.get("org_scopes", []))
     ctx["slug"] = org_ctx.get("slug")
 
-    effective_scopes = _dedupe_scopes(
-        list(ctx["global_scopes"]) + list(ctx["org_scopes"])
-    )
+    effective_scopes = list(ctx["org_scopes"])
+    if "*" in ctx["global_scopes"] and "*" not in effective_scopes:
+        effective_scopes.insert(0, "*")
+    if "platform:admin" in ctx["global_scopes"] and "platform:admin" not in effective_scopes:
+        effective_scopes.append("platform:admin")
+    effective_scopes = _dedupe_scopes(effective_scopes)
 
     effective_identity = dict(identity)
     effective_identity["scopes"] = effective_scopes
@@ -362,6 +371,7 @@ def get_context(
     audit.log(
         event="context_resolved",
         identity=effective_identity,
+        request=request,
         metadata={
             "context_id": ctx["context_id"],
             "enterprise_enabled": enterprise_enabled,
@@ -372,6 +382,7 @@ def get_context(
     )
 
     return ctx
+
 
 def require_scopes(scope_sets):
     if isinstance(scope_sets, str):

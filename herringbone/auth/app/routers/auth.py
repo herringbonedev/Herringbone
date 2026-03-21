@@ -8,9 +8,9 @@ from starlette.requests import Request
 
 from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.auth import (
-    require_scopes, 
-    get_identity, 
-    get_identity_optional, 
+    require_scopes,
+    get_identity,
+    get_identity_optional,
     get_context
 )
 
@@ -241,13 +241,12 @@ async def list_users(
     mongo = get_mongo()
 
     context_id = context.get("context_id")
-
-    enterprise_enabled = context_id is not None and context_id != "default"
+    enterprise_enabled = context.get("enterprise_enabled", False)
 
     users = []
     members_by_user = {}
 
-    if not enterprise_enabled:
+    if not enterprise_enabled or context_id == "default":
         users = mongo.find("users", {})
 
     else:
@@ -277,21 +276,19 @@ async def list_users(
             )
             return {"count": 0, "users": []}
 
-        user_ids = []
+        object_ids = []
         for m in members:
             uid = m.get("user_id")
-            if uid:
-                user_id_str = str(m.get("user_id"))
-                if user_id_str:
-                    user_ids.append(m["user_id"])
-                    members_by_user[user_id_str] = m
+            if not uid:
+                continue
 
-        object_ids = []
-        for uid in user_ids:
             try:
-                object_ids.append(ObjectId(uid))
+                oid = uid if isinstance(uid, ObjectId) else ObjectId(str(uid))
             except Exception:
                 continue
+
+            object_ids.append(oid)
+            members_by_user[str(oid)] = m
 
         if object_ids:
             users = mongo.find(
@@ -310,7 +307,7 @@ async def list_users(
         org_scopes = None
         role = None
 
-        if enterprise_enabled:
+        if enterprise_enabled and context_id != "default":
             member = members_by_user.get(user_id)
 
             if member:
@@ -367,10 +364,9 @@ async def update_user_scopes(
     validate_admin_scope_assignment(payload.scopes, caller_scopes)
 
     context_id = context.get("context_id")
+    enterprise_enabled = context.get("enterprise_enabled", False)
 
-    enterprise_enabled = context_id is not None and context_id != "default"
-
-    if not enterprise_enabled:
+    if not enterprise_enabled or not context_id or context_id == "default":
         mongo.update_one(
             "users",
             {"_id": target["_id"]},
@@ -394,16 +390,44 @@ async def update_user_scopes(
             "email": payload.email,
             "scopes": payload.scopes,
         }
-    
-    mongo.upsert_one(
+
+    try:
+        org_oid = ObjectId(context_id)
+    except Exception:
+        raise HTTPException(400, "invalid context_id")
+
+    member = mongo.find_one(
         "organization_members",
         {
             "user_id": target["_id"],
-            "org_id": ObjectId(context_id),
+            "org_id": org_oid,
+            "status": "active",
         },
+    )
+
+    if not member:
+        audit.log(
+            event="user_scopes_update_denied",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={
+                "email": payload.email,
+                "context_id": context_id,
+                "reason": "membership_not_found",
+            },
+            request=request,
+        )
+        raise HTTPException(404, "user is not a member of this organization")
+
+    mongo.update_one(
+        "organization_members",
+        {"_id": member["_id"]},
         {
-            "scopes": payload.scopes,
-            "updated_at": datetime.now(UTC),
+            "$set": {
+                "scopes": payload.scopes,
+                "updated_at": datetime.now(UTC),
+            }
         },
     )
 
@@ -688,7 +712,7 @@ async def create_ingestion_key_api(
             request=request,
         )
         raise HTTPException(403, "user identity required")
-    
+
     context_id = context["context_id"]
 
     raw_key = generate_ingestion_key()
@@ -732,7 +756,7 @@ async def list_ingestion_keys(
             request=request,
         )
         raise HTTPException(403, "user identity required")
-    
+
     context_id = context["context_id"]
 
     keys = mongo.find(
@@ -776,7 +800,7 @@ async def revoke_ingestion_key(
             request=request,
         )
         raise HTTPException(403, "user identity required")
-    
+
     context_id = context["context_id"]
 
     try:
@@ -795,7 +819,7 @@ async def revoke_ingestion_key(
 
     if result.matched_count == 0:
         raise HTTPException(404, "key not found")
-    
+
     audit.log(
         event="ingestion_key_revoked",
         identity=identity,
