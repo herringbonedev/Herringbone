@@ -431,7 +431,7 @@ def get_context(
         return ctx
 
     try:
-        from app.enterprise.orgs_context import resolve_org_context
+        from app.enterprise.orgs.orgs_context import resolve_org_context
     except ImportError:
         audit.log(
             event="enterprise_module_missing",
