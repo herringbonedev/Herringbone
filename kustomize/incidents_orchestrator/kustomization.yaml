@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/incidents-orchestrator
-    newTag: 4ccc9883
-    digest: sha256:2431a007b32ea149d5fdb6f999a4a29bfa42c2299c0b8a73d186b36231a9960f
+    newTag: 50da3b76
+    digest: sha256:e363ff7a4783820d9e87ad7bfd47229902c603bc1f425e5b49cd1ff387dad6a7
