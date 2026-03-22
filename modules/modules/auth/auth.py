@@ -449,12 +449,9 @@ def get_context(
     ctx["org_scopes"] = list(org_ctx.get("org_scopes", []))
     ctx["slug"] = org_ctx.get("slug")
 
-    effective_scopes = list(ctx["org_scopes"])
-    if "*" in ctx["global_scopes"] and "*" not in effective_scopes:
-        effective_scopes.insert(0, "*")
-    if "platform:admin" in ctx["global_scopes"] and "platform:admin" not in effective_scopes:
-        effective_scopes.append("platform:admin")
-    effective_scopes = _dedupe_scopes(effective_scopes)
+    effective_scopes = _dedupe_scopes(
+        list(ctx["global_scopes"]) + list(ctx["org_scopes"])
+    )
 
     effective_identity = dict(identity)
     effective_identity["scopes"] = effective_scopes
