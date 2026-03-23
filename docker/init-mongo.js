@@ -2,6 +2,25 @@ db = db.getSiblingDB("herringbone")
 
 db.scopes.createIndex({ scope: 1 }, { unique: true })
 
+const defaultOrg = db.organizations.findOneAndUpdate(
+  { slug: "default" },
+  {
+    $set: {
+      name: "Default",
+      slug: "default",
+      status: "active",
+      updated_at: new Date()
+    },
+    $setOnInsert: {
+      created_at: new Date()
+    }
+  },
+  {
+    upsert: true,
+    returnDocument: "after"
+  }
+)
+
 const defaultScopes = [
 
   {
@@ -50,7 +69,6 @@ const defaultScopes = [
     ui_group: "Parser",
     order: 2
   },
-
   {
     scope: "parser:results:read",
     category: "parser",
@@ -60,7 +78,6 @@ const defaultScopes = [
     ui_group: "Parser",
     order: 3
   },
-
   {
     scope: "parser:results:write",
     category: "parser",
@@ -201,31 +218,11 @@ const defaultScopes = [
     tier: "free",
     ui_group: "Platform",
     order: 2
-  },
-
-  {
-    scope: "org:admin",
-    category: "org",
-    action: "admin",
-    description: "Organization administrator",
-    tier: "enterprise",
-    ui_group: "Organization",
-    order: 1
-  },
-  {
-    scope: "org:analyst",
-    category: "org",
-    action: "analyst",
-    description: "Organization analyst",
-    tier: "enterprise",
-    ui_group: "Organization",
-    order: 2
   }
 
 ]
 
 defaultScopes.forEach(scope => {
-
   db.scopes.updateOne(
     { scope: scope.scope },
     {
@@ -243,7 +240,7 @@ defaultScopes.forEach(scope => {
     },
     { upsert: true }
   )
-
 })
 
+print("Default org ensured")
 print("Scopes seeded or updated")
