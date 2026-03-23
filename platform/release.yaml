@@ -9,7 +9,7 @@ services:
   parser-cardset: quay.io/herringbone/parser-cardset:86fd8b43@sha256:1c56b006ac292f9491b7503e2eb9bbca2ca46bc5505f63ea3639a11266616d74
   parser-extractor: quay.io/herringbone/parser-extractor:9f4a781c@sha256:ac8163e102a2eba0c152c9b5d3723a334cf98712e51ea623e062c67a81de0e4f
   parser-enrichment: quay.io/herringbone/parser-enrichment:9f4a781c@sha256:055cf23096c7c1355cc99e3c117a8fd36fd805358e1cec098004518b207fa1d4
-  incidents-correlator: quay.io/herringbone/incidents-correlator:aa674029@sha256:6d7d1345358ee6e6f7e02c019fb03fb4df92fe8ebc7e5b93e42d370448d92778
+  incidents-correlator: quay.io/herringbone/incidents-correlator:b5fb555b@sha256:2c6d237f118a98ddd6d80f6bd0c1ca3ae28cc6fe454d38c3de9540f4baafc681
   incidents-orchestrator: quay.io/herringbone/incidents-orchestrator:4ccc9883@sha256:2431a007b32ea149d5fdb6f999a4a29bfa42c2299c0b8a73d186b36231a9960f
   incidents-incidentset: quay.io/herringbone/incidents-incidentset:50da3b76@sha256:914b029fcc15d2dd698602e1d95976689ced0a487465119ed4cf5388744c7721
   logingestion-receiver: quay.io/herringbone/receiver:e54e8170@sha256:3737a566772abbd91d55982463367f65f28ffcfb4be546e767a2ab78824cdc74
