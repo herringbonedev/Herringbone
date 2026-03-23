@@ -240,6 +240,7 @@ async def login_user(
     )
 
     return {
+        "token": token,
         "access_token": token,
         "context_token": context_token,
         "token_type": "bearer",
@@ -249,7 +250,6 @@ async def login_user(
 @router.post("/context-token")
 async def create_context_token_api(
     request: Request,
-    context=Depends(get_context),
     identity=Depends(get_identity),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
@@ -264,24 +264,72 @@ async def create_context_token_api(
         )
         raise HTTPException(403, "user identity required")
 
-    effective_identity = context.get("identity", identity)
-    context_id = context.get("context_id", "default")
-    scopes = context.get("scopes", effective_identity.get("scopes", []))
-    role = context.get("role")
+    context_id = (
+        request.headers.get("X-Context-Id")
+        or request.headers.get("X-Herringbone-Org")
+        or request.headers.get("X-Herringbone-Context")
+        or "default"
+    )
+
+    global_scopes = list(identity.get("scopes", []))
+    org_scopes = []
+    scopes = list(global_scopes)
+    role = None
+
+    if os.environ.get("HB_ENTERPRISE", "false").lower() == "true" and context_id != "default":
+        try:
+            from app.enterprise.orgs.orgs_context import resolve_org_context
+        except ImportError:
+            audit.log(
+                event="enterprise_module_missing",
+                identity=identity,
+                request=request,
+                result="failure",
+                severity="ERROR",
+            )
+            raise HTTPException(500, "enterprise module not available")
+
+        base_context = {
+            "context_id": context_id,
+            "identity": identity,
+            "global_scopes": global_scopes,
+            "org_scopes": [],
+            "role": None,
+            "enterprise_enabled": True,
+        }
+
+        org_ctx = resolve_org_context(request=request, context=base_context)
+        context_id = org_ctx["context_id"]
+        role = org_ctx.get("role")
+        org_scopes = list(org_ctx.get("org_scopes", []))
+        deduped = []
+        seen = set()
+        for scope in global_scopes + org_scopes:
+            if scope and scope not in seen:
+                seen.add(scope)
+                deduped.append(scope)
+        scopes = deduped
 
     token = create_context_token(
-        user_id=effective_identity.get("id"),
-        email=effective_identity.get("email"),
+        user_id=identity.get("id"),
+        email=identity.get("email"),
         context_id=context_id,
         scopes=scopes,
         role=role,
-        global_scopes=context.get("global_scopes", effective_identity.get("global_scopes", [])),
-        org_scopes=context.get("org_scopes", effective_identity.get("org_scopes", [])),
+        global_scopes=global_scopes,
+        org_scopes=org_scopes,
     )
 
     audit.log(
         event="context_token_created",
-        identity=effective_identity,
+        identity={
+            **identity,
+            "scopes": scopes,
+            "global_scopes": global_scopes,
+            "org_scopes": org_scopes,
+            "context_id": context_id,
+            "role": role,
+        },
         metadata={
             "context_id": context_id,
             "scope_count": len(scopes),
@@ -291,6 +339,7 @@ async def create_context_token_api(
     )
 
     return {
+        "token": token,
         "access_token": token,
         "token_type": "bearer",
         "context_id": context_id,

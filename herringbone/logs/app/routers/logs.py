@@ -14,8 +14,6 @@ router = APIRouter(
     tags=["logs"],
 )
 
-audit = AuditLogger()
-
 
 def events_get_auth(context=Depends(get_context)):
     return require_scopes("events:get")(context)
@@ -23,6 +21,8 @@ def events_get_auth(context=Depends(get_context)):
 
 def dashboard_auth(context=Depends(get_context)):
     return require_scopes("dashboard:read")(context)
+
+audit = AuditLogger()
 
 
 def get_mongo():
@@ -78,6 +78,7 @@ def list_events(
     identity=Depends(events_get_auth),
     context=Depends(get_context),
 ):
+
     mongo = get_mongo()
     base_filter = context_filter(context)
 
@@ -129,6 +130,7 @@ def get_event(
     identity=Depends(events_get_auth),
     context=Depends(get_context),
 ):
+
     mongo = get_mongo()
 
     oid = ObjectId(event_id)
@@ -176,6 +178,7 @@ def dashboard_summary(
     identity=Depends(dashboard_auth),
     context=Depends(get_context),
 ):
+
     mongo = get_mongo()
     now = datetime.now(UTC)
     since = now - timedelta(hours=24)
@@ -232,6 +235,7 @@ def dashboard_recent_events(
     identity=Depends(dashboard_auth),
     context=Depends(get_context),
 ):
+
     mongo = get_mongo()
     base_filter = context_filter(context)
 
@@ -288,6 +292,7 @@ def dashboard_recent_detections(
     identity=Depends(dashboard_auth),
     context=Depends(get_context),
 ):
+
     mongo = get_mongo()
 
     detections = mongo.find_sorted(
@@ -321,6 +326,7 @@ def recent_incidents(
     identity=Depends(dashboard_auth),
     context=Depends(get_context),
 ):
+
     mongo = get_mongo()
 
     incidents = mongo.find_sorted(
@@ -358,6 +364,7 @@ def incidents_throughput(
     identity=Depends(dashboard_auth),
     context=Depends(get_context),
 ):
+
     mongo = get_mongo()
 
     since = datetime.now(UTC) - timedelta(days=days)
