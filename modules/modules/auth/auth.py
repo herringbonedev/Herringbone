@@ -131,75 +131,68 @@ def decode_token(token):
     audit = AuditLogger()
 
     try:
-        payload = jwt.decode(
-            token,
-            get_user_secret(),
-            algorithms=[JWT_ALG_USER],
-        )
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg")
 
-        if payload.get("typ") == "context":
-            identity = _normalize_context_identity(payload)
-
-            audit.log(
-                event="auth_context_token_valid",
-                identity=identity,
-                metadata={
-                    "token_type": "context",
-                    "context_id": identity.get("context_id"),
-                    "role": identity.get("role"),
-                },
+        if alg == "HS256":
+            payload = jwt.decode(
+                token,
+                get_user_secret(),
+                algorithms=["HS256"],
             )
-            return identity
 
-        if payload.get("typ") == "user":
-            identity = _normalize_identity(payload, "user")
+            if payload.get("typ") == "context":
+                identity = _normalize_context_identity(payload)
 
-            audit.log(
-                event="auth_user_token_valid",
-                identity=identity,
-                metadata={"token_type": "user"},
+                audit.log(
+                    event="auth_context_token_valid",
+                    identity=identity,
+                    metadata={
+                        "token_type": "context",
+                        "context_id": identity.get("context_id"),
+                        "role": identity.get("role"),
+                    },
+                )
+                return identity
+
+            if payload.get("typ") == "user":
+                identity = _normalize_identity(payload, "user")
+
+                audit.log(
+                    event="auth_user_token_valid",
+                    identity=identity,
+                    metadata={"token_type": "user"},
+                )
+                return identity
+
+        elif alg == "RS256":
+            payload = jwt.decode(
+                token,
+                get_service_public_key(),
+                algorithms=["RS256"],
+                audience=SERVICE_AUD,
             )
-            return identity
+
+            if payload.get("typ") == "service":
+                identity = _normalize_identity(payload, "service")
+
+                audit.log(
+                    event="auth_service_token_valid",
+                    identity=identity,
+                    metadata={"token_type": "service"},
+                )
+                return identity
+
+        else:
+            raise Exception(f"Unsupported alg: {alg}")
 
     except Exception as e:
         audit.log(
-            event="auth_user_token_invalid",
+            event="auth_token_rejected",
             result="failure",
             severity="WARNING",
             metadata={"error": str(e)},
         )
-
-    try:
-        payload = jwt.decode(
-            token,
-            get_service_public_key(),
-            algorithms=[JWT_ALG_SERVICE],
-            audience=SERVICE_AUD,
-        )
-
-        if payload.get("typ") == "service":
-            identity = _normalize_identity(payload, "service")
-
-            audit.log(
-                event="auth_service_token_valid",
-                identity=identity,
-                metadata={"token_type": "service"},
-            )
-            return identity
-
-    except Exception as e:
-        audit.log(
-            event="auth_service_token_invalid",
-            result="failure",
-            severity="WARNING",
-            metadata={"error": str(e)},
-        )
-
-    audit.log(
-        event="auth_token_rejected",
-        result="failure",
-        severity="WARNING",
-    )
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

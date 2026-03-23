@@ -20,4 +20,4 @@ try:
     from app.enterprise import register_enterprise
     register_enterprise(app)
 except ImportError:
-    print("Core (Free)")
+    print("Core Mode.")
