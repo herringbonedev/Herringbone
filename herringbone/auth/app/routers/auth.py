@@ -360,10 +360,10 @@ async def create_context_token_api(
 @router.get("/users")
 async def list_users(
     request: Request,
-    identity=Depends(get_identity),
     context=Depends(get_context),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
+    identity = context["identity"]
     mongo = get_mongo()
 
     context_id = context.get("context_id")
@@ -475,10 +475,10 @@ async def list_users(
 async def update_user_scopes(
     payload: UserScopesUpdateRequest,
     request: Request,
-    identity=Depends(get_identity),
     context=Depends(get_context),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
+    identity = context["identity"]
     mongo = get_mongo()
 
     target = mongo.find_one("users", {"email": payload.email})
@@ -823,9 +823,10 @@ async def delete_service(
 async def create_ingestion_key_api(
     request: Request,
     context=Depends(get_context),
-    identity=Depends(require_scopes("ingestion:write")),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
+    identity = context["identity"]
+    require_scopes("ingestion:write")(context)
     mongo = get_mongo()
 
     if identity.get("type") != "user":
@@ -867,9 +868,10 @@ async def create_ingestion_key_api(
 async def list_ingestion_keys(
     request: Request,
     context=Depends(get_context),
-    identity=Depends(require_scopes("ingestion:write")),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
+    identity = context["identity"]
+    require_scopes("ingestion:read")(context)
     mongo = get_mongo()
 
     if identity.get("type") != "user":
@@ -911,9 +913,10 @@ async def revoke_ingestion_key(
     key_id: str,
     request: Request,
     context=Depends(get_context),
-    identity=Depends(require_scopes("ingestion:write")),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
+    identity = context["identity"]
+    require_scopes("ingestion:write")(context)
     mongo = get_mongo()
 
     if identity.get("type") != "user":

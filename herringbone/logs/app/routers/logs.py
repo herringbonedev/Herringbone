@@ -24,7 +24,6 @@ def dashboard_auth(context=Depends(get_context)):
     require_scopes("dashboard:read")(context)
     return context
 
-
 audit = AuditLogger()
 
 
@@ -77,9 +76,10 @@ def context_filter(context: dict):
 @router.get("/events")
 def list_events(
     request: Request,
-    n: int = Query(25, ge=1, le=500),
+    n: int=Query(25, ge=1, le=500),
     context=Depends(events_get_auth),
 ):
+
     identity = context["identity"]
     mongo = get_mongo()
     base_filter = context_filter(context)
@@ -131,9 +131,9 @@ def get_event(
     request: Request,
     context=Depends(events_get_auth),
 ):
+
     identity = context["identity"]
     mongo = get_mongo()
-
     oid = ObjectId(event_id)
 
     event = mongo.find_one(
@@ -234,6 +234,7 @@ def dashboard_recent_events(
     n: int = Query(10, ge=1, le=50),
     context=Depends(dashboard_auth),
 ):
+    
     identity = context["identity"]
     mongo = get_mongo()
     base_filter = context_filter(context)
@@ -290,6 +291,7 @@ def dashboard_recent_detections(
     n: int = Query(10, ge=1, le=50),
     context=Depends(dashboard_auth),
 ):
+
     identity = context["identity"]
     mongo = get_mongo()
 
@@ -323,6 +325,7 @@ def recent_incidents(
     n: int = Query(10, ge=1, le=50),
     context=Depends(dashboard_auth),
 ):
+
     identity = context["identity"]
     mongo = get_mongo()
 
@@ -360,6 +363,7 @@ def incidents_throughput(
     days: int = Query(7, ge=1, le=30),
     context=Depends(dashboard_auth),
 ):
+
     identity = context["identity"]
     mongo = get_mongo()
 
