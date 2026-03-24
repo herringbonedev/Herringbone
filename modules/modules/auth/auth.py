@@ -271,15 +271,16 @@ def get_context(
     audit = AuditLogger()
 
     enterprise_enabled = is_enterprise_enabled()
+
     header_context = (
         request.headers.get("X-Herringbone-Org")
         or request.headers.get("X-Herringbone-Context")
     )
-
+    
     if identity.get("token_type") == "context":
         token_context_id = str(identity.get("context_id") or DEFAULT_CONTEXT)
 
-        if not enterprise_enabled and token_context_id != DEFAULT_CONTEXT:
+        if not enterprise_enabled:
             token_context_id = DEFAULT_CONTEXT
 
         if header_context and str(header_context) != token_context_id:
@@ -296,110 +297,51 @@ def get_context(
             )
             raise HTTPException(400, "context token does not match requested context")
 
-        effective_scopes = _dedupe_scopes(list(identity.get("scopes", [])))
-        effective_identity = dict(identity)
-        effective_identity["scopes"] = effective_scopes
-        effective_identity["context_id"] = token_context_id
+        scopes = _dedupe_scopes(list(identity.get("scopes", [])))
 
         ctx = {
             "context_id": token_context_id,
-            "identity": effective_identity,
+            "identity": {
+                **identity,
+                "scopes": scopes,
+                "context_id": token_context_id,
+            },
             "trace_id": str(uuid.uuid4()),
             "global_scopes": list(identity.get("global_scopes", [])),
             "org_scopes": list(identity.get("org_scopes", [])),
             "role": identity.get("role"),
             "enterprise_enabled": enterprise_enabled,
-            "scopes": effective_scopes,
+            "scopes": scopes,
         }
 
-        request.state.context_id = token_context_id
-        request.state.scopes = effective_scopes
-        request.state.identity = effective_identity
+        request.state.context_id = ctx["context_id"]
+        request.state.scopes = scopes
+        request.state.identity = ctx["identity"]
         request.state.org_role = ctx.get("role")
 
         audit.log(
             event="context_resolved",
-            identity=effective_identity,
+            identity=ctx["identity"],
             request=request,
             metadata={
-                "context_id": token_context_id,
+                "context_id": ctx["context_id"],
                 "enterprise_enabled": enterprise_enabled,
                 "header_present": bool(header_context),
-                "scope_count": len(effective_scopes),
+                "scope_count": len(scopes),
                 "role": ctx.get("role"),
                 "token_type": "context",
             },
         )
 
         return ctx
-
-        if header_context and str(header_context) != token_context_id:
-            audit.log(
-                event="context_token_header_mismatch",
-                identity=identity,
-                request=request,
-                result="failure",
-                severity="WARNING",
-                metadata={
-                    "header_context": str(header_context),
-                    "token_context": token_context_id,
-                },
-            )
-            raise HTTPException(400, "context token does not match requested context")
-
-        effective_scopes = _dedupe_scopes(list(identity.get("scopes", [])))
-        effective_identity = dict(identity)
-        effective_identity["scopes"] = effective_scopes
-        effective_identity["context_id"] = token_context_id
-
-        ctx = {
-            "context_id": token_context_id,
-            "identity": effective_identity,
-            "trace_id": str(uuid.uuid4()),
-            "global_scopes": list(identity.get("global_scopes", [])),
-            "org_scopes": list(identity.get("org_scopes", [])),
-            "role": identity.get("role"),
-            "enterprise_enabled": enterprise_enabled,
-            "scopes": effective_scopes,
-        }
-
-        request.state.context_id = token_context_id
-        request.state.scopes = effective_scopes
-        request.state.identity = effective_identity
-        request.state.org_role = ctx.get("role")
-
-        audit.log(
-            event="context_resolved",
-            identity=effective_identity,
-            request=request,
-            metadata={
-                "context_id": token_context_id,
-                "enterprise_enabled": enterprise_enabled,
-                "header_present": bool(header_context),
-                "scope_count": len(effective_scopes),
-                "role": ctx.get("role"),
-                "token_type": "context",
-            },
-        )
-
-        return ctx
-
-    if enterprise_enabled:
-        if not header_context:
-            audit.log(
-                event="context_missing_header_fallback",
-                identity=identity,
-                metadata={"fallback": "default_context"},
-                request=request,
-            )
-            raw_context_id = DEFAULT_CONTEXT
-        else:
-            raw_context_id = header_context
+    
+    if not enterprise_enabled:
+        context_id = DEFAULT_CONTEXT
     else:
-        raw_context_id = DEFAULT_CONTEXT
+        context_id = header_context or DEFAULT_CONTEXT
 
     ctx = {
-        "context_id": raw_context_id,
+        "context_id": context_id,
         "identity": identity,
         "trace_id": str(uuid.uuid4()),
         "global_scopes": list(identity.get("scopes", [])),
@@ -410,110 +352,28 @@ def get_context(
 
     ctx["context_id"] = resolve_context_id(request, ctx)
 
-    if identity.get("type") == "service":
-        effective_scopes = _dedupe_scopes(list(identity.get("scopes", [])))
-        effective_identity = dict(identity)
-        effective_identity["scopes"] = effective_scopes
-        effective_identity["context_id"] = ctx["context_id"]
+    scopes = _dedupe_scopes(list(identity.get("scopes", [])))
 
-        ctx["scopes"] = effective_scopes
-        ctx["identity"] = effective_identity
-
-        request.state.context_id = ctx["context_id"]
-        request.state.scopes = effective_scopes
-        request.state.identity = effective_identity
-
-        audit.log(
-            event="context_resolved",
-            identity=effective_identity,
-            request=request,
-            metadata={
-                "context_id": ctx["context_id"],
-                "enterprise_enabled": enterprise_enabled,
-                "header_present": bool(header_context),
-                "scope_count": len(effective_scopes),
-                "role": None,
-            },
-        )
-
-        return ctx
-
-    if not enterprise_enabled or ctx["context_id"] == DEFAULT_CONTEXT:
-        effective_scopes = _dedupe_scopes(list(identity.get("scopes", [])))
-        effective_identity = dict(identity)
-        effective_identity["scopes"] = effective_scopes
-        effective_identity["context_id"] = ctx["context_id"]
-
-        ctx["scopes"] = effective_scopes
-        ctx["identity"] = effective_identity
-
-        request.state.context_id = ctx["context_id"]
-        request.state.scopes = effective_scopes
-        request.state.identity = effective_identity
-
-        audit.log(
-            event="context_resolved",
-            identity=effective_identity,
-            request=request,
-            metadata={
-                "context_id": ctx["context_id"],
-                "enterprise_enabled": enterprise_enabled,
-                "header_present": bool(header_context),
-                "scope_count": len(effective_scopes),
-                "role": None,
-            },
-        )
-
-        return ctx
-
-    try:
-        from app.enterprise.orgs.orgs_context import resolve_org_context
-    except ImportError:
-        audit.log(
-            event="enterprise_module_missing",
-            identity=identity,
-            request=request,
-            result="failure",
-            severity="ERROR",
-        )
-        raise HTTPException(500, "enterprise module not available")
-
-    org_ctx = resolve_org_context(request=request, context=ctx)
-
-    ctx["context_id"] = org_ctx["context_id"]
-    ctx["role"] = org_ctx.get("role")
-    ctx["org_scopes"] = list(org_ctx.get("org_scopes", []))
-    ctx["slug"] = org_ctx.get("slug")
-
-    effective_scopes = _dedupe_scopes(
-        list(ctx["global_scopes"]) + list(ctx["org_scopes"])
-    )
-
-    effective_identity = dict(identity)
-    effective_identity["scopes"] = effective_scopes
-    effective_identity["global_scopes"] = list(ctx["global_scopes"])
-    effective_identity["org_scopes"] = list(ctx["org_scopes"])
-    effective_identity["context_id"] = ctx["context_id"]
-    effective_identity["org_role"] = ctx["role"]
-
-    ctx["scopes"] = effective_scopes
-    ctx["identity"] = effective_identity
+    ctx["identity"] = {
+        **identity,
+        "scopes": scopes,
+        "context_id": ctx["context_id"],
+    }
+    ctx["scopes"] = scopes
 
     request.state.context_id = ctx["context_id"]
-    request.state.scopes = effective_scopes
-    request.state.identity = effective_identity
-    request.state.org_role = ctx["role"]
+    request.state.scopes = scopes
+    request.state.identity = ctx["identity"]
 
     audit.log(
         event="context_resolved",
-        identity=effective_identity,
+        identity=ctx["identity"],
         request=request,
         metadata={
             "context_id": ctx["context_id"],
             "enterprise_enabled": enterprise_enabled,
             "header_present": bool(header_context),
-            "scope_count": len(effective_scopes),
-            "role": ctx["role"],
+            "scope_count": len(scopes),
         },
     )
 
