@@ -101,10 +101,8 @@ async def register_user(
     identity: dict | None = Depends(get_identity_optional),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
-    import secrets
 
     mongo = get_mongo()
-
     bootstrap_required = is_bootstrap_required(mongo)
 
     if bootstrap_required:
@@ -163,6 +161,9 @@ async def register_user(
         scopes = ["*"]
     else:
         requested_scopes = payload.scopes or [
+            "detections:rules:read",
+            "parser:cards:read",
+            "dashboard:read",
             "logs:read",
             "search:query",
             "incidents:read",
