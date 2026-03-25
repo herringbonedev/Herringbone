@@ -28,7 +28,7 @@ services:
 
     build:
       context: ../../..
-      dockerfile: docker/Dockerfile
+      dockerfile: logingestion/receiver/docker/Dockerfile
 
     restart: unless-stopped
 

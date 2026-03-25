@@ -188,19 +188,74 @@ class HerringboneMongoDatabase:
     # ===========================
 
     @with_connection
-    def insert_one(self, collection: str, doc: dict, *, clean_codec: bool = False, mongo_db):
+    def insert_one(
+        self,
+        collection: str,
+        doc: dict,
+        *,
+        context_id: str,
+        clean_codec: bool = False,
+        mongo_db,
+    ):
+        if not context_id:
+            raise RuntimeError("context_id is required")
+
         payload = self._sanitize_payload(doc) if clean_codec else dict(doc)
+        payload["context_id"] = context_id
+
         return mongo_db[collection].insert_one(payload).inserted_id
 
     @with_connection
-    def insert_many(self, collection: str, docs: Iterable[dict], *, clean_codec: bool = False, mongo_db):
-        payload = [self._sanitize_payload(d) if clean_codec else dict(d) for d in docs]
+    def insert_many(
+        self,
+        collection: str,
+        docs: Iterable[dict],
+        *,
+        context_id: str,
+        clean_codec: bool = False,
+        mongo_db,
+    ):
+        if not context_id:
+            raise RuntimeError("context_id is required")
+
+        payload = []
+        for d in docs:
+            doc = self._sanitize_payload(d) if clean_codec else dict(d)
+            doc["context_id"] = context_id
+            payload.append(doc)
+
         return mongo_db[collection].insert_many(payload).inserted_ids
 
     @with_connection
-    def upsert_one(self, collection: str, filter_query: dict, update_fields: dict, *, clean_codec: bool = False, mongo_db):
+    def upsert_one(
+        self,
+        collection: str,
+        filter_query: dict,
+        update_fields: dict,
+        *,
+        context_id: str,
+        clean_codec: bool = False,
+        mongo_db,
+    ):
+        if not context_id:
+            raise RuntimeError("context_id is required")
+
         fields = self._sanitize_payload(update_fields) if clean_codec else dict(update_fields)
-        res = mongo_db[collection].update_one(filter_query, {"$set": fields}, upsert=True)
+        fields["context_id"] = context_id
+
+        scoped_filter = {
+            "$and": [
+                {"context_id": context_id},
+                filter_query or {}
+            ]
+        }
+
+        res = mongo_db[collection].update_one(
+            scoped_filter,
+            {"$set": fields},
+            upsert=True
+        )
+
         return res.upserted_id
 
     @with_connection
@@ -228,36 +283,72 @@ class HerringboneMongoDatabase:
         filter_query: dict,
         update_query: dict,
         *,
+        context_id: str,
         mongo_db,
     ):
-        return mongo_db[collection].update_one(filter_query, update_query)
+        if not context_id:
+            raise RuntimeError("context_id is required")
 
+        scoped_filter = {
+            "$and": [
+                {"context_id": context_id},
+                filter_query or {}
+            ]
+        }
+
+        if "$set" in update_query:
+            update_query["$set"]["context_id"] = context_id
+        else:
+            update_query["$set"] = {"context_id": context_id}
+
+        return mongo_db[collection].update_one(scoped_filter, update_query)
+    
     @with_connection
     def delete_one(
         self,
         collection: str,
         filter_query: dict,
         *,
+        context_id: str,
         mongo_db,
     ):
-        return mongo_db[collection].delete_one(filter_query)
+        if not context_id:
+            raise RuntimeError("context_id is required")
+
+        scoped_filter = {
+            "$and": [
+                {"context_id": context_id},
+                filter_query or {}
+            ]
+        }
+
+        return mongo_db[collection].delete_one(scoped_filter)
 
     # ===========================
     # Canonical Herringbone APIs
     # ===========================
 
-    def insert_event(self, event: dict):
-        return self.insert_one("events", event)
+    def insert_event(self, event: dict, *, context_id: str):
+        return self.insert_one("events", event, context_id=context_id)
 
-    def upsert_event_state(self, event_id, state: dict):
+
+    def upsert_event_state(self, event_id, state: dict, *, context_id: str):
         state["last_updated"] = datetime.now(UTC)
-        return self.upsert_one("event_state", {"event_id": event_id}, state)
+        return self.upsert_one(
+            "event_state",
+            {"event_id": event_id},
+            state,
+            context_id=context_id
+        )
 
-    def insert_parse_result(self, result: dict):
-        return self.insert_one("parse_results", result)
 
-    def insert_enrichment_result(self, result: dict):
-        return self.insert_one("enrichment_results", result)
+    def insert_parse_result(self, result: dict, *, context_id: str):
+        return self.insert_one("parse_results", result, context_id=context_id)
 
-    def insert_detection(self, detection: dict):
-        return self.insert_one("detections", detection)
+
+    def insert_enrichment_result(self, result: dict, *, context_id: str):
+        return self.insert_one("enrichment_results", result, context_id=context_id)
+
+
+    def insert_detection(self, detection: dict, *, context_id: str):
+        return self.insert_one("detections", detection, context_id=context_id)

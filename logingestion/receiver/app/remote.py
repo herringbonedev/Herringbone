@@ -71,7 +71,6 @@ def receiver_v2():
     try:
 
         event_id = mongo.insert_event({
-            "context_id": context_id,
             "raw": data,
             "source": {
                 "address": addr,
@@ -82,14 +81,14 @@ def receiver_v2():
             "receiver": {
                 "hostname": hostname
             }
-        })
+        }, context_id)
 
         mongo.upsert_event_state(event_id, {
             "parsed": False,
             "enriched": False,
             "detected": False,
             "severity": None,
-        })
+        }, context_id)
 
         return ("Data received", 200)
 

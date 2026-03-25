@@ -1,33 +1,26 @@
+import hashlib
+
 def resolve_ingestion_key(request, mongo):
-    auth = request.headers.get("Authorization")
+    raw_key = request.headers.get("X-Herringbone-Key")
 
-    if not auth:
+    if not raw_key:
         return None
 
-    auth = auth.strip()
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
 
-    if not auth.lower().startswith("bearer "):
+    try:
+        record = mongo.find_one(
+            "ingestion_keys",
+            {
+                "key_hash": key_hash,
+                "enabled": True
+            }
+        )
+    except Exception as e:
+        print(f"[✗] ingestion key lookup failed: {e}")
         return None
 
-    token = auth[7:].strip()
-
-    if not token:
+    if not record:
         return None
 
-    key_doc = mongo.find_one(
-        "ingestion_keys",
-        {
-            "key": token,
-            "enabled": True,
-        }
-    )
-
-    if not key_doc:
-        return None
-
-    context_id = key_doc.get("context_id")
-
-    if not context_id:
-        return None
-
-    return context_id
+    return record.get("context_id")
