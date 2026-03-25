@@ -1,7 +1,7 @@
 services:
   herringbone-logs:
     container_name: herringbone-logs
-    image: quay.io/herringbone/herringbone-logs:1c4d9ac7@sha256:322c10a82d420e69b6a2f44eb774b770b19455fc28850f8f70f25a5ff91ac134
+    image: quay.io/herringbone/herringbone-logs:d9398d91@sha256:9ef5fa129212ca09a37b6f0d06d58fc78d4d1827b5300b600ad496efc5b17fd3
     restart: unless-stopped
     depends_on:
       mongodb:
