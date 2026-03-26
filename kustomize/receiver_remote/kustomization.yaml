@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/receiver
-    newTag: e54e8170
-    digest: "sha256:3737a566772abbd91d55982463367f65f28ffcfb4be546e767a2ab78824cdc74"
+    newTag: 6faf333f
+    digest: "sha256:e032bbb7924e7fc92017018605f78af03f8c4eaf995d720088d2a276e59e6177"
