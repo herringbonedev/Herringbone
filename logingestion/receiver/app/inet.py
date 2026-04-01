@@ -61,14 +61,14 @@ def worker():
                     "receiver": {
                         "hostname": hostname
                     }
-                }, os.environ.get("CONTEXT_ID", "default"))
+                }, context_id=os.environ.get("CONTEXT_ID", "default"))
 
                 mongo.upsert_event_state(event_id, {
                     "parsed": False,
                     "enriched": False,
                     "detected": False,
                     "severity": None,
-                }, os.environ.get("CONTEXT_ID", "default"))
+                }, context_id=os.environ.get("CONTEXT_ID", "default"))
 
         except Exception as e:
             print(f"[✗] Worker failure: {e}")

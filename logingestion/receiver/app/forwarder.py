@@ -51,7 +51,7 @@ def forward_data(route, data, source_addr):
     }
 
     if INGESTION_KEY:
-        headers["Authorization"] = f"Bearer {INGESTION_KEY}"
+        headers["X-Herringbone-Key"] = INGESTION_KEY
 
     try:
         response = requests.post(
