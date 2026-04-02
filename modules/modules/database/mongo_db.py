@@ -277,6 +277,56 @@ class HerringboneMongoDatabase:
         return mongo_db[collection].find_one(filter_query, projection or None)
     
     @with_connection
+    def find_with_context(
+        self,
+        collection: str,
+        filter_query: dict,
+        *,
+        context_id: str,
+        projection: dict | None = None,
+        limit: int | None = None,
+        mongo_db,
+    ):
+        if not context_id:
+            raise RuntimeError("context_id is required")
+
+        scoped_filter = {
+            "$and": [
+                {"context_id": context_id},
+                filter_query or {}
+            ]
+        }
+
+        cur = mongo_db[collection].find(scoped_filter, projection or None)
+
+        if limit:
+            cur = cur.limit(limit)
+
+        return list(cur)
+    
+    @with_connection
+    def find_one_with_context(
+        self,
+        collection: str,
+        filter_query: dict,
+        *,
+        context_id: str,
+        projection: dict | None = None,
+        mongo_db,
+    ):
+        if not context_id:
+            raise RuntimeError("context_id is required")
+
+        scoped_filter = {
+            "$and": [
+                {"context_id": context_id},
+                filter_query or {}
+            ]
+        }
+
+        return mongo_db[collection].find_one(scoped_filter, projection or None)
+    
+    @with_connection
     def update_one(
         self,
         collection: str,
@@ -302,6 +352,35 @@ class HerringboneMongoDatabase:
             update_query["$set"] = {"context_id": context_id}
 
         return mongo_db[collection].update_one(scoped_filter, update_query)
+
+    @with_connection
+    def find_sorted_with_context(
+        self,
+        collection: str,
+        filter_query: dict,
+        *,
+        context_id: str,
+        sort: list,
+        limit: int | None = None,
+        projection: dict | None = None,
+        mongo_db,
+    ):
+        if not context_id:
+            raise RuntimeError("context_id is required")
+
+        scoped_filter = {
+            "$and": [
+                {"context_id": context_id},
+                filter_query or {}
+            ]
+        }
+
+        cur = mongo_db[collection].find(scoped_filter, projection).sort(sort)
+
+        if limit:
+            cur = cur.limit(limit)
+
+        return list(cur)
     
     @with_connection
     def delete_one(

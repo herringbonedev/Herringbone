@@ -91,6 +91,8 @@ async def insert_card(
     mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
 
+    context_id = request.state.context_id
+
     payload = card.model_dump()
 
     payload["selector_type"] = payload["selector"]["type"]
@@ -110,7 +112,12 @@ async def insert_card(
         )
         raise HTTPException(status_code=400, detail=f"Schema validation failed: {result.get('error')}")
 
-    existing = mongo.find_one(cards_collection(), {"selector": payload.get("selector")})
+    existing = mongo.find_one_with_context(
+        cards_collection(),
+        {"selector": payload.get("selector")},
+        context_id=context_id
+    )
+
     if existing:
         audit.log(
             event="card_insert_duplicate",
@@ -125,7 +132,11 @@ async def insert_card(
     payload["last_updated"] = datetime.now(UTC)
 
     try:
-        mongo.insert_one(cards_collection(), payload)
+        mongo.insert_one(
+            cards_collection(),
+            payload,
+            context_id=context_id
+        )
     except Exception as e:
         audit.log(
             event="card_insert_failed",
@@ -158,6 +169,8 @@ async def pull_cards(
     mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
 
+    context_id = request.state.context_id
+
     sel_type = body.selector_type
     sel_value = body.selector_value
     limit = body.limit
@@ -179,7 +192,12 @@ async def pull_cards(
     }
 
     try:
-        docs = mongo.find(cards_collection(), query, limit=limit)
+        docs = mongo.find_with_context(
+            cards_collection(),
+            query,
+            context_id=context_id,
+            limit=limit
+        )
     except Exception as e:
         audit.log(
             event="card_query_failed",
@@ -215,8 +233,14 @@ async def pull_all_cards(
     mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
 
+    context_id = request.state.context_id
+
     try:
-        docs = mongo.find(cards_collection(), {"deleted": {"$ne": True}})
+        docs = mongo.find_with_context(
+            cards_collection(),
+            {"deleted": {"$ne": True}},
+            context_id=context_id
+        )
     except Exception as e:
         audit.log(
             event="card_query_all_failed",
@@ -253,6 +277,8 @@ async def delete_cards(
     mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
 
+    context_id = request.state.context_id
+
     sel_type = body.selector_type
     sel_value = body.selector_value
 
@@ -271,6 +297,7 @@ async def delete_cards(
             cards_collection(),
             {"selector.type": sel_type, "selector.value": sel_value},
             {"deleted": True, "deleted_at": datetime.now(UTC)},
+            context_id=context_id
         )
     except Exception as e:
         audit.log(
@@ -301,6 +328,8 @@ async def update_card(
     identity=Depends(cardset_write),
     mongo: HerringboneMongoDatabase = Depends(get_mongo),
 ):
+
+    context_id = request.state.context_id
 
     payload = new_card.model_dump()
     result = validator(payload)
@@ -341,6 +370,7 @@ async def update_card(
             cards_collection(),
             filter_query,
             payload,
+            context_id=context_id,
             clean_codec=False,
         )
     except Exception as e:
