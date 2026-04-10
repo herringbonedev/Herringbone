@@ -1,7 +1,7 @@
 services:
   parser-enrichment:
     container_name: parser-enrichment
-    image: quay.io/herringbone/parser-enrichment:9f4a781c@sha256:055cf23096c7c1355cc99e3c117a8fd36fd805358e1cec098004518b207fa1d4
+    image: quay.io/herringbone/parser-enrichment:ecf2837c@sha256:fc35544528c680c966ff1ab9de25d1afe6de2f94a8d4f9891bed0caae1826a09
     restart: unless-stopped
     user: "65532:65532"
     read_only: true
