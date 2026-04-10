@@ -30,7 +30,6 @@ if USE_TEST:
 
 
 def _maybe_log(interval: float = 5.0):
-
     t = now()
 
     if t - _metrics["last_log"] < interval:
@@ -127,18 +126,47 @@ def normalize_results(results: dict) -> dict:
 
 def process_event(mongo, state: dict):
 
-    event = mongo.find_one("events", {"_id": state["event_id"]})
+    context_id = state.get("context_id")
+
+    if not context_id:
+        audit.log(
+            event="missing_context_in_state",
+            severity="CRITICAL",
+            metadata={"state": state},
+        )
+        return
+
+    audit.log(
+        event="processing_event",
+        metadata={
+            "event_id": str(state.get("event_id")),
+            "context_id": context_id,
+        },
+    )
+
+    event = mongo.find_one_with_context(
+        "events",
+        {"_id": state["event_id"]},
+        context_id=context_id,
+    )
 
     if not event:
-        mongo.upsert_event_state(state["event_id"], {"parsed": True})
+        mongo.upsert_event_state(
+            state["event_id"],
+            {"parsed": True},
+            context_id=context_id,
+        )
 
         _metrics["processed"] += 1
         _metrics["failed"] += 1
         _maybe_log()
-
         return
 
-    cards = mongo.find("parse_cards", {})
+    cards = mongo.find_with_context(
+        "parse_cards",
+        {},
+        context_id=context_id,
+    )
 
     for card in cards:
 
@@ -167,24 +195,30 @@ def process_event(mongo, state: dict):
 
                 results = normalize_results(raw_result)
 
-            mongo.insert_parse_result({
-                "event_id": event["_id"],
-                "card": card.get("name"),
-                "results": results,
-                "created_at": datetime.now(timezone.utc),
-            })
+            mongo.insert_parse_result(
+                {
+                    "event_id": event["_id"],
+                    "card": card.get("name"),
+                    "results": results,
+                    "created_at": datetime.now(timezone.utc),
+                },
+                context_id=context_id,
+            )
 
             _metrics["processed"] += 1
             _metrics["matched_cards"] += 1
 
         except Exception as e:
 
-            mongo.insert_parse_result({
-                "event_id": event["_id"],
-                "card": card.get("name"),
-                "error": str(e),
-                "created_at": datetime.now(timezone.utc),
-            })
+            mongo.insert_parse_result(
+                {
+                    "event_id": event["_id"],
+                    "card": card.get("name"),
+                    "error": str(e),
+                    "created_at": datetime.now(timezone.utc),
+                },
+                context_id=context_id,
+            )
 
             audit.log(
                 event="parser_card_failed",
@@ -193,6 +227,7 @@ def process_event(mongo, state: dict):
                 target=card.get("name"),
                 metadata={
                     "event_id": str(event["_id"]),
+                    "context_id": context_id,
                     "error": str(e),
                 },
             )
@@ -200,7 +235,11 @@ def process_event(mongo, state: dict):
             _metrics["processed"] += 1
             _metrics["failed"] += 1
 
-    mongo.upsert_event_state(event["_id"], {"parsed": True})
+    mongo.upsert_event_state(
+        event["_id"],
+        {"parsed": True},
+        context_id=context_id,
+    )
 
     _maybe_log()
 
