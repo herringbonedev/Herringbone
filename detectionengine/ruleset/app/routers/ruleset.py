@@ -56,12 +56,13 @@ async def insert_rule(
     identity=Depends(ruleset_write),
 ):
 
+    context_id = request.state.context_id
+
     data = payload.model_dump()
 
     validation = validator(data)
 
     if not validation["valid"]:
-
         audit.log(
             event="rule_insert_validation_failed",
             identity=identity,
@@ -69,34 +70,30 @@ async def insert_rule(
             result="failure",
             metadata=validation,
         )
-
         raise HTTPException(
             status_code=400,
             detail={"error": "Invalid JSON", "details": validation["error"]},
         )
 
     try:
-
-        mongo.insert_one("rules", data)
+        mongo.insert_one("rules", data, context_id=context_id)
 
         audit.log(
             event="rule_inserted",
             identity=identity,
             request=request,
-            metadata={"rule_name": data.get("name")},
+            metadata={"rule_name": data.get("name"), "context_id": context_id},
         )
 
     except Exception as e:
-
         audit.log(
             event="rule_insert_failed",
             identity=identity,
             request=request,
             result="failure",
             severity="ERROR",
-            metadata={"error": str(e)},
+            metadata={"error": str(e), "context_id": context_id},
         )
-
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"inserted": True}
@@ -109,30 +106,29 @@ async def get_rules(
     identity=Depends(ruleset_read),
 ):
 
-    try:
+    context_id = request.state.context_id
 
-        docs = mongo.find("rules", {})
+    try:
+        docs = mongo.find_with_context("rules", {}, context_id=context_id)
 
         audit.log(
             event="rules_list_accessed",
             identity=identity,
             request=request,
-            metadata={"count": len(docs)},
+            metadata={"count": len(docs), "context_id": context_id},
         )
 
         return JSONResponse(content=json.loads(dumps(docs)))
 
     except Exception as e:
-
         audit.log(
             event="rules_list_failed",
             identity=identity,
             request=request,
             result="failure",
             severity="ERROR",
-            metadata={"error": str(e)},
+            metadata={"error": str(e), "context_id": context_id},
         )
-
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -144,33 +140,33 @@ async def delete_rule(
     identity=Depends(ruleset_admin),
 ):
 
+    context_id = request.state.context_id
+
     try:
         oid = ObjectId(id)
     except Exception:
-
         audit.log(
             event="rule_delete_invalid_id",
             identity=identity,
             request=request,
             target=id,
             result="failure",
+            metadata={"context_id": context_id},
         )
-
         raise HTTPException(status_code=400, detail="Invalid ObjectId")
 
     try:
-
-        mongo.delete_one("rules", {"_id": oid})
+        mongo.delete_one("rules", {"_id": oid}, context_id=context_id)
 
         audit.log(
             event="rule_deleted",
             identity=identity,
             request=request,
             target=str(oid),
+            metadata={"context_id": context_id},
         )
 
     except Exception as e:
-
         audit.log(
             event="rule_delete_failed",
             identity=identity,
@@ -178,9 +174,8 @@ async def delete_rule(
             target=str(oid),
             result="failure",
             severity="ERROR",
-            metadata={"error": str(e)},
+            metadata={"error": str(e), "context_id": context_id},
         )
-
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"deleted": True}
@@ -194,34 +189,33 @@ async def update_rule(
     identity=Depends(ruleset_write),
 ):
 
+    context_id = request.state.context_id
+
     data = payload.model_dump(by_alias=True)
 
     rule_id = data.pop("_id", None)
 
     if not rule_id:
-
         audit.log(
             event="rule_update_missing_id",
             identity=identity,
             request=request,
             result="failure",
+            metadata={"context_id": context_id},
         )
-
         raise HTTPException(status_code=400, detail="Missing rule _id")
 
     validation = validator(data)
 
     if not validation["valid"]:
-
         audit.log(
             event="rule_update_validation_failed",
             identity=identity,
             request=request,
             target=str(rule_id),
             result="failure",
-            metadata=validation,
+            metadata={**validation, "context_id": context_id},
         )
-
         raise HTTPException(
             status_code=400,
             detail={"error": "Invalid JSON", "details": validation["error"]},
@@ -233,18 +227,17 @@ async def update_rule(
         raise HTTPException(status_code=400, detail="Invalid ObjectId")
 
     try:
-
-        mongo.upsert_one("rules", {"_id": oid}, data)
+        mongo.upsert_one("rules", {"_id": oid}, data, context_id=context_id)
 
         audit.log(
             event="rule_updated",
             identity=identity,
             request=request,
             target=str(oid),
+            metadata={"context_id": context_id},
         )
 
     except Exception as e:
-
         audit.log(
             event="rule_update_failed",
             identity=identity,
@@ -252,9 +245,8 @@ async def update_rule(
             target=str(oid),
             result="failure",
             severity="ERROR",
-            metadata={"error": str(e)},
+            metadata={"error": str(e), "context_id": context_id},
         )
-
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"updated": True}
