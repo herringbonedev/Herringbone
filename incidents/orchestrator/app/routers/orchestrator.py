@@ -46,12 +46,30 @@ def service_auth_headers():
     return {"Authorization": f"Bearer {_service_token_cache}"}
 
 
+def service_headers(context_id: str):
+    return {
+        **service_auth_headers(),
+        "X-Herringbone-Context": context_id,
+    }
+
+
 @router.post("/process_detection")
 async def process_detection(
     payload: dict,
     request: Request,
     identity=Depends(orchestrator_run),
 ):
+
+    context_id = request.state.context_id
+
+    if not context_id:
+        audit.log(
+            event="orchestrator_missing_context",
+            identity=identity,
+            request=request,
+            result="failure",
+        )
+        raise HTTPException(status_code=500, detail="Missing context_id")
 
     if "rule_id" not in payload:
 
@@ -67,13 +85,12 @@ async def process_detection(
     rule_id = payload.get("rule_id")
     rule_name = payload.get("rule_name", rule_id)
 
-
     try:
 
         resp = requests.post(
             CORRELATOR_URL,
-            json=payload,
-            headers=service_auth_headers(),
+            json={**payload, "context_id": context_id},
+            headers=service_headers(context_id),
             timeout=5,
         )
 
@@ -94,7 +111,6 @@ async def process_detection(
         raise HTTPException(status_code=502, detail=str(e))
 
     action = decision.get("action")
-
 
     if action == "attach":
 
@@ -121,8 +137,8 @@ async def process_detection(
 
             resp = requests.post(
                 f"{INCIDENTSET_API}/update_incident",
-                json=update_payload,
-                headers=service_auth_headers(),
+                json={**update_payload, "context_id": context_id},
+                headers=service_headers(context_id),
                 timeout=5,
             )
 
@@ -147,10 +163,10 @@ async def process_detection(
             identity=identity,
             request=request,
             target=incident_id,
+            metadata={"context_id": context_id},
         )
 
         return {"result": "attached", "incident_id": incident_id}
-
 
     if action == "create":
 
@@ -174,8 +190,8 @@ async def process_detection(
 
             resp = requests.post(
                 f"{INCIDENTSET_API}/insert_incident",
-                json=create_payload,
-                headers=service_auth_headers(),
+                json={**create_payload, "context_id": context_id},
+                headers=service_headers(context_id),
                 timeout=5,
             )
 
@@ -198,18 +214,20 @@ async def process_detection(
             event="orchestrator_incident_created",
             identity=identity,
             request=request,
-            metadata={"rule_id": rule_id},
+            metadata={
+                "rule_id": rule_id,
+                "context_id": context_id,
+            },
         )
 
         return {"result": "created"}
-    
 
     audit.log(
         event="orchestrator_unknown_action",
         identity=identity,
         request=request,
         result="failure",
-        metadata={"action": action},
+        metadata={"action": action, "context_id": context_id},
     )
 
     raise HTTPException(status_code=400, detail=f"Unknown action {action}")
