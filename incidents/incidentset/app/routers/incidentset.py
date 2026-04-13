@@ -62,6 +62,8 @@ async def insert_incident(
     identity=Depends(incident_writer),
 ):
 
+    context_id = request.state.context_id
+
     data = payload.model_dump()
     now = datetime.now(timezone.utc)
 
@@ -86,14 +88,21 @@ async def insert_incident(
 
     try:
 
-        mongo.insert_one(incidents_collection(), data)
+        mongo.insert_one(
+            incidents_collection(),
+            data,
+            context_id=context_id
+        )
 
         audit.log(
             event="incident_inserted",
             identity=identity,
             request=request,
             target=data.get("title"),
-            metadata={"status": data["status"]},
+            metadata={
+                "status": data["status"],
+                "context_id": context_id
+            },
         )
 
     except Exception as e:
@@ -119,6 +128,8 @@ async def update_incident(
     mongo=Depends(get_mongo),
     identity=Depends(incident_writer),
 ):
+
+    context_id = request.state.context_id
 
     raw_id = payload.pop("_id", None)
 
@@ -170,13 +181,11 @@ async def update_incident(
 
     try:
 
-        client, db = mongo.open_mongo_connection()
-        collection = db[incidents_collection()]
-
-        result = collection.update_one(
+        result = mongo.update_one(
+            incidents_collection(),
             {"_id": oid},
             update_doc,
-            upsert=True,
+            context_id=context_id
         )
 
         audit.log(
@@ -184,7 +193,9 @@ async def update_incident(
             identity=identity,
             request=request,
             target=str(oid),
-            metadata={"modified_count": result.modified_count},
+            metadata={
+                "context_id": context_id
+            },
         )
 
     except Exception as e:
@@ -201,9 +212,6 @@ async def update_incident(
 
         raise HTTPException(status_code=500, detail=str(e))
 
-    finally:
-        mongo.close_mongo_connection()
-
     return {"updated": True}
 
 
@@ -214,14 +222,21 @@ async def get_incidents(
     identity=Depends(incident_reader),
 ):
 
+    context_id = request.state.context_id
+
     try:
 
-        docs = mongo.find(incidents_collection(), {})
+        docs = mongo.find_with_context(
+            incidents_collection(),
+            {},
+            context_id=context_id
+        )
 
         audit.log(
             event="incident_list_accessed",
             identity=identity,
             request=request,
+            metadata={"context_id": context_id},
         )
 
         return JSONResponse(content=json.loads(dumps(docs)))
@@ -248,6 +263,8 @@ async def get_incident(
     identity=Depends(incident_reader),
 ):
 
+    context_id = request.state.context_id
+
     try:
         oid = ObjectId(incident_id)
     except Exception:
@@ -263,7 +280,11 @@ async def get_incident(
         raise HTTPException(status_code=400, detail="Invalid incident id")
 
     try:
-        doc = mongo.find_one(incidents_collection(), {"_id": oid})
+        doc = mongo.find_one_with_context(
+            incidents_collection(),
+            {"_id": oid},
+            context_id=context_id
+        )
     except Exception as e:
 
         audit.log(
@@ -295,6 +316,7 @@ async def get_incident(
         identity=identity,
         request=request,
         target=incident_id,
+        metadata={"context_id": context_id},
     )
 
     return JSONResponse(content=json.loads(dumps(doc)))
