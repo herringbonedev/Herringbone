@@ -1,352 +1,224 @@
-from fastapi import APIRouter, Query, HTTPException, Depends, Request
-from typing import Optional, Dict, Any, List
-from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from bson import ObjectId
+from bson.json_util import dumps
+from datetime import datetime, timedelta, UTC
 import os
+import json
 
 from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.auth import require_scopes, get_context
 from modules.audit.logger import AuditLogger
 
-from app.service import search_collection_service, get_collection_fields
 
-from app.config import (
-    MAX_LIMIT,
-    MAX_SCHEMA_SAMPLE,
-    MAX_SCHEMA_DEPTH,
-    MAX_ENUM_VALUES,
-    ALLOWED_COLLECTIONS,
-    SORTABLE_FIELDS,
-    ALLOWED_OPERATORS,
-)
+search_read = require_scopes("search:query")
 
 router = APIRouter(
     prefix="/herringbone/search",
     tags=["search"],
-    dependencies=[Depends(get_context)]
+    dependencies=[Depends(get_context)],
 )
-
-search_query_auth = require_scopes("search:query")
-search_schema_auth = require_scopes("search:schema")
 
 audit = AuditLogger()
 
 
 def get_mongo():
     return HerringboneMongoDatabase(
-        user=os.environ.get("MONGO_USER", "admin"),
-        password=os.environ.get("MONGO_PASS", "secret"),
+        user=os.environ.get("MONGO_USER", ""),
+        password=os.environ.get("MONGO_PASS", ""),
         database=os.environ.get("DB_NAME", "herringbone"),
         host=os.environ.get("MONGO_HOST", "localhost"),
-        port=int(os.environ.get("MONGO_PORT", 27017)),
-        auth_source=os.environ.get("AUTH_DB", "herringbone"),
     )
 
 
-class SearchParams:
-    def __init__(
-        self,
-        limit: int,
-        q: Optional[str],
-        after: Optional[str],
-        from_ts: Optional[str],
-        to_ts: Optional[str],
-        sort: Optional[str],
-        order: str,
-        filter_field: Optional[str] = None,
-        filter_kind: Optional[str] = None,
-        filter_min: Optional[int] = None,
-        filter_max: Optional[int] = None,
-        filter_in: Optional[str] = None,
-    ):
-        self.limit = limit
-        self.q = q
-        self.after = after
-        self.from_ts = from_ts
-        self.to_ts = to_ts
-        self.sort = sort
-        self.order = order
-        self.filter_field = filter_field
-        self.filter_kind = filter_kind
-        self.filter_min = filter_min
-        self.filter_max = filter_max
-        self.filter_in = filter_in
-        self.severity_min = None
-        self.severity_max = None
+def encode(obj):
+    return json.loads(dumps(obj))
 
 
-@router.get("/{collection}")
-def search_collection(
-    collection: str,
+@router.get("/events")
+async def search_events(
     request: Request,
-    limit: int = Query(50, ge=1, le=MAX_LIMIT),
-    q: Optional[str] = Query(None),
-    after: Optional[str] = Query(None),
-    from_ts: Optional[str] = Query(None),
-    to_ts: Optional[str] = Query(None),
-    filter_field: Optional[str] = Query(None),
-    filter_kind: Optional[str] = Query(None, pattern="^(range|in)$"),
-    filter_min: Optional[int] = Query(None),
-    filter_max: Optional[int] = Query(None),
-    filter_in: Optional[str] = Query(None),
-    sort: Optional[str] = Query(None),
-    order: str = Query("desc", pattern="^(asc|desc)$"),
-    identity=Depends(search_query_auth),
+    q: str | None = Query(None),
+    since_hours: int | None = Query(None),
+    limit: int = Query(50, ge=1, le=500),
+    mongo=Depends(get_mongo),
+    context=Depends(search_read),
 ):
 
-    if collection not in ALLOWED_COLLECTIONS:
-        raise HTTPException(status_code=400, detail="Collection not allowed")
+    context_id = request.state.context_id
+    identity = context["identity"]
 
-    params = SearchParams(
-        limit=limit,
-        q=q,
-        after=after,
-        from_ts=from_ts,
-        to_ts=to_ts,
-        sort=sort,
-        order=order,
-        filter_field=filter_field,
-        filter_kind=filter_kind,
-        filter_min=filter_min,
-        filter_max=filter_max,
-        filter_in=filter_in,
-    )
-
-    mongo = get_mongo()
+    query = {}
+    
+    if q:
+        query["$or"] = [
+            {"raw": {"$regex": q, "$options": "i"}},
+            {"source.address": {"$regex": q, "$options": "i"}},
+        ]
+    
+    if since_hours:
+        since = datetime.now(UTC) - timedelta(hours=since_hours)
+        query["ingested_at"] = {"$gte": since}
 
     try:
-        results, next_after = search_collection_service(
-            mongo=mongo,
-            collection=collection,
-            params=params,
-        )
 
-        audit.log(
-            event="search_query",
-            identity=identity,
-            request=request,
-            target=collection,
-            metadata={"limit": limit, "q": q},
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-
-        audit.log(
-            event="search_query_failed",
-            identity=identity,
-            request=request,
-            target=collection,
-            result="failure",
-            metadata={"error": str(e)},
-            severity="ERROR",
-        )
-
-        raise HTTPException(status_code=500, detail=str(e))
-
-    return {
-        "collection": collection,
-        "limit": limit,
-        "count": len(results),
-        "after": after,
-        "next_after": next_after,
-        "results": results,
-    }
-
-
-@router.get("/{collection}/fields")
-def list_collection_fields(
-    collection: str,
-    request: Request,
-    identity=Depends(search_schema_auth),
-):
-
-    if collection not in ALLOWED_COLLECTIONS:
-        raise HTTPException(status_code=400, detail="Collection not allowed")
-
-    mongo = get_mongo()
-
-    try:
-        fields = get_collection_fields(mongo, collection)
-
-        audit.log(
-            event="search_fields_accessed",
-            identity=identity,
-            request=request,
-            target=collection,
-        )
-
-    except Exception as e:
-
-        audit.log(
-            event="search_fields_failed",
-            identity=identity,
-            request=request,
-            target=collection,
-            result="failure",
-            metadata={"error": str(e)},
-            severity="ERROR",
-        )
-
-        raise HTTPException(status_code=500, detail=str(e))
-
-    return {
-        "collection": collection,
-        "count": len(fields),
-        "fields": fields,
-    }
-
-
-def _infer_type(v: Any) -> str:
-    if isinstance(v, bool):
-        return "bool"
-    if isinstance(v, int) or isinstance(v, float):
-        return "number"
-    if isinstance(v, datetime):
-        return "datetime"
-    if isinstance(v, ObjectId):
-        return "objectid"
-    if isinstance(v, str):
-        return "string"
-    if isinstance(v, list):
-        return "array"
-    if isinstance(v, dict):
-        return "object"
-    if v is None:
-        return "null"
-    return "unknown"
-
-
-def _normalize_example(v: Any):
-    if isinstance(v, datetime):
-        return v.isoformat()
-    if isinstance(v, ObjectId):
-        return str(v)
-    return v
-
-
-def _record_scalar(entry: Dict[str, Any], v: Any, t: str):
-
-    ex = _normalize_example(v)
-
-    if len(entry["examples"]) < 3:
-        entry["examples"].append(ex)
-
-    if t == "string" and len(entry["enum"]) < MAX_ENUM_VALUES:
-        entry["enum"].add(v)
-
-
-def _walk_fields(obj: Any, prefix: str, depth: int, out: Dict[str, Dict[str, Any]]):
-
-    if depth > MAX_SCHEMA_DEPTH:
-        return
-
-    if isinstance(obj, list):
-        for item in obj[:5]:
-            _walk_fields(item, prefix, depth + 1, out)
-        return
-
-    if not isinstance(obj, dict):
-        return
-
-    for k, v in obj.items():
-
-        if not isinstance(k, str):
-            continue
-
-        path = f"{prefix}.{k}" if prefix else k
-        t = _infer_type(v)
-
-        entry = out.setdefault(path, {
-            "path": path,
-            "types": set(),
-            "examples": [],
-            "enum": set(),
-        })
-
-        entry["types"].add(t)
-
-        if t in ("string", "number", "bool", "datetime", "objectid"):
-            if v is not None:
-                _record_scalar(entry, v, t)
-
-        elif t == "array":
-            for item in v[:5]:
-
-                it = _infer_type(item)
-                entry["types"].add(it)
-
-                if it in ("string", "number", "bool", "datetime", "objectid"):
-                    _record_scalar(entry, item, it)
-
-                elif isinstance(item, dict):
-                    _walk_fields(item, path, depth + 1, out)
-
-        elif isinstance(v, dict):
-            _walk_fields(v, path, depth + 1, out)
-
-
-@router.get("/{collection}/schema")
-def get_collection_schema(
-    collection: str,
-    request: Request,
-    identity=Depends(search_schema_auth),
-):
-
-    if collection not in ALLOWED_COLLECTIONS:
-        raise HTTPException(status_code=400, detail="Collection not allowed")
-
-    mongo = get_mongo()
-
-    try:
-        docs = mongo.find_sorted(
-            collection=collection,
-            filter_query={},
+        results = mongo.find_sorted_with_context(
+            collection="events",
+            filter_query=query,
+            context_id=context_id,
             sort=[("_id", -1)],
-            limit=MAX_SCHEMA_SAMPLE,
+            limit=limit,
         )
+
+        audit.log(
+            event="search_events",
+            identity=identity,
+            request=request,
+            metadata={
+                "query": q,
+                "count": len(results),
+                "context_id": context_id,
+            },
+        )
+
+        return JSONResponse(content=encode(results))
+
     except Exception as e:
 
         audit.log(
-            event="search_schema_failed",
+            event="search_events_failed",
             identity=identity,
             request=request,
-            target=collection,
             result="failure",
-            metadata={"error": str(e)},
+            metadata={"error": str(e), "context_id": context_id},
             severity="ERROR",
         )
 
         raise HTTPException(status_code=500, detail=str(e))
 
-    out: Dict[str, Dict[str, Any]] = {}
 
-    for d in docs or []:
-        _walk_fields(d, "", 0, out)
+@router.get("/incidents")
+async def search_incidents(
+    request: Request,
+    status: str | None = Query(None),
+    priority: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    mongo=Depends(get_mongo),
+    context=Depends(search_read),
+):
 
-    fields: List[Dict[str, Any]] = []
+    context_id = request.state.context_id
+    identity = context["identity"]
 
-    for meta in out.values():
-        fields.append({
-            "path": meta["path"],
-            "types": sorted(list(meta["types"])),
-            "examples": meta["examples"],
-            "enum": sorted(list(meta["enum"])),
-        })
+    query = {}
 
-    fields.sort(key=lambda x: x["path"])
+    if status:
+        query["status"] = status
 
-    audit.log(
-        event="search_schema_accessed",
-        identity=identity,
-        request=request,
-        target=collection,
-        metadata={"fields": len(fields)},
-    )
+    if priority:
+        query["priority"] = priority
 
-    return {
-        "collection": collection,
-        "count": len(fields),
-        "fields": fields,
-    }
+    try:
+
+        results = mongo.find_sorted_with_context(
+            collection="incidents",
+            filter_query=query,
+            context_id=context_id,
+            sort=[("created_at", -1)],
+            limit=limit,
+        )
+
+        audit.log(
+            event="search_incidents",
+            identity=identity,
+            request=request,
+            metadata={
+                "status": status,
+                "priority": priority,
+                "count": len(results),
+                "context_id": context_id,
+            },
+        )
+
+        return JSONResponse(content=encode(results))
+
+    except Exception as e:
+
+        audit.log(
+            event="search_incidents_failed",
+            identity=identity,
+            request=request,
+            result="failure",
+            metadata={"error": str(e), "context_id": context_id},
+            severity="ERROR",
+        )
+
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/detections")
+async def search_detections(
+    request: Request,
+    severity_min: int | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    mongo=Depends(get_mongo),
+    context=Depends(search_read),
+):
+
+    context_id = request.state.context_id
+    identity = context["identity"]
+
+    query = {}
+
+    if severity_min is not None:
+        query["severity"] = {"$gte": severity_min}
+
+    try:
+
+        results = mongo.find_sorted_with_context(
+            collection="detections",
+            filter_query=query,
+            context_id=context_id,
+            sort=[("inserted_at", -1)],
+            limit=limit,
+        )
+
+        audit.log(
+            event="search_detections",
+            identity=identity,
+            request=request,
+            metadata={
+                "severity_min": severity_min,
+                "count": len(results),
+                "context_id": context_id,
+            },
+        )
+
+        return JSONResponse(content=encode(results))
+
+    except Exception as e:
+
+        audit.log(
+            event="search_detections_failed",
+            identity=identity,
+            request=request,
+            result="failure",
+            metadata={"error": str(e), "context_id": context_id},
+            severity="ERROR",
+        )
+
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/livez")
+async def livez():
+    return {"status": "ok"}
+
+
+@router.get("/readyz")
+async def readyz(mongo=Depends(get_mongo)):
+    try:
+        mongo.find_one("events", {})
+        return {"ready": True}
+    except Exception:
+        return JSONResponse(content={"ready": False}, status_code=503)
