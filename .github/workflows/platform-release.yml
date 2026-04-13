@@ -136,7 +136,7 @@ jobs:
           fi
 
       - name: Create GitHub Release and upload docker bundle
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.manifest.outputs.version }}
           name: Platform ${{ steps.manifest.outputs.version }}
