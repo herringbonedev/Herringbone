@@ -5,8 +5,6 @@ from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.auth import require_scopes, get_context
 from modules.audit.logger import AuditLogger
 import os
-import json
-import requests
 
 
 correlate_required = require_scopes("incidents:correlate")
@@ -27,22 +25,6 @@ def get_mongo():
         database=os.environ.get("DB_NAME", "herringbone"),
         host=os.environ.get("MONGO_HOST", "localhost"),
     )
-
-
-EVENTS_API_BASE = os.environ.get(
-    "EVENTS_API_BASE",
-    "http://127.0.0.1:7010/herringbone/logs/events/",
-)
-
-
-def fetch_event(event_id: str):
-    try:
-        r = requests.get(f"{EVENTS_API_BASE}/{event_id}", timeout=5)
-        if r.status_code != 200:
-            return None
-        return r.json()
-    except Exception:
-        return None
 
 
 def extract_correlate_values(event: dict, correlate_on: list[str]):
@@ -89,6 +71,17 @@ async def correlate(
     identity=Depends(correlate_required),
 ):
 
+    context_id = request.state.context_id
+
+    if not context_id:
+        audit.log(
+            event="correlator_missing_context",
+            identity=identity,
+            request=request,
+            result="failure",
+        )
+        raise HTTPException(status_code=500, detail="Missing context_id")
+
     if "rule_id" not in payload:
         audit.log(
             event="correlator_invalid_request",
@@ -121,11 +114,15 @@ async def correlate(
                 event="correlator_no_event_for_correlation",
                 identity=identity,
                 request=request,
-                metadata={"rule_id": rule_id},
+                metadata={"rule_id": rule_id, "context_id": context_id},
             )
             return {"action": "create", "correlation_identity": {}}
 
-        event = fetch_event(event_id)
+        event = mongo.find_one_with_context(
+            "events",
+            {"_id": ObjectId(event_id)},
+            context_id=context_id,
+        )
 
         if not isinstance(event, dict):
             audit.log(
@@ -134,7 +131,7 @@ async def correlate(
                 request=request,
                 result="failure",
                 severity="WARNING",
-                metadata={"event_id": event_id},
+                metadata={"event_id": event_id, "context_id": context_id},
             )
             return {"action": "create", "correlation_identity": {}}
 
@@ -147,7 +144,7 @@ async def correlate(
                 event="correlator_no_correlation_values",
                 identity=identity,
                 request=request,
-                metadata={"rule_id": rule_id},
+                metadata={"rule_id": rule_id, "context_id": context_id},
             )
             return {"action": "create", "correlation_identity": {}}
 
@@ -159,9 +156,10 @@ async def correlate(
         }
 
         try:
-            candidates = mongo.find_sorted(
+            candidates = mongo.find_sorted_with_context(
                 collection=incidents_collection,
                 filter_query=query,
+                context_id=context_id,
                 sort=[("state.last_updated", -1)],
                 limit=1,
             )
@@ -172,7 +170,7 @@ async def correlate(
                 request=request,
                 result="failure",
                 severity="ERROR",
-                metadata={"error": str(e)},
+                metadata={"error": str(e), "context_id": context_id},
             )
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -184,7 +182,7 @@ async def correlate(
                 identity=identity,
                 request=request,
                 target=incident_id,
-                metadata={"rule_id": rule_id},
+                metadata={"rule_id": rule_id, "context_id": context_id},
             )
 
             return {
@@ -196,7 +194,7 @@ async def correlate(
             event="correlator_create_incident",
             identity=identity,
             request=request,
-            metadata={"rule_id": rule_id},
+            metadata={"rule_id": rule_id, "context_id": context_id},
         )
 
         return {
@@ -211,9 +209,10 @@ async def correlate(
     }
 
     try:
-        candidates = mongo.find_sorted(
+        candidates = mongo.find_sorted_with_context(
             collection=incidents_collection,
             filter_query=query,
+            context_id=context_id,
             sort=[("state.last_updated", -1)],
             limit=1,
         )
@@ -224,7 +223,7 @@ async def correlate(
             request=request,
             result="failure",
             severity="ERROR",
-            metadata={"error": str(e)},
+            metadata={"error": str(e), "context_id": context_id},
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -236,7 +235,7 @@ async def correlate(
             identity=identity,
             request=request,
             target=incident_id,
-            metadata={"rule_id": rule_id},
+            metadata={"rule_id": rule_id, "context_id": context_id},
         )
 
         return {
@@ -248,7 +247,7 @@ async def correlate(
         event="correlator_create_incident",
         identity=identity,
         request=request,
-        metadata={"rule_id": rule_id},
+        metadata={"rule_id": rule_id, "context_id": context_id},
     )
 
     return {"action": "create"}
