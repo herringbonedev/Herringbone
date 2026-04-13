@@ -14,22 +14,22 @@ _metrics = {
     "last_log": 0.0,
 }
 
-# cache rules so we don't reload every event
-_rules_cache = None
-_rules_last_load = 0
-RULE_RELOAD_INTERVAL = 30  # seconds
+_rules_cache: dict[str, list[dict]] = {}
+_rules_last_load: dict[str, float] = {}
+RULE_RELOAD_INTERVAL = 30
 
 
-def _get_rules():
-    global _rules_cache, _rules_last_load
-
+def _get_rules(context_id: str):
     now = time()
 
-    if _rules_cache is None or now - _rules_last_load > RULE_RELOAD_INTERVAL:
-        _rules_cache = load_rules()
-        _rules_last_load = now
+    cached_rules = _rules_cache.get(context_id)
+    last_load = _rules_last_load.get(context_id, 0)
 
-    return _rules_cache
+    if cached_rules is None or now - last_load > RULE_RELOAD_INTERVAL:
+        _rules_cache[context_id] = load_rules(context_id)
+        _rules_last_load[context_id] = now
+
+    return _rules_cache.get(context_id, [])
 
 
 def _sanitize(event: dict) -> dict:
@@ -48,14 +48,12 @@ def _sanitize(event: dict) -> dict:
 
 
 def _maybe_log(interval: float = 5.0):
-
     now = time()
 
     if now - _metrics["last_log"] < interval:
         return
 
     processed = _metrics["processed"]
-
     rate = processed / interval if interval else 0
 
     print(
@@ -73,7 +71,6 @@ def _maybe_log(interval: float = 5.0):
 
 
 def process_one():
-
     doc = fetch_one_undetected()
 
     if not doc:
@@ -81,8 +78,10 @@ def process_one():
         return {"status": False}
 
     event = doc.get("event")
+    status = doc.get("status") or {}
+    context_id = doc.get("context_id") or status.get("context_id") or event.get("context_id")
 
-    if not event:
+    if not event or not context_id:
         _metrics["failed"] += 1
         _maybe_log()
         return {"status": False}
@@ -95,11 +94,9 @@ def process_one():
         return {"status": False}
 
     to_send = _sanitize(event)
-
-    rules = _get_rules()
+    rules = _get_rules(context_id)
 
     try:
-
         analysis = analyze_log_with_rules(to_send, rules)
 
         print(f"[*] analysis result detection={analysis.get('detection')}")
@@ -118,6 +115,7 @@ def process_one():
 
         apply_result(
             event_id,
+            context_id,
             analysis,
             rule_id,
         )
@@ -132,13 +130,12 @@ def process_one():
         return {"status": True}
 
     except Exception as e:
-
         _metrics["processed"] += 1
         _metrics["failed"] += 1
 
         print(f"[✗] detector processing failed: {e}")
 
-        set_failed(event_id, str(e))
+        set_failed(event_id, context_id, str(e))
 
         _maybe_log()
 

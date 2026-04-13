@@ -18,6 +18,13 @@ def service_auth_headers():
         return {}
 
 
+def service_headers(context_id: str):
+    return {
+        **service_auth_headers(),
+        "X-Herringbone-Context": context_id,
+    }
+
+
 def _db() -> HerringboneMongoDatabase:
     return HerringboneMongoDatabase(
         user=os.environ.get("MONGO_USER", ""),
@@ -36,26 +43,35 @@ def _max_severity(analysis: dict):
     return max(vals) if vals else None
 
 
-def notify_orchestrator(payload):
+def notify_orchestrator(payload: dict, context_id: str):
     if not ORCHESTRATOR_URL:
         print("[✗] ORCHESTRATOR_URL not set, skipping notification")
         return
 
+    if not context_id:
+        print("[✗] Missing context_id, skipping orchestrator notification")
+        return
+
     try:
-        resp = requests.post(ORCHESTRATOR_URL, 
-                             json=payload, 
-                             headers=service_auth_headers(), 
-                             timeout=2)
-        
+        resp = requests.post(
+            ORCHESTRATOR_URL,
+            json={**payload, "context_id": context_id},
+            headers=service_headers(context_id),
+            timeout=2,
+        )
         resp.raise_for_status()
         print("[✓] Detection forwarded to orchestrator")
     except Exception as e:
         print(f"[✗] Failed to notify orchestrator: {e}")
 
 
-def set_failed(event_id, reason: str):
+def set_failed(event_id, context_id: str, reason: str):
     now = datetime.now(timezone.utc)
     mongo = _db()
+
+    if not context_id:
+        print("[✗] Missing context_id, cannot mark event failed")
+        return
 
     status_collection = os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state")
 
@@ -70,15 +86,20 @@ def set_failed(event_id, reason: str):
                 "last_updated": now,
                 "error": reason,
             },
+            context_id=context_id,
         )
     except Exception as e:
         print(f"[✗] Failed to mark event failed: {e}")
 
 
-def apply_result(event_id, analysis: dict, rule_id: str):
+def apply_result(event_id, context_id: str, analysis: dict, rule_id: str):
     now = datetime.now(timezone.utc)
     severity = _max_severity(analysis)
     detected = bool(analysis.get("detection"))
+
+    if not context_id:
+        print("[✗] Missing context_id, cannot apply result")
+        return
 
     mongo = _db()
     status_collection = os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state")
@@ -106,6 +127,7 @@ def apply_result(event_id, analysis: dict, rule_id: str):
             status_collection,
             {"event_id": event_id},
             update_fields,
+            context_id=context_id,
         )
     except Exception as e:
         print(f"[✗] Failed to update status: {e}")
@@ -113,15 +135,18 @@ def apply_result(event_id, analysis: dict, rule_id: str):
 
     if detected:
         print("[*] Detection evaluated as TRUE")
-        notify_orchestrator({
-            "detection_id": str(event_id),
-            "rule_id": rule_id,
-            "event_ids": [str(event_id)],
-            "severity": severity,
-            "correlate_on": correlate_values,
-            "priority": "high" if (severity or 0) >= 75 else "medium",
-            "timestamp": now.isoformat(),
-        })
+        notify_orchestrator(
+            {
+                "detection_id": str(event_id),
+                "rule_id": rule_id,
+                "event_ids": [str(event_id)],
+                "severity": severity,
+                "correlate_on": correlate_values,
+                "priority": "high" if (severity or 0) >= 75 else "medium",
+                "timestamp": now.isoformat(),
+            },
+            context_id=context_id,
+        )
 
     det_collection = os.environ.get("DETECTIONS_COLLECTION_NAME")
     if det_collection:
@@ -135,6 +160,7 @@ def apply_result(event_id, analysis: dict, rule_id: str):
                     "analysis": analysis,
                     "inserted_at": now,
                 },
+                context_id=context_id,
                 clean_codec=False,
             )
             print("[✓] Detection written to detections collection")

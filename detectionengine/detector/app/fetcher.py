@@ -36,11 +36,17 @@ def fetch_one_undetected() -> dict | None:
     status = status_list[0]
 
     event_id = status.get("event_id")
-    if not event_id:
+    context_id = status.get("context_id")
+
+    if not event_id or not context_id:
         return None
 
     try:
-        event = mongo.find_one(events_collection, {"_id": event_id})
+        event = mongo.find_one_with_context(
+            events_collection,
+            {"_id": event_id},
+            context_id=context_id,
+        )
     except Exception:
         return None
 
@@ -50,4 +56,5 @@ def fetch_one_undetected() -> dict | None:
     return {
         "event": event,
         "status": status,
+        "context_id": context_id,
     }

@@ -11,12 +11,15 @@ def get_rules_db() -> HerringboneMongoDatabase:
     )
 
 
-def load_rules() -> list[dict]:
+def load_rules(context_id: str) -> list[dict]:
+    if not context_id:
+        return []
+
     rules_collection = os.environ.get("RULES_COLLECTION_NAME", "rules")
     mongo = get_rules_db()
 
     try:
-        items = mongo.find(rules_collection, {})
+        items = mongo.find_with_context(rules_collection, {}, context_id=context_id)
     except Exception:
         return []
 
