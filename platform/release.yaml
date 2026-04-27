@@ -10,7 +10,7 @@ services:
   parser-extractor: quay.io/herringbone/parser-extractor:9f4a781c@sha256:ac8163e102a2eba0c152c9b5d3723a334cf98712e51ea623e062c67a81de0e4f
   parser-enrichment: quay.io/herringbone/parser-enrichment:ecf2837c@sha256:fc35544528c680c966ff1ab9de25d1afe6de2f94a8d4f9891bed0caae1826a09
   incidents-correlator: quay.io/herringbone/incidents-correlator:7b28559b@sha256:466c73b307d9d15afb1161056366818f7b905a9714def9ff5b2e6da31a442050
-  incidents-orchestrator: quay.io/herringbone/incidents-orchestrator:ce985520@sha256:3af085a3b067ab8b06233d27f5f6ba5902a456cea43a8263055e973091d9c01c
+  incidents-orchestrator: quay.io/herringbone/incidents-orchestrator:97cd747e@sha256:e376d6f3a69ad8bbf8748146107a3d2b5e2e3e7bf838f97ce761414ba9f31e81
   incidents-incidentset: quay.io/herringbone/incidents-incidentset:f19a6a50@sha256:76eb66bf889735e256a744eaa3894938dc47961e6582bfd09e92da19bcf3f40e
   logingestion-receiver: quay.io/herringbone/receiver:ce61473f@sha256:d088e465c2ff14173641d99efbbc1afe26855ff083b4c7e611c1d45d6afc910f
   operations-center: quay.io/herringbone/operations-center:sha-fe638be4@sha256:5ddf25cd8f174d5be6eb77ee2e756e2d8f6438170716257022003fc149808a98
