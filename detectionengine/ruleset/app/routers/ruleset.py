@@ -13,9 +13,9 @@ from modules.audit.logger import AuditLogger
 from app.schema import RuleSchema
 
 
-ruleset_write = require_scopes("rules:write")
-ruleset_read = require_scopes("rules:read")
-ruleset_admin = require_scopes("rules:admin")
+ruleset_write = require_scopes("detections:rules:write")
+ruleset_read = require_scopes("detections:rules:read")
+ruleset_admin = require_scopes("detections:rules:write")
 
 router = APIRouter(
     prefix="/detectionengine/ruleset",
