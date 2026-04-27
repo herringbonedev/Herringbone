@@ -1,7 +1,7 @@
 services:
   parser-extractor:
     container_name: parser-extractor
-    image: quay.io/herringbone/parser-extractor:9f4a781c@sha256:ac8163e102a2eba0c152c9b5d3723a334cf98712e51ea623e062c67a81de0e4f
+    image: quay.io/herringbone/parser-extractor:97cd747e@sha256:9a5ae818dc24dfd45a6fa21c9ba795175bf17c9a5c94dbca287fe45199a1fb12
     restart: unless-stopped
     networks:
       - herringbone
