@@ -3,7 +3,7 @@ pytest==9.0.2
 pytest-cov==7.0.0
 requests-mock==1.12.1
 httpx==0.28.1
-testcontainers[mongodb]>=4.0.0
+testcontainers[mongodb]>=4.14.2
 
 # Formatting and linting
 black==26.1.0
