@@ -612,7 +612,7 @@ async def list_scopes(
     audit: AuditLogger = Depends(get_audit_logger),
 ):
     mongo = get_mongo()
-    scopes = mongo.find_one("scopes", {})
+    scopes = mongo.find("scopes", {})
 
     return {
         "count": len(scopes),
@@ -627,5 +627,5 @@ async def list_scopes(
                 "order": s.get("order", 0),
             }
             for s in scopes
-        ]
+        ],
     }
