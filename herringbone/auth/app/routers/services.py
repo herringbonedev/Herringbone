@@ -114,7 +114,7 @@ async def register_internal_service(
         "created_at": datetime.now(UTC),
     }
 
-    svc_id = mongo.insert_one("service_accounts", svc_doc)
+    svc_id = mongo.insert_one("service_accounts", svc_doc, context_id="default")
 
     audit.log(
         event="internal_service_registered",
@@ -192,7 +192,7 @@ async def register_customer_service(
         "created_by": identity.get("email"),
     }
 
-    svc_id = mongo.insert_one("service_accounts", svc_doc)
+    svc_id = mongo.insert_one("service_accounts", svc_doc, context_id=context_id)
 
     audit.log(
         event="customer_service_registered",

@@ -177,7 +177,7 @@ async def create_ingestion_key_api(
         "created_by": identity.get("email"),
     }
 
-    mongo.insert_one("ingestion_keys", doc)
+    mongo.insert_one("ingestion_keys", doc, context_id=context_id)
 
     audit.log(
         event="ingestion_key_created",
