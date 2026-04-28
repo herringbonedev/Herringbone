@@ -89,6 +89,7 @@ def create_service_token_for_context(*, service_id: str, service_name: str, scop
         "service_id": service_id,
         "service_name": service_name,
         "scopes": scopes,
+        "context_id": context_id,
     }
 
     if "context_id" in inspect.signature(create_service_token).parameters:

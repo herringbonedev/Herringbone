@@ -154,6 +154,7 @@ def create_service_token(
     service_id: str,
     service_name: str,
     scopes: list[str],
+    context_id: str,
 ) -> str:
 
     now = datetime.now(timezone.utc)
@@ -165,7 +166,7 @@ def create_service_token(
         "scope": scopes,
         "typ": "service",
         "aud": "herringbone-services",
-        "context_id": "default",
+        "context_id": context_id,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=SERVICE_JWT_EXPIRE_MINUTES)).timestamp()),
     }
