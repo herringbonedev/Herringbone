@@ -73,7 +73,7 @@ def load_bootstrap_token() -> Optional[str]:
 
 def is_bootstrap_required(mongo: HerringboneMongoDatabase) -> bool:
     try:
-        return len(mongo.find("users", {})) == 0
+        return len(mongo.find_with_context("users", {}, context_id="default")) == 0
     except Exception:
         return True
 
@@ -112,9 +112,10 @@ async def list_ingestion_keys(
         )
         raise HTTPException(403, "organization context required")
 
-    keys = mongo.find(
+    keys = mongo.find_with_context(
         "ingestion_keys",
-        {"context_id": context_id},
+        {},
+        context_id=context_id,
     )
 
     return {
@@ -231,11 +232,9 @@ async def revoke_ingestion_key(
 
     result = mongo.update_one(
         "ingestion_keys",
-        {
-            "_id": oid,
-            "context_id": context_id,
-        },
+        {"_id": oid},
         {"$set": {"enabled": False}},
+        context_id=context_id,
     )
 
     if result.matched_count == 0:

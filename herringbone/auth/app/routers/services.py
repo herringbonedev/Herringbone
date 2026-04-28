@@ -1,3 +1,4 @@
+import inspect
 import os, secrets
 from datetime import datetime, UTC
 from typing import Optional
@@ -78,9 +79,22 @@ def load_bootstrap_token() -> Optional[str]:
 
 def is_bootstrap_required(mongo: HerringboneMongoDatabase) -> bool:
     try:
-        return len(mongo.find("users", {})) == 0
+        return len(mongo.find_with_context("users", {}, context_id="default")) == 0
     except Exception:
         return True
+
+
+def create_service_token_for_context(*, service_id: str, service_name: str, scopes: list, context_id: str):
+    kwargs = {
+        "service_id": service_id,
+        "service_name": service_name,
+        "scopes": scopes,
+    }
+
+    if "context_id" in inspect.signature(create_service_token).parameters:
+        kwargs["context_id"] = context_id
+
+    return create_service_token(**kwargs)
 
 
 @router.post("/services/internal/register")
@@ -94,12 +108,13 @@ async def register_internal_service(
 
     service_id = getattr(payload, "service_id", None) or payload.service_name
 
-    if mongo.find_one(
+    if mongo.find_one_with_context(
         "service_accounts",
         {
             "service_name": payload.service_name,
             "owner_type": "platform",
         },
+        context_id="default",
     ):
         raise HTTPException(status_code=400, detail="Service already exists")
 
@@ -108,7 +123,7 @@ async def register_internal_service(
         "service_id": service_id,
         "owner_type": "platform",
         "internal": True,
-        "context_id": None,
+        "context_id": "default",
         "scopes": payload.scopes,
         "enabled": True,
         "created_at": datetime.now(UTC),
@@ -170,13 +185,13 @@ async def register_customer_service(
         )
         raise HTTPException(403, "organization context required")
 
-    if mongo.find_one(
+    if mongo.find_one_with_context(
         "service_accounts",
         {
             "service_name": payload.service_name,
             "owner_type": "customer",
-            "context_id": context_id,
         },
+        context_id=context_id,
     ):
         raise HTTPException(status_code=400, detail="Service already exists")
 
@@ -247,13 +262,13 @@ async def list_services(
         )
         raise HTTPException(403, "organization context required")
 
-    services = mongo.find(
+    services = mongo.find_with_context(
         "service_accounts",
         {
             "owner_type": "customer",
             "internal": {"$ne": True},
-            "context_id": context_id,
         },
+        context_id=context_id,
     )
 
     audit.log(
@@ -320,14 +335,14 @@ async def set_service_scopes(
         )
         raise HTTPException(403, "organization context required")
 
-    svc = mongo.find_one(
+    svc = mongo.find_one_with_context(
         "service_accounts",
         {
             "service_name": payload.service_name,
             "owner_type": "customer",
             "internal": {"$ne": True},
-            "context_id": context_id,
         },
+        context_id=context_id,
     )
 
     if not svc:
@@ -356,6 +371,7 @@ async def set_service_scopes(
                 "updated_at": datetime.now(UTC),
             }
         },
+        context_id=context_id
     )
 
     audit.log(
@@ -412,15 +428,15 @@ async def create_service_token_api(
         )
         raise HTTPException(403, "organization context required")
 
-    svc = mongo.find_one(
+    svc = mongo.find_one_with_context(
         "service_accounts",
         {
             "service_name": payload.service,
             "owner_type": "customer",
             "internal": {"$ne": True},
-            "context_id": context_id,
             "enabled": True,
         },
+        context_id=context_id,
     )
 
     if not svc:
@@ -461,10 +477,11 @@ async def create_service_token_api(
             )
             raise HTTPException(403, "requested scopes exceed service account grants")
 
-    token = create_service_token(
+    token = create_service_token_for_context(
         service_id=str(svc["_id"]),
         service_name=svc["service_name"],
         scopes=requested_scopes,
+        context_id=context_id,
     )
 
     audit.log(
@@ -493,7 +510,7 @@ async def create_internal_service_token_api(
 ):
     mongo = get_mongo()
 
-    svc = mongo.find_one(
+    svc = mongo.find_one_with_context(
         "service_accounts",
         {
             "service_name": payload.service,
@@ -501,6 +518,7 @@ async def create_internal_service_token_api(
             "internal": True,
             "enabled": True,
         },
+        context_id="default",
     )
 
     if not svc:
@@ -537,10 +555,11 @@ async def create_internal_service_token_api(
             )
             raise HTTPException(403, "requested scopes exceed service account grants")
 
-    token = create_service_token(
+    token = create_service_token_for_context(
         service_id=str(svc["_id"]),
         service_name=svc["service_name"],
         scopes=requested_scopes,
+        context_id="default",
     )
 
     audit.log(
@@ -595,14 +614,14 @@ async def delete_service(
         )
         raise HTTPException(403, "organization context required")
 
-    svc = mongo.find_one(
+    svc = mongo.find_one_with_context(
         "service_accounts",
         {
             "service_name": service_name,
             "owner_type": "customer",
             "internal": {"$ne": True},
-            "context_id": context_id,
         },
+        context_id=context_id,
     )
 
     if not svc:
@@ -622,6 +641,7 @@ async def delete_service(
     mongo.delete_one(
         "service_accounts",
         {"_id": svc["_id"]},
+        context_id=context_id
     )
 
     audit.log(

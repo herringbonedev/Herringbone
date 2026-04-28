@@ -79,7 +79,7 @@ def load_bootstrap_token() -> Optional[str]:
 
 def is_bootstrap_required(mongo: HerringboneMongoDatabase) -> bool:
     try:
-        return len(mongo.find("users", {})) == 0
+        return len(mongo.find_with_context("users", {}, context_id="default")) == 0
     except Exception:
         return True
 
@@ -92,7 +92,7 @@ async def login_user(
 ):
     mongo = get_mongo()
 
-    user = mongo.find_one("users", {"email": payload.email})
+    user = mongo.find_one_with_context("users", {"email": payload.email}, context_id="default")
 
     if not user or not verify_password(payload.password, user["password_hash"]):
         audit.log(
@@ -256,7 +256,7 @@ async def list_scopes(
     audit: AuditLogger = Depends(get_audit_logger),
 ):
     mongo = get_mongo()
-    scopes = mongo.find("scopes", {})
+    scopes = mongo.find_with_context("scopes", {}, context_id="default")
 
     return {
         "count": len(scopes),

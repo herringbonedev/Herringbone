@@ -138,7 +138,7 @@ class AuditLogger:
 
         if self.mongo:
             try:
-                self.mongo.insert_one("audit_log", record)
+                self.mongo.insert_one("audit_log", record, context_id=context_id)
             except Exception as e:
                 audit_logger.error(
                     json.dumps({

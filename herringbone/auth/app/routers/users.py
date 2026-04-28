@@ -83,7 +83,7 @@ def load_bootstrap_token() -> Optional[str]:
 
 def is_bootstrap_required(mongo: HerringboneMongoDatabase) -> bool:
     try:
-        return len(mongo.find("users", {})) == 0
+        return len(mongo.find_with_context("users", {}, context_id="default")) == 0
     except Exception:
         return True
 
@@ -138,7 +138,7 @@ async def register_user(
             )
             raise HTTPException(403, "Only platform admins can create users")
 
-    if mongo.find_one("users", {"email": payload.email}):
+    if mongo.find_one_with_context("users", {"email": payload.email}, context_id="default"):
         audit.log(
             event="user_register_denied",
             identity=identity,
@@ -149,7 +149,7 @@ async def register_user(
         )
         raise HTTPException(400, "User already exists")
 
-    user_count = len(mongo.find("users", {}))
+    user_count = len(mongo.find_with_context("users", {}, context_id="default"))
 
     if user_count == 0:
         scopes = ["*"]
@@ -175,7 +175,7 @@ async def register_user(
         "created_at": datetime.now(UTC),
     }
 
-    user_id = mongo.insert_one("users", user_doc)
+    user_id = mongo.insert_one("users", user_doc, context_id="default")
 
     audit.log(
         event="user_register_success",
@@ -195,7 +195,7 @@ async def login_user(
 ):
     mongo = get_mongo()
 
-    user = mongo.find_one("users", {"email": payload.email})
+    user = mongo.find_one_with_context("users", {"email": payload.email}, context_id="default")
 
     if not user or not verify_password(payload.password, user["password_hash"]):
         audit.log(
@@ -368,7 +368,7 @@ async def list_users(
     members_by_user = {}
 
     if not enterprise_enabled or context_id == "default":
-        users = mongo.find("users", {})
+        users = mongo.find_with_context("users", {}, context_id="default")
 
     else:
         try:
@@ -376,12 +376,13 @@ async def list_users(
         except Exception:
             raise HTTPException(400, "invalid context_id")
 
-        members = mongo.find(
+        members = mongo.find_with_context(
             "organization_members",
             {
                 "org_id": org_oid,
                 "status": "active",
             },
+            context_id=context_id,
         )
 
         if not members:
@@ -412,9 +413,10 @@ async def list_users(
             members_by_user[str(oid)] = m
 
         if object_ids:
-            users = mongo.find(
+            users = mongo.find_with_context(
                 "users",
                 {"_id": {"$in": object_ids}},
+                context_id="default",
             )
         else:
             users = []
@@ -476,7 +478,7 @@ async def update_user_scopes(
     identity = context["identity"]
     mongo = get_mongo()
 
-    target = mongo.find_one("users", {"email": payload.email})
+    target = mongo.find_one_with_context("users", {"email": payload.email}, context_id="default")
 
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
@@ -492,6 +494,7 @@ async def update_user_scopes(
             "users",
             {"_id": target["_id"]},
             {"$set": {"scopes": payload.scopes}},
+            context_id="default",
         )
 
         audit.log(
@@ -517,13 +520,14 @@ async def update_user_scopes(
     except Exception:
         raise HTTPException(400, "invalid context_id")
 
-    member = mongo.find_one(
+    member = mongo.find_one_with_context(
         "organization_members",
         {
             "user_id": target["_id"],
             "org_id": org_oid,
             "status": "active",
         },
+        context_id=context_id,
     )
 
     if not member:
@@ -550,6 +554,7 @@ async def update_user_scopes(
                 "updated_at": datetime.now(UTC),
             }
         },
+        context_id=context_id,
     )
 
     audit.log(
@@ -580,12 +585,12 @@ async def delete_user(
 ):
     mongo = get_mongo()
 
-    target = mongo.find_one("users", {"email": payload.email})
+    target = mongo.find_one_with_context("users", {"email": payload.email}, context_id="default")
 
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
-    mongo.delete_one("users", {"_id": target["_id"]})
+    mongo.delete_one("users", {"_id": target["_id"]}, context_id="default")
 
     audit.log(
         event="user_deleted",
@@ -607,7 +612,7 @@ async def list_scopes(
     audit: AuditLogger = Depends(get_audit_logger),
 ):
     mongo = get_mongo()
-    scopes = mongo.find("scopes", {})
+    scopes = mongo.find_with_context("scopes", {}, context_id="default")
 
     return {
         "count": len(scopes),
