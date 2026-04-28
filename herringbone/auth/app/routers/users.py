@@ -1,6 +1,7 @@
 import os, secrets
 from datetime import datetime, UTC
 from typing import Optional
+from bson import ObjectId
 
 from fastapi import APIRouter, HTTPException, Depends
 from starlette.requests import Request
@@ -10,6 +11,7 @@ from modules.auth.auth import (
     require_scopes,
     get_identity,
     get_identity_optional,
+    get_context
 )
 
 from modules.audit import AuditLogger
@@ -24,9 +26,11 @@ from app.security import (
 from app.schemas import (
     RegisterRequest,
     LoginRequest,
+    UserDeleteRequest,
+    UserScopesUpdateRequest,
 )
 
-router = APIRouter(prefix="/herringbone/auth", tags=["auth"])
+router = APIRouter(prefix="/herringbone/auth", tags=["users"])
 
 identity = Depends(get_identity)
 admin = Depends(require_scopes("platform:admin"))
@@ -345,6 +349,254 @@ async def create_context_token_api(
         "context_id": context_id,
         "scopes": scopes,
         "role": role,
+    }
+
+
+@router.get("/users")
+async def list_users(
+    request: Request,
+    context=Depends(get_context),
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    identity = context["identity"]
+    mongo = get_mongo()
+
+    context_id = context.get("context_id")
+    enterprise_enabled = context.get("enterprise_enabled", False)
+
+    users = []
+    members_by_user = {}
+
+    if not enterprise_enabled or context_id == "default":
+        users = mongo.find("users", {})
+
+    else:
+        try:
+            org_oid = ObjectId(context_id)
+        except Exception:
+            raise HTTPException(400, "invalid context_id")
+
+        members = mongo.find(
+            "organization_members",
+            {
+                "org_id": org_oid,
+                "status": "active",
+            },
+        )
+
+        if not members:
+            audit.log(
+                event="users_list",
+                identity=identity,
+                metadata={
+                    "count": 0,
+                    "context_id": context_id,
+                    "enterprise_enabled": enterprise_enabled,
+                },
+                request=request,
+            )
+            return {"count": 0, "users": []}
+
+        object_ids = []
+        for m in members:
+            uid = m.get("user_id")
+            if not uid:
+                continue
+
+            try:
+                oid = uid if isinstance(uid, ObjectId) else ObjectId(str(uid))
+            except Exception:
+                continue
+
+            object_ids.append(oid)
+            members_by_user[str(oid)] = m
+
+        if object_ids:
+            users = mongo.find(
+                "users",
+                {"_id": {"$in": object_ids}},
+            )
+        else:
+            users = []
+
+    result = []
+
+    for u in users:
+        user_id = str(u["_id"])
+
+        global_scopes = u.get("scopes", [])
+        org_scopes = None
+        role = None
+
+        if enterprise_enabled and context_id != "default":
+            member = members_by_user.get(user_id)
+
+            if member:
+                org_scopes = member.get("scopes", [])
+                role = member.get("role")
+
+        effective_scopes = (
+            org_scopes if org_scopes is not None else global_scopes
+        )
+
+        result.append(
+            {
+                "email": u.get("email"),
+                "scopes": effective_scopes,
+                "global_scopes": global_scopes,
+                "org_scopes": org_scopes,
+                "role": role,
+            }
+        )
+
+    audit.log(
+        event="users_list",
+        identity=identity,
+        metadata={
+            "count": len(result),
+            "context_id": context_id,
+            "enterprise_enabled": enterprise_enabled,
+        },
+        request=request,
+    )
+
+    return {
+        "count": len(result),
+        "users": result,
+    }
+
+
+@router.post("/users/scopes")
+async def update_user_scopes(
+    payload: UserScopesUpdateRequest,
+    request: Request,
+    context=Depends(get_context),
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    identity = context["identity"]
+    mongo = get_mongo()
+
+    target = mongo.find_one("users", {"email": payload.email})
+
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    caller_scopes = identity.get("scopes", [])
+    validate_admin_scope_assignment(payload.scopes, caller_scopes)
+
+    context_id = context.get("context_id")
+    enterprise_enabled = context.get("enterprise_enabled", False)
+
+    if not enterprise_enabled or not context_id or context_id == "default":
+        mongo.update_one(
+            "users",
+            {"_id": target["_id"]},
+            {"$set": {"scopes": payload.scopes}},
+        )
+
+        audit.log(
+            event="user_scopes_updated",
+            identity=identity,
+            metadata={
+                "email": payload.email,
+                "scopes": payload.scopes,
+                "mode": "global",
+                "context_id": "default",
+            },
+            request=request,
+        )
+
+        return {
+            "ok": True,
+            "email": payload.email,
+            "scopes": payload.scopes,
+        }
+
+    try:
+        org_oid = ObjectId(context_id)
+    except Exception:
+        raise HTTPException(400, "invalid context_id")
+
+    member = mongo.find_one(
+        "organization_members",
+        {
+            "user_id": target["_id"],
+            "org_id": org_oid,
+            "status": "active",
+        },
+    )
+
+    if not member:
+        audit.log(
+            event="user_scopes_update_denied",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={
+                "email": payload.email,
+                "context_id": context_id,
+                "reason": "membership_not_found",
+            },
+            request=request,
+        )
+        raise HTTPException(404, "user is not a member of this organization")
+
+    mongo.update_one(
+        "organization_members",
+        {"_id": member["_id"]},
+        {
+            "$set": {
+                "scopes": payload.scopes,
+                "updated_at": datetime.now(UTC),
+            }
+        },
+    )
+
+    audit.log(
+        event="user_scopes_updated",
+        identity=identity,
+        metadata={
+            "email": payload.email,
+            "scopes": payload.scopes,
+            "mode": "org",
+            "context_id": context_id,
+        },
+        request=request,
+    )
+
+    return {
+        "ok": True,
+        "email": payload.email,
+        "scopes": payload.scopes,
+    }
+
+
+@router.delete("/users")
+async def delete_user(
+    payload: UserDeleteRequest,
+    request: Request,
+    identity=admin,
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    mongo = get_mongo()
+
+    target = mongo.find_one("users", {"email": payload.email})
+
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    mongo.delete_one("users", {"_id": target["_id"]})
+
+    audit.log(
+        event="user_deleted",
+        identity=identity,
+        metadata={"email": payload.email},
+        request=request,
+    )
+
+    return {
+        "ok": True,
+        "deleted": payload.email,
     }
 
 
