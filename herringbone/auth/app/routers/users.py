@@ -603,29 +603,3 @@ async def delete_user(
         "ok": True,
         "deleted": payload.email,
     }
-
-
-@router.get("/scopes")
-async def list_scopes(
-    request: Request,
-    identity=Depends(get_identity),
-    audit: AuditLogger = Depends(get_audit_logger),
-):
-    mongo = get_mongo()
-    scopes = mongo.find("scopes", {})
-
-    return {
-        "count": len(scopes),
-        "scopes": [
-            {
-                "scope": s.get("scope"),
-                "category": s.get("category"),
-                "action": s.get("action"),
-                "description": s.get("description", ""),
-                "tier": s.get("tier", "free"),
-                "ui_group": s.get("ui_group", "General"),
-                "order": s.get("order", 0),
-            }
-            for s in scopes
-        ],
-    }
