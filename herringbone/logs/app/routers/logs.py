@@ -17,7 +17,7 @@ router = APIRouter(
 
 
 def events_get_auth(context=Depends(get_context)):
-    require_scopes("events:get")(context)
+    require_scopes("logs:read")(context)
     return context
 
 
