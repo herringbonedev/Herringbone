@@ -53,10 +53,14 @@ def _maybe_log(interval: float = 5.0):
     _metrics["last_log"] = t
 
 
-def service_auth_headers():
+def service_auth_headers(context_id: str):
     with open(SERVICE_TOKEN_PATH, "r") as f:
         token = f.read().strip()
-    return {"Authorization": f"Bearer {token}"}
+
+    return {
+        "Authorization": f"Bearer {token}",
+        "X-Herringbone-Context": context_id,
+    }
 
 
 def get_mongo():
@@ -91,7 +95,7 @@ def selector_matches(selector: dict, event: dict) -> bool:
     return False
 
 
-def call_extractor(card: dict, raw_log: str) -> dict:
+def call_extractor(card: dict, raw_log: str, context_id: str) -> dict:
     if not EXTRACTOR_SVC:
         raise RuntimeError("EXTRACTOR_SVC is not set")
 
@@ -103,7 +107,7 @@ def call_extractor(card: dict, raw_log: str) -> dict:
     resp = requests.post(
         EXTRACTOR_SVC,
         json=payload,
-        headers=service_auth_headers(),
+        headers=service_auth_headers(context_id),
         timeout=30,
     )
 
@@ -188,7 +192,7 @@ def process_event(mongo, state: dict):
 
             if not results:
 
-                raw_result = call_extractor(card, event.get("raw", ""))
+                raw_result = call_extractor(card, event.get("raw", ""), context_id)
 
                 if not isinstance(raw_result, dict):
                     raise RuntimeError("Extractor returned invalid result shape")
