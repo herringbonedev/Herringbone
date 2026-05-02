@@ -5,12 +5,11 @@ import requests
 import os
 
 
-orchestrator_run = require_scopes("incidents:orchestrate")
+orchestrator_run = require_internal_scopes("incidents:orchestrate")
 
 router = APIRouter(
     prefix="/incidents/orchestrator",
     tags=["orchestrator"],
-    dependencies=[Depends(get_context)],
 )
 
 audit = AuditLogger()
