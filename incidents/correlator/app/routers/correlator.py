@@ -7,7 +7,7 @@ from modules.audit.logger import AuditLogger
 import os
 
 
-correlate_required = require_scopes("incidents:correlate")
+correlate_required = require_internal_scopes("incidents:correlate")
 
 router = APIRouter(
     prefix="/incidents/correlator",
