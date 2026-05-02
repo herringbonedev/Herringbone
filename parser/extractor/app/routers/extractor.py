@@ -5,10 +5,10 @@ from typing import Any, Dict, List, Optional, Union
 from app.parser import CardParser
 import json
 
-from modules.auth.auth import require_scopes
+from modules.auth.auth import require_internal_scopes
 from modules.audit.logger import AuditLogger
 
-extractor_call_scope = require_scopes("extractor:call")
+extractor_call_scope = require_internal_scopes("extractor:call")
 
 router = APIRouter(
     prefix="/parser/extractor",

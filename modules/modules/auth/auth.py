@@ -418,6 +418,64 @@ def require_scopes(scope_sets):
     return checker
 
 
+def require_internal_scopes(scope_sets):
+    if isinstance(scope_sets, str):
+        scope_sets = [(scope_sets,)]
+
+    def checker(identity: dict = Depends(get_identity)):
+        audit = AuditLogger()
+
+        if not identity:
+            audit.log(
+                event="internal_auth_missing",
+                result="failure",
+                severity="WARNING",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+
+        if identity.get("type") != "service":
+            audit.log(
+                event="internal_service_required",
+                identity=identity,
+                result="failure",
+                severity="WARNING",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Service identity required",
+            )
+
+        scopes = set(identity.get("scopes", []))
+
+        if "*" in scopes:
+            return identity
+
+        for scope_set in scope_sets:
+            if all(scope in scopes for scope in scope_set):
+                return identity
+
+        audit.log(
+            event="internal_scope_denied",
+            identity=identity,
+            result="failure",
+            severity="WARNING",
+            metadata={
+                "required_scopes": scope_sets,
+                "granted_scopes": list(scopes),
+            },
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient internal service permissions",
+        )
+
+    return checker
+
+
 def require_user_identity(identity: dict = Depends(get_identity)):
     audit = AuditLogger()
 
