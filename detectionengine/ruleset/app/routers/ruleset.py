@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
 from bson import ObjectId
 from bson.json_util import dumps
+from typing import Any
 import os
 import json
 
@@ -36,7 +37,7 @@ class RuleCreate(RuleBase):
 
 
 class RuleUpdate(RuleBase):
-    id: str = Field(..., alias="_id", serialization_alias="_id")
+    id: Any = Field(..., alias="_id", serialization_alias="_id")
 
 
 def get_mongo():
@@ -188,12 +189,14 @@ async def update_rule(
     mongo=Depends(get_mongo),
     identity=Depends(ruleset_write),
 ):
-
     context_id = request.state.context_id
 
     data = payload.model_dump(by_alias=True)
 
     rule_id = data.pop("_id", None)
+
+    if isinstance(rule_id, dict):
+        rule_id = rule_id.get("$oid")
 
     if not rule_id:
         audit.log(
@@ -222,7 +225,7 @@ async def update_rule(
         )
 
     try:
-        oid = ObjectId(rule_id)
+        oid = ObjectId(str(rule_id))
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid ObjectId")
 
