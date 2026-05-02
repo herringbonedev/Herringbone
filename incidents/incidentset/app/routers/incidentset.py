@@ -6,7 +6,7 @@ from bson import ObjectId
 from bson.json_util import dumps
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.auth import require_scopes, get_context
+from modules.auth.auth import require_scopes, require_internal_scopes, get_context
 from modules.audit.logger import AuditLogger
 
 from app.schema import IncidentSchema
@@ -18,11 +18,12 @@ import json
 incident_writer = require_scopes("incidents:write")
 incident_reader = require_scopes("incidents:read")
 
+internal_incident_writer = require_internal_scopes("incidents:write")
+
 
 router = APIRouter(
     prefix="/incidents/incidentset",
     tags=["incidentset"],
-    dependencies=[Depends(get_context)],
 )
 
 validator = IncidentSchema()
@@ -54,19 +55,69 @@ def incidents_collection():
     return os.environ.get("COLLECTION_NAME", "incidents")
 
 
+def resolve_internal_context(
+    payload: dict,
+    request: Request,
+    identity: dict,
+) -> str:
+    payload_context_id = payload.get("context_id")
+
+    header_context_id = (
+        request.headers.get("X-Herringbone-Context")
+        or request.headers.get("X-Herringbone-Org")
+    )
+
+    context_id = payload_context_id or header_context_id
+
+    if not context_id:
+        audit.log(
+            event="incidentset_missing_context",
+            identity=identity,
+            request=request,
+            result="failure",
+            severity="WARNING",
+        )
+        raise HTTPException(status_code=400, detail="Missing context_id")
+
+    if (
+        payload_context_id
+        and header_context_id
+        and str(payload_context_id) != str(header_context_id)
+    ):
+        audit.log(
+            event="incidentset_context_mismatch",
+            identity=identity,
+            request=request,
+            result="failure",
+            severity="WARNING",
+            metadata={
+                "payload_context_id": str(payload_context_id),
+                "header_context_id": str(header_context_id),
+            },
+        )
+        raise HTTPException(status_code=403, detail="Context mismatch")
+
+    context_id = str(context_id)
+
+    request.state.context_id = context_id
+    request.state.identity = identity
+
+    return context_id
+
+
 @router.post("/insert_incident")
 async def insert_incident(
     payload: IncidentCreate,
     request: Request,
     mongo=Depends(get_mongo),
-    identity=Depends(incident_writer),
+    identity=Depends(internal_incident_writer),
 ):
-
-    context_id = request.state.context_id
-
     data = payload.model_dump()
+    context_id = resolve_internal_context(data, request, identity)
+
     now = datetime.now(timezone.utc)
 
+    data.pop("context_id", None)
     data["created_at"] = now
     data["last_updated"] = now
     data["state"] = {"last_updated": now}
@@ -75,23 +126,24 @@ async def insert_incident(
     validation = validator(data)
 
     if not validation["valid"]:
-
         audit.log(
             event="incident_insert_validation_failed",
             identity=identity,
             request=request,
             result="failure",
-            metadata=validation,
+            metadata={
+                "context_id": context_id,
+                "validation": validation,
+            },
         )
 
         raise HTTPException(status_code=400, detail=validation)
 
     try:
-
         mongo.insert_one(
             incidents_collection(),
             data,
-            context_id=context_id
+            context_id=context_id,
         )
 
         audit.log(
@@ -101,18 +153,20 @@ async def insert_incident(
             target=data.get("title"),
             metadata={
                 "status": data["status"],
-                "context_id": context_id
+                "context_id": context_id,
             },
         )
 
     except Exception as e:
-
         audit.log(
             event="incident_insert_failed",
             identity=identity,
             request=request,
             result="failure",
-            metadata={"error": str(e)},
+            metadata={
+                "context_id": context_id,
+                "error": str(e),
+            },
             severity="ERROR",
         )
 
@@ -126,20 +180,20 @@ async def update_incident(
     payload: dict,
     request: Request,
     mongo=Depends(get_mongo),
-    identity=Depends(incident_writer),
+    identity=Depends(internal_incident_writer),
 ):
-
-    context_id = request.state.context_id
+    context_id = resolve_internal_context(payload, request, identity)
 
     raw_id = payload.pop("_id", None)
+    payload.pop("context_id", None)
 
     if not raw_id:
-
         audit.log(
             event="incident_update_missing_id",
             identity=identity,
             request=request,
             result="failure",
+            metadata={"context_id": context_id},
         )
 
         raise HTTPException(status_code=400, detail="Missing _id")
@@ -147,13 +201,13 @@ async def update_incident(
     try:
         oid = ObjectId(raw_id if isinstance(raw_id, str) else raw_id.get("$oid"))
     except Exception:
-
         audit.log(
             event="incident_update_invalid_id",
             identity=identity,
             request=request,
             target=str(raw_id),
             result="failure",
+            metadata={"context_id": context_id},
         )
 
         raise HTTPException(status_code=400, detail="Invalid _id")
@@ -168,7 +222,6 @@ async def update_incident(
     push_fields = {}
 
     for key, value in payload.items():
-
         if key in ("events", "detections", "notes") and isinstance(value, list):
             push_fields[key] = {"$each": value}
         else:
@@ -180,12 +233,11 @@ async def update_incident(
         update_doc["$push"] = push_fields
 
     try:
-
-        result = mongo.update_one(
+        mongo.update_one(
             incidents_collection(),
             {"_id": oid},
             update_doc,
-            context_id=context_id
+            context_id=context_id,
         )
 
         audit.log(
@@ -193,20 +245,20 @@ async def update_incident(
             identity=identity,
             request=request,
             target=str(oid),
-            metadata={
-                "context_id": context_id
-            },
+            metadata={"context_id": context_id},
         )
 
     except Exception as e:
-
         audit.log(
             event="incident_update_failed",
             identity=identity,
             request=request,
             target=str(oid),
             result="failure",
-            metadata={"error": str(e)},
+            metadata={
+                "context_id": context_id,
+                "error": str(e),
+            },
             severity="ERROR",
         )
 
@@ -215,21 +267,19 @@ async def update_incident(
     return {"updated": True}
 
 
-@router.get("/get_incidents")
+@router.get("/get_incidents", dependencies=[Depends(get_context)])
 async def get_incidents(
     request: Request,
     mongo=Depends(get_mongo),
     identity=Depends(incident_reader),
 ):
-
     context_id = request.state.context_id
 
     try:
-
         docs = mongo.find_with_context(
             incidents_collection(),
             {},
-            context_id=context_id
+            context_id=context_id,
         )
 
         audit.log(
@@ -242,39 +292,40 @@ async def get_incidents(
         return JSONResponse(content=json.loads(dumps(docs)))
 
     except Exception as e:
-
         audit.log(
             event="incident_list_failed",
             identity=identity,
             request=request,
             result="failure",
-            metadata={"error": str(e)},
+            metadata={
+                "context_id": context_id,
+                "error": str(e),
+            },
             severity="ERROR",
         )
 
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/get_incident/{incident_id}")
+@router.get("/get_incident/{incident_id}", dependencies=[Depends(get_context)])
 async def get_incident(
     incident_id: str,
     request: Request,
     mongo=Depends(get_mongo),
     identity=Depends(incident_reader),
 ):
-
     context_id = request.state.context_id
 
     try:
         oid = ObjectId(incident_id)
     except Exception:
-
         audit.log(
             event="incident_lookup_invalid_id",
             identity=identity,
             request=request,
             target=incident_id,
             result="failure",
+            metadata={"context_id": context_id},
         )
 
         raise HTTPException(status_code=400, detail="Invalid incident id")
@@ -283,30 +334,32 @@ async def get_incident(
         doc = mongo.find_one_with_context(
             incidents_collection(),
             {"_id": oid},
-            context_id=context_id
+            context_id=context_id,
         )
     except Exception as e:
-
         audit.log(
             event="incident_lookup_failed",
             identity=identity,
             request=request,
             target=incident_id,
             result="failure",
-            metadata={"error": str(e)},
+            metadata={
+                "context_id": context_id,
+                "error": str(e),
+            },
             severity="ERROR",
         )
 
         raise HTTPException(status_code=500, detail=str(e))
 
     if not doc:
-
         audit.log(
             event="incident_lookup_not_found",
             identity=identity,
             request=request,
             target=incident_id,
             result="failure",
+            metadata={"context_id": context_id},
         )
 
         raise HTTPException(status_code=404, detail="Incident not found")
