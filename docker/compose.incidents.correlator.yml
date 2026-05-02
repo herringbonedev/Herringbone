@@ -1,7 +1,7 @@
 services:
   incidents-correlator:
     container_name: incidents-correlator
-    image: quay.io/herringbone/incidents-correlator:7b28559b@sha256:466c73b307d9d15afb1161056366818f7b905a9714def9ff5b2e6da31a442050
+    image: quay.io/herringbone/incidents-correlator:d6fb2fcd@sha256:78c8518983128f15065f09961a982c1722467ba8117434a34f9eb66ce3a83640
     restart: unless-stopped
     networks:
       - herringbone
