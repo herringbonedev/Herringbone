@@ -5,12 +5,12 @@ services:
   herringbone-auth: quay.io/herringbone/herringbone-auth:a973acd8@sha256:fbfacf077c7c39f8ed44396491281ca22f1dd0fffa0ca1fcfbc41439233ded81
   detectionengine-detector: quay.io/herringbone/detectionengine-detector:5e4cac18@sha256:187a8153165247481115e3042bc24326280ab8be7aeeed13380049bbccd2dc75
   detectionengine-matcher: quay.io/herringbone/detectionengine-matcher:71250fcd@sha256:6e0c7c214d256181d202758601c367f591e276f28e6dc3c60b57287a124600ca
-  detectionengine-ruleset: quay.io/herringbone/detectionengine-ruleset:441490c1@sha256:ddbccc51c3994017aac48de2fa2e5810f97add5bd8733cfaa18882fc226a57bb
+  detectionengine-ruleset: quay.io/herringbone/detectionengine-ruleset:535d5747@sha256:a8f869615d7e5b060e5a5e958d86f4e2453f24d24173c0fff34c1949d7330c54
   parser-cardset: quay.io/herringbone/parser-cardset:66a4c548@sha256:f236593007154236b91b3d34e1f5830050ab7777f5733838ba2e6ab1be6c3681
   parser-extractor: quay.io/herringbone/parser-extractor:837fbfb4@sha256:9fe5f1899c2b04818cf0a8e14aee48b6c83a08900a39e436f3aeca1ce2b8a5c8
   parser-enrichment: quay.io/herringbone/parser-enrichment:10ac235b@sha256:00a0d1d362d3bea9a47bb25860898da0da4693b884c85805d5ebbbe65ebc44cc
   incidents-correlator: quay.io/herringbone/incidents-correlator:573da897@sha256:5b43ab5e477f6cc60a0ca4231b99425a1e1eb6f0ffb4b677ea5f458ae1f84741
   incidents-orchestrator: quay.io/herringbone/incidents-orchestrator:1ba4dd34@sha256:3ee85acb143b3031526cbf6dc665cf741b6d1514173d5c61bcdbed08d6f3d59e
-  incidents-incidentset: quay.io/herringbone/incidents-incidentset:04a0959d@sha256:38278e65cf6073cc14b63602e94c620f23db596bc227a78f1a52e2c49b5fba2f
+  incidents-incidentset: quay.io/herringbone/incidents-incidentset:ef5d46b4@sha256:407744cdc0a2af712dda7d03b2cfabaa4b9888de92ea99da278cb596cd8c136d
   logingestion-receiver: quay.io/herringbone/receiver:ce61473f@sha256:d088e465c2ff14173641d99efbbc1afe26855ff083b4c7e611c1d45d6afc910f
   operations-center: quay.io/herringbone/operations-center:sha-fe638be4@sha256:5ddf25cd8f174d5be6eb77ee2e756e2d8f6438170716257022003fc149808a98
