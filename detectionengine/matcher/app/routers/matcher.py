@@ -14,7 +14,6 @@ run_matchengine = require_internal_scopes("detectionengine:run")
 router = APIRouter(
     prefix="/detectionengine/matcher",
     tags=["matcher"],
-    dependencies=[Depends(get_context)],
 )
 
 matchengine = MatchEngine()
