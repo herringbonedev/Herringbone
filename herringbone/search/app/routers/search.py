@@ -33,6 +33,28 @@ def encode(obj):
     return json.loads(dumps(obj))
 
 
+def search_response(collection: str, results: list, next_after=None):
+    return JSONResponse(
+        content=encode(
+            {
+                "collection": collection,
+                "count": len(results),
+                "results": results,
+                "next_after": next_after,
+            }
+        )
+    )
+
+
+def schema_response(collection: str, fields: list[dict]):
+    return JSONResponse(
+        content={
+            "collection": collection,
+            "fields": fields,
+        }
+    )
+
+
 def parse_ts(value: str | None):
     if not value:
         return None
@@ -90,6 +112,94 @@ def apply_time_range(
     return query
 
 
+@router.get("/events/schema")
+async def events_schema(
+    identity=Depends(search_read),
+):
+    return schema_response(
+        "events",
+        [
+            {"path": "raw", "types": ["string"]},
+            {"path": "source.address", "types": ["string"]},
+            {"path": "source.kind", "types": ["string"], "enum": ["remote", "udp", "tcp", "http"]},
+            {"path": "receiver.hostname", "types": ["string"]},
+            {"path": "event_time", "types": ["date"]},
+            {"path": "ingested_at", "types": ["date"]},
+            {"path": "context_id", "types": ["string"]},
+        ],
+    )
+
+
+@router.get("/incidents/schema")
+async def incidents_schema(
+    identity=Depends(search_read),
+):
+    return schema_response(
+        "incidents",
+        [
+            {"path": "title", "types": ["string"]},
+            {"path": "description", "types": ["string"]},
+            {"path": "status", "types": ["string"], "enum": ["open", "investigating", "closed"]},
+            {"path": "priority", "types": ["string"], "enum": ["low", "medium", "high", "critical"]},
+            {"path": "rule_id", "types": ["string"]},
+            {"path": "rule_name", "types": ["string"]},
+            {"path": "created_at", "types": ["date"]},
+            {"path": "last_updated", "types": ["date"]},
+            {"path": "context_id", "types": ["string"]},
+        ],
+    )
+
+
+@router.get("/detections/schema")
+async def detections_schema(
+    identity=Depends(search_read),
+):
+    return schema_response(
+        "detections",
+        [
+            {"path": "event_id", "types": ["string"]},
+            {"path": "detection", "types": ["boolean"]},
+            {"path": "severity", "types": ["number"]},
+            {"path": "inserted_at", "types": ["date"]},
+            {"path": "context_id", "types": ["string"]},
+        ],
+    )
+
+
+@router.get("/event_state/schema")
+async def event_state_schema(
+    identity=Depends(search_read),
+):
+    return schema_response(
+        "event_state",
+        [
+            {"path": "event_id", "types": ["string"]},
+            {"path": "parsed", "types": ["boolean"]},
+            {"path": "detected", "types": ["boolean"]},
+            {"path": "detection", "types": ["boolean"]},
+            {"path": "last_stage", "types": ["string"]},
+            {"path": "severity", "types": ["number"]},
+            {"path": "last_updated", "types": ["date"]},
+            {"path": "context_id", "types": ["string"]},
+        ],
+    )
+
+
+@router.get("/parse_results/schema")
+async def parse_results_schema(
+    identity=Depends(search_read),
+):
+    return schema_response(
+        "parse_results",
+        [
+            {"path": "event_id", "types": ["string"]},
+            {"path": "card", "types": ["string"]},
+            {"path": "created_at", "types": ["date"]},
+            {"path": "context_id", "types": ["string"]},
+        ],
+    )
+
+
 @router.get("/events")
 async def search_events(
     request: Request,
@@ -136,7 +246,7 @@ async def search_events(
             },
         )
 
-        return JSONResponse(content=encode(results))
+        return search_response("events", results)
 
     except Exception as e:
         audit.log(
@@ -202,7 +312,7 @@ async def search_incidents(
             },
         )
 
-        return JSONResponse(content=encode(results))
+        return search_response("incidents", results)
 
     except Exception as e:
         audit.log(
@@ -263,11 +373,123 @@ async def search_detections(
             },
         )
 
-        return JSONResponse(content=encode(results))
+        return search_response("detections", results)
 
     except Exception as e:
         audit.log(
             event="search_detections_failed",
+            identity=identity,
+            request=request,
+            result="failure",
+            metadata={"error": str(e), "context_id": context_id},
+            severity="ERROR",
+        )
+
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/event_state")
+async def search_event_state(
+    request: Request,
+    q: str | None = Query(None),
+    from_ts: str | None = Query(None),
+    to_ts: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    mongo=Depends(get_mongo),
+    identity=Depends(search_read),
+):
+    context_id = request.state.context_id
+
+    query = parse_json_query(q)
+
+    query = apply_time_range(
+        query=query,
+        field="last_updated",
+        from_ts=from_ts,
+        to_ts=to_ts,
+    )
+
+    try:
+        results = mongo.find_sorted_with_context(
+            collection="event_state",
+            filter_query=query,
+            context_id=context_id,
+            sort=[("last_updated", -1)],
+            limit=limit,
+        )
+
+        audit.log(
+            event="search_event_state",
+            identity=identity,
+            request=request,
+            metadata={
+                "query": q,
+                "count": len(results),
+                "context_id": context_id,
+            },
+        )
+
+        return search_response("event_state", results)
+
+    except Exception as e:
+        audit.log(
+            event="search_event_state_failed",
+            identity=identity,
+            request=request,
+            result="failure",
+            metadata={"error": str(e), "context_id": context_id},
+            severity="ERROR",
+        )
+
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/parse_results")
+async def search_parse_results(
+    request: Request,
+    q: str | None = Query(None),
+    from_ts: str | None = Query(None),
+    to_ts: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    mongo=Depends(get_mongo),
+    identity=Depends(search_read),
+):
+    context_id = request.state.context_id
+
+    query = parse_json_query(q)
+
+    query = apply_time_range(
+        query=query,
+        field="created_at",
+        from_ts=from_ts,
+        to_ts=to_ts,
+    )
+
+    try:
+        results = mongo.find_sorted_with_context(
+            collection="parse_results",
+            filter_query=query,
+            context_id=context_id,
+            sort=[("created_at", -1)],
+            limit=limit,
+        )
+
+        audit.log(
+            event="search_parse_results",
+            identity=identity,
+            request=request,
+            metadata={
+                "query": q,
+                "count": len(results),
+                "context_id": context_id,
+            },
+        )
+
+        return search_response("parse_results", results)
+
+    except Exception as e:
+        audit.log(
+            event="search_parse_results_failed",
             identity=identity,
             request=request,
             result="failure",
