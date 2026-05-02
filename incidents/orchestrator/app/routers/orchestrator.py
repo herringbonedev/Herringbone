@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
-from modules.auth.auth import require_scopes, get_context
+from modules.auth.auth import require_internal_scopes, get_context
 from modules.audit.logger import AuditLogger
 import requests
 import os
