@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 from modules.database.mongo_db import HerringboneMongoDatabase
-from modules.auth.auth import require_internal_scopes, get_context
+from modules.auth.auth import require_internal_scopes
 from modules.audit.logger import AuditLogger
 import os
 
@@ -12,7 +12,6 @@ correlate_required = require_internal_scopes("incidents:correlate")
 router = APIRouter(
     prefix="/incidents/correlator",
     tags=["correlator"],
-    dependencies=[Depends(get_context)],
 )
 
 audit = AuditLogger()
@@ -25,6 +24,56 @@ def get_mongo():
         database=os.environ.get("DB_NAME", "herringbone"),
         host=os.environ.get("MONGO_HOST", "localhost"),
     )
+
+
+def resolve_internal_context(
+    payload: dict,
+    request: Request,
+    identity: dict,
+) -> str:
+    payload_context_id = payload.get("context_id")
+
+    header_context_id = (
+        request.headers.get("X-Herringbone-Context")
+        or request.headers.get("X-Herringbone-Org")
+    )
+
+    context_id = payload_context_id or header_context_id
+
+    if not context_id:
+        audit.log(
+            event="correlator_missing_context",
+            identity=identity,
+            request=request,
+            result="failure",
+            severity="WARNING",
+        )
+        raise HTTPException(status_code=400, detail="Missing context_id")
+
+    if (
+        payload_context_id
+        and header_context_id
+        and str(payload_context_id) != str(header_context_id)
+    ):
+        audit.log(
+            event="correlator_context_mismatch",
+            identity=identity,
+            request=request,
+            result="failure",
+            severity="WARNING",
+            metadata={
+                "payload_context_id": str(payload_context_id),
+                "header_context_id": str(header_context_id),
+            },
+        )
+        raise HTTPException(status_code=403, detail="Context mismatch")
+
+    context_id = str(context_id)
+
+    request.state.context_id = context_id
+    request.state.identity = identity
+
+    return context_id
 
 
 def extract_correlate_values(event: dict, correlate_on: list[str]):
@@ -70,17 +119,7 @@ async def correlate(
     mongo=Depends(get_mongo),
     identity=Depends(correlate_required),
 ):
-
-    context_id = request.state.context_id
-
-    if not context_id:
-        audit.log(
-            event="correlator_missing_context",
-            identity=identity,
-            request=request,
-            result="failure",
-        )
-        raise HTTPException(status_code=500, detail="Missing context_id")
+    context_id = resolve_internal_context(payload, request, identity)
 
     if "rule_id" not in payload:
         audit.log(
@@ -89,7 +128,10 @@ async def correlate(
             request=request,
             result="failure",
             severity="WARNING",
-            metadata={"reason": "missing_rule_id"},
+            metadata={
+                "reason": "missing_rule_id",
+                "context_id": context_id,
+            },
         )
         raise HTTPException(status_code=400, detail="Missing rule_id")
 
@@ -108,19 +150,43 @@ async def correlate(
         rule_clauses.append({"rule_id": ObjectId(rule_id)})
 
     if correlate_on:
-
         if not event_id:
             audit.log(
                 event="correlator_no_event_for_correlation",
                 identity=identity,
                 request=request,
-                metadata={"rule_id": rule_id, "context_id": context_id},
+                metadata={
+                    "rule_id": rule_id,
+                    "context_id": context_id,
+                },
             )
-            return {"action": "create", "correlation_identity": {}}
+            return {
+                "action": "create",
+                "correlation_identity": {},
+            }
+
+        try:
+            event_object_id = ObjectId(event_id)
+        except Exception:
+            audit.log(
+                event="correlator_invalid_event_id",
+                identity=identity,
+                request=request,
+                result="failure",
+                severity="WARNING",
+                metadata={
+                    "event_id": str(event_id),
+                    "context_id": context_id,
+                },
+            )
+            return {
+                "action": "create",
+                "correlation_identity": {},
+            }
 
         event = mongo.find_one_with_context(
             "events",
-            {"_id": ObjectId(event_id)},
+            {"_id": event_object_id},
             context_id=context_id,
         )
 
@@ -131,12 +197,19 @@ async def correlate(
                 request=request,
                 result="failure",
                 severity="WARNING",
-                metadata={"event_id": event_id, "context_id": context_id},
+                metadata={
+                    "event_id": str(event_id),
+                    "context_id": context_id,
+                },
             )
-            return {"action": "create", "correlation_identity": {}}
+            return {
+                "action": "create",
+                "correlation_identity": {},
+            }
 
         correlation_identity, correlation_filters = extract_correlate_values(
-            event, correlate_on
+            event,
+            correlate_on,
         )
 
         if not correlation_filters:
@@ -144,9 +217,15 @@ async def correlate(
                 event="correlator_no_correlation_values",
                 identity=identity,
                 request=request,
-                metadata={"rule_id": rule_id, "context_id": context_id},
+                metadata={
+                    "rule_id": rule_id,
+                    "context_id": context_id,
+                },
             )
-            return {"action": "create", "correlation_identity": {}}
+            return {
+                "action": "create",
+                "correlation_identity": {},
+            }
 
         query = {
             "status": {"$in": ["open", "investigating"]},
@@ -170,7 +249,10 @@ async def correlate(
                 request=request,
                 result="failure",
                 severity="ERROR",
-                metadata={"error": str(e), "context_id": context_id},
+                metadata={
+                    "error": str(e),
+                    "context_id": context_id,
+                },
             )
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -182,7 +264,10 @@ async def correlate(
                 identity=identity,
                 request=request,
                 target=incident_id,
-                metadata={"rule_id": rule_id, "context_id": context_id},
+                metadata={
+                    "rule_id": rule_id,
+                    "context_id": context_id,
+                },
             )
 
             return {
@@ -194,7 +279,10 @@ async def correlate(
             event="correlator_create_incident",
             identity=identity,
             request=request,
-            metadata={"rule_id": rule_id, "context_id": context_id},
+            metadata={
+                "rule_id": rule_id,
+                "context_id": context_id,
+            },
         )
 
         return {
@@ -223,7 +311,10 @@ async def correlate(
             request=request,
             result="failure",
             severity="ERROR",
-            metadata={"error": str(e), "context_id": context_id},
+            metadata={
+                "error": str(e),
+                "context_id": context_id,
+            },
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -235,7 +326,10 @@ async def correlate(
             identity=identity,
             request=request,
             target=incident_id,
-            metadata={"rule_id": rule_id, "context_id": context_id},
+            metadata={
+                "rule_id": rule_id,
+                "context_id": context_id,
+            },
         )
 
         return {
@@ -247,7 +341,10 @@ async def correlate(
         event="correlator_create_incident",
         identity=identity,
         request=request,
-        metadata={"rule_id": rule_id, "context_id": context_id},
+        metadata={
+            "rule_id": rule_id,
+            "context_id": context_id,
+        },
     )
 
     return {"action": "create"}
