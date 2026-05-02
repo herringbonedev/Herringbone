@@ -60,6 +60,7 @@ async def insert_rule(
     context_id = request.state.context_id
 
     data = payload.model_dump()
+    data.pop("context_id", None)
 
     validation = validator(data)
 
@@ -192,7 +193,8 @@ async def update_rule(
     context_id = request.state.context_id
 
     data = payload.model_dump(by_alias=True)
-
+    data.pop("context_id", None)
+    
     rule_id = data.pop("_id", None)
 
     if isinstance(rule_id, dict):
