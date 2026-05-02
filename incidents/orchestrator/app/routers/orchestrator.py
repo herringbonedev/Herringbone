@@ -156,7 +156,7 @@ async def process_detection(
 
         try:
             resp = requests.post(
-                f"{INCIDENTSET_API}/update_incident",
+                f"{INCIDENTSET_API}/internal/update_incident",
                 json={**update_payload, "context_id": context_id},
                 headers=service_headers(context_id),
                 timeout=5,
@@ -212,7 +212,7 @@ async def process_detection(
 
         try:
             resp = requests.post(
-                f"{INCIDENTSET_API}/insert_incident",
+                f"{INCIDENTSET_API}/internal/insert_incident",
                 json={**create_payload, "context_id": context_id},
                 headers=service_headers(context_id),
                 timeout=5,
