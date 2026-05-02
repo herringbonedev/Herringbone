@@ -17,7 +17,6 @@ import json
 
 incident_writer = require_scopes("incidents:write")
 incident_reader = require_scopes("incidents:read")
-
 internal_incident_writer = require_internal_scopes("incidents:write")
 
 
@@ -105,23 +104,62 @@ def resolve_internal_context(
     return context_id
 
 
-@router.post("/insert_incident")
-async def insert_incident(
-    payload: IncidentCreate,
-    request: Request,
-    mongo=Depends(get_mongo),
-    identity=Depends(internal_incident_writer),
-):
-    data = payload.model_dump()
-    context_id = resolve_internal_context(data, request, identity)
+def normalize_object_id(raw_id):
+    if isinstance(raw_id, dict):
+        raw_id = raw_id.get("$oid")
 
+    if not raw_id:
+        return None
+
+    return str(raw_id)
+
+
+def build_update_doc(payload: dict):
+    now = datetime.now(timezone.utc)
+
+    set_fields = {
+        "last_updated": now,
+        "state.last_updated": now,
+    }
+
+    push_fields = {}
+
+    for key, value in payload.items():
+        if key in ("events", "detections", "notes") and isinstance(value, list):
+            push_fields[key] = {"$each": value}
+        else:
+            set_fields[key] = value
+
+    update_doc = {"$set": set_fields}
+
+    if push_fields:
+        update_doc["$push"] = push_fields
+
+    return update_doc
+
+
+def prepare_incident_create(data: dict) -> dict:
     now = datetime.now(timezone.utc)
 
     data.pop("context_id", None)
+
     data["created_at"] = now
     data["last_updated"] = now
     data["state"] = {"last_updated": now}
     data["status"] = data.get("status", "open")
+
+    return data
+
+
+async def insert_incident_common(
+    data: dict,
+    request: Request,
+    mongo,
+    identity: dict,
+    context_id: str,
+    caller_type: str,
+):
+    data = prepare_incident_create(data)
 
     validation = validator(data)
 
@@ -133,6 +171,7 @@ async def insert_incident(
             result="failure",
             metadata={
                 "context_id": context_id,
+                "caller_type": caller_type,
                 "validation": validation,
             },
         )
@@ -154,6 +193,7 @@ async def insert_incident(
             metadata={
                 "status": data["status"],
                 "context_id": context_id,
+                "caller_type": caller_type,
             },
         )
 
@@ -165,6 +205,7 @@ async def insert_incident(
             result="failure",
             metadata={
                 "context_id": context_id,
+                "caller_type": caller_type,
                 "error": str(e),
             },
             severity="ERROR",
@@ -175,17 +216,18 @@ async def insert_incident(
     return {"inserted": True}
 
 
-@router.post("/update_incident")
-async def update_incident(
+async def update_incident_common(
     payload: dict,
     request: Request,
-    mongo=Depends(get_mongo),
-    identity=Depends(internal_incident_writer),
+    mongo,
+    identity: dict,
+    context_id: str,
+    caller_type: str,
 ):
-    context_id = resolve_internal_context(payload, request, identity)
-
     raw_id = payload.pop("_id", None)
     payload.pop("context_id", None)
+
+    raw_id = normalize_object_id(raw_id)
 
     if not raw_id:
         audit.log(
@@ -193,13 +235,16 @@ async def update_incident(
             identity=identity,
             request=request,
             result="failure",
-            metadata={"context_id": context_id},
+            metadata={
+                "context_id": context_id,
+                "caller_type": caller_type,
+            },
         )
 
         raise HTTPException(status_code=400, detail="Missing _id")
 
     try:
-        oid = ObjectId(raw_id if isinstance(raw_id, str) else raw_id.get("$oid"))
+        oid = ObjectId(raw_id)
     except Exception:
         audit.log(
             event="incident_update_invalid_id",
@@ -207,30 +252,15 @@ async def update_incident(
             request=request,
             target=str(raw_id),
             result="failure",
-            metadata={"context_id": context_id},
+            metadata={
+                "context_id": context_id,
+                "caller_type": caller_type,
+            },
         )
 
         raise HTTPException(status_code=400, detail="Invalid _id")
 
-    now = datetime.now(timezone.utc)
-
-    set_fields = {
-        "last_updated": now,
-        "state.last_updated": now,
-    }
-
-    push_fields = {}
-
-    for key, value in payload.items():
-        if key in ("events", "detections", "notes") and isinstance(value, list):
-            push_fields[key] = {"$each": value}
-        else:
-            set_fields[key] = value
-
-    update_doc = {"$set": set_fields}
-
-    if push_fields:
-        update_doc["$push"] = push_fields
+    update_doc = build_update_doc(payload)
 
     try:
         mongo.update_one(
@@ -245,7 +275,10 @@ async def update_incident(
             identity=identity,
             request=request,
             target=str(oid),
-            metadata={"context_id": context_id},
+            metadata={
+                "context_id": context_id,
+                "caller_type": caller_type,
+            },
         )
 
     except Exception as e:
@@ -257,6 +290,7 @@ async def update_incident(
             result="failure",
             metadata={
                 "context_id": context_id,
+                "caller_type": caller_type,
                 "error": str(e),
             },
             severity="ERROR",
@@ -265,6 +299,84 @@ async def update_incident(
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"updated": True}
+
+
+@router.post("/insert_incident", dependencies=[Depends(get_context)])
+async def insert_incident(
+    payload: IncidentCreate,
+    request: Request,
+    mongo=Depends(get_mongo),
+    identity=Depends(incident_writer),
+):
+    context_id = request.state.context_id
+    data = payload.model_dump()
+
+    return await insert_incident_common(
+        data=data,
+        request=request,
+        mongo=mongo,
+        identity=identity,
+        context_id=context_id,
+        caller_type="user",
+    )
+
+
+@router.post("/update_incident", dependencies=[Depends(get_context)])
+async def update_incident(
+    payload: dict,
+    request: Request,
+    mongo=Depends(get_mongo),
+    identity=Depends(incident_writer),
+):
+    context_id = request.state.context_id
+
+    return await update_incident_common(
+        payload=payload,
+        request=request,
+        mongo=mongo,
+        identity=identity,
+        context_id=context_id,
+        caller_type="user",
+    )
+
+
+@router.post("/internal/insert_incident")
+async def internal_insert_incident(
+    payload: IncidentCreate,
+    request: Request,
+    mongo=Depends(get_mongo),
+    identity=Depends(internal_incident_writer),
+):
+    data = payload.model_dump()
+    context_id = resolve_internal_context(data, request, identity)
+
+    return await insert_incident_common(
+        data=data,
+        request=request,
+        mongo=mongo,
+        identity=identity,
+        context_id=context_id,
+        caller_type="internal",
+    )
+
+
+@router.post("/internal/update_incident")
+async def internal_update_incident(
+    payload: dict,
+    request: Request,
+    mongo=Depends(get_mongo),
+    identity=Depends(internal_incident_writer),
+):
+    context_id = resolve_internal_context(payload, request, identity)
+
+    return await update_incident_common(
+        payload=payload,
+        request=request,
+        mongo=mongo,
+        identity=identity,
+        context_id=context_id,
+        caller_type="internal",
+    )
 
 
 @router.get("/get_incidents", dependencies=[Depends(get_context)])
@@ -373,3 +485,17 @@ async def get_incident(
     )
 
     return JSONResponse(content=json.loads(dumps(doc)))
+
+
+@router.get("/livez")
+async def livez():
+    return {"status": "ok"}
+
+
+@router.get("/readyz")
+async def readyz(mongo=Depends(get_mongo)):
+    try:
+        mongo.find_one(incidents_collection(), {})
+        return {"ready": True}
+    except Exception:
+        return JSONResponse(content={"ready": False}, status_code=503)
