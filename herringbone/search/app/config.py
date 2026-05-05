@@ -9,15 +9,18 @@ ALLOWED_COLLECTIONS = {
     "incidents",
     "detections",
     "parse_results",
+    "incident_events",
+    "enrichment_results",
 }
 
 SORTABLE_FIELDS = {
-    "events": {"ingested_at", "_id"},
+    "events": {"ingested_at", "event_time", "_id"},
     "event_state": {"severity", "last_updated", "_id"},
     "detections": {"severity", "inserted_at", "_id"},
-    "incidents": {"created_at", "updated_at", "priority", "_id"},
-    "parse_results": {"parsed_at", "_id"},
-    "enrichment_results": {"enriched_at", "_id"},
+    "incidents": {"created_at", "updated_at", "last_updated", "priority", "_id"},
+    "parse_results": {"created_at", "parsed_at", "_id"},
+    "incident_events": {"created_at", "_id"},
+    "enrichment_results": {"created_at", "enriched_at", "_id"},
 }
 
 ALLOWED_OPERATORS = {

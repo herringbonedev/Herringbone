@@ -19,7 +19,9 @@ def default_time_field(collection: str) -> str:
         "incidents": "created_at",
         "detections": "inserted_at",
         "parse_results": "created_at",
-    }.get(collection, "inserted_at")
+        "incident_events": "created_at",
+        "enrichment_results": "created_at",
+    }.get(collection, "created_at")
 
 
 def _split_csv(v: Optional[str]) -> List[str]:
