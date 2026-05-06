@@ -1,6 +1,6 @@
 services:
   operations-center:
-    image: quay.io/herringbone/operations-center:sha-fe638be4@sha256:5ddf25cd8f174d5be6eb77ee2e756e2d8f6438170716257022003fc149808a98
+    image: quay.io/herringbone/operations-center:sha-cecc7ffc@sha256:56e2e6afe5ac0c37a2c3a345cd5a2f35a3008905cd945f73786d8c737aed7167
     container_name: operations-center
     restart: unless-stopped
 
