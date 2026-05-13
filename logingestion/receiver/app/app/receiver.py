@@ -1,0 +1,31 @@
+import os
+import sys
+
+TYPE = os.environ.get("RECEIVER_TYPE")
+
+if not TYPE:
+    print("[✗] RECEIVER_TYPE is required. Valid values: UDP, TCP, HTTP, REMOTE")
+    sys.exit(1)
+
+TYPE = TYPE.upper()
+print(f"Starting herringbone receiver...{TYPE}")
+
+if TYPE == "UDP":
+    import app.inet
+    app.inet.start_udp_receiver()
+
+elif TYPE == "TCP":
+    import app.inet
+    app.inet.start_tcp_receiver()
+
+elif TYPE == "HTTP":
+    import app.web
+    app.web.start_http_receiver()
+
+elif TYPE == "REMOTE":
+    import app.remote
+    app.remote.start_remote_receiver()
+
+else:
+    print(f"[✗] Unknown receiver type: {TYPE}. Valid values: UDP, TCP, HTTP, REMOTE")
+    sys.exit(1)
