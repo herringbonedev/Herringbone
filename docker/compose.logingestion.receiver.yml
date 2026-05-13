@@ -1,7 +1,7 @@
 services:
   logingestion-receiver:
     container_name: logingestion-receiver
-    image: quay.io/herringbone/receiver:ce61473f@sha256:d088e465c2ff14173641d99efbbc1afe26855ff083b4c7e611c1d45d6afc910f
+    image: quay.io/herringbone/receiver:9c117071@sha256:5b273d08179d8f7a2c70ec62134bd7123b703a1de3c9134c231cd3194ec0de1e
     restart: unless-stopped
     depends_on:
       - mongodb
@@ -17,23 +17,18 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-
       COLLECTION_NAME: "events"
       EVENTS_COLLECTION: "events"
       EVENT_STATE_COLLECTION: "event_state"
-
       RECEIVER_TYPE: ${RECEIVER_TYPE}
       CONTEXT_ID: ${CONTEXT_ID:-default}
-
       RECEIVER_QUEUE: ${RECEIVER_QUEUE:-50000}
       RECEIVER_WORKERS: ${RECEIVER_WORKERS:-4}
       RECEIVER_BATCH_SIZE: ${RECEIVER_BATCH_SIZE:-500}
       RECEIVER_BATCH_FLUSH_MS: ${RECEIVER_BATCH_FLUSH_MS:-250}
       UDP_BUFFER: ${UDP_BUFFER:-8192}
       UDP_SOCKET_RCVBUF: ${UDP_SOCKET_RCVBUF:-16777216}
-
       BATCH_DIRECT_MONGO: ${BATCH_DIRECT_MONGO:-true}
-
     extra_hosts:
       - "host.docker.internal:host-gateway"
     read_only: true
@@ -41,7 +36,6 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
 networks:
   herringbone:
     external: true
