@@ -1,23 +1,23 @@
-from flask import Flask, request
-from datetime import datetime, UTC
+from flask import Flask, request, jsonify
 import os
 import socket
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from app.keys import resolve_ingestion_key
+from logingestion.receiver.app.batcher import get_batch_writer
+from logingestion.receiver.app.keys import resolve_ingestion_key
 
 app = Flask(__name__)
 
 hostname = socket.gethostname()
 
 mongo = None
+batch_writer = None
 
 
 def get_mongo():
     global mongo
 
     if mongo is None:
-
         mongo = HerringboneMongoDatabase(
             user=os.environ.get("MONGO_USER", "admin"),
             password=os.environ.get("MONGO_PASS", "secret"),
@@ -32,15 +32,47 @@ def get_mongo():
     return mongo
 
 
+def get_writer():
+    global batch_writer
+
+    if batch_writer is None:
+        batch_writer = get_batch_writer(get_mongo())
+
+    return batch_writer
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({
+        "service": "herringbone-receiver",
+        "receiver_type": "REMOTE",
+        "status": "ok",
+        "hostname": hostname,
+    }), 200
+
+
+@app.route("/ready", methods=["GET"])
+def ready():
+    try:
+        get_mongo()
+        return jsonify({
+            "service": "herringbone-receiver",
+            "receiver_type": "REMOTE",
+            "status": "ready",
+            "stats": get_writer().stats(),
+        }), 200
+    except Exception as exc:
+        return jsonify({
+            "service": "herringbone-receiver",
+            "receiver_type": "REMOTE",
+            "status": "not_ready",
+            "error": str(exc),
+        }), 503
+
+
 @app.route("/logingestion/remote", methods=["POST"])
 def receiver_v2():
-
-    try:
-        mongo = get_mongo()
-    except Exception as e:
-        print(f"[✗] Mongo init failed: {e}")
-        return ("Database initialization failed", 500)
-
+    mongo = get_mongo()
     context_id = resolve_ingestion_key(request, mongo)
 
     if context_id is None:
@@ -54,53 +86,73 @@ def receiver_v2():
 
     remote = payload.get("remote_from")
 
-    if (
-        not isinstance(remote, dict)
-        or "source_addr" not in remote
-        or not remote["source_addr"]
-    ):
+    if not isinstance(remote, dict) or "source_addr" not in remote or not remote["source_addr"]:
         return ('Missing "remote_from.source_addr"', 400)
-
-    addr = remote["source_addr"]
 
     data = payload.get("data")
 
     if data is None:
         return ('Missing "data"', 400)
 
-    try:
+    if not get_writer().enqueue(data, remote["source_addr"], "remote", context_id):
+        return ("Receiver queue full", 503)
 
-        event_id = mongo.insert_event({
-            "raw": data,
-            "source": {
-                "address": addr,
-                "kind": "remote",
-            },
-            "event_time": datetime.now(UTC),
-            "ingested_at": datetime.now(UTC),
-            "receiver": {
-                "hostname": hostname
-            }
-        }, context_id=context_id)
+    return ("Data received", 200)
 
-        mongo.upsert_event_state(event_id, {
-            "parsed": False,
-            "enriched": False,
-            "detected": False,
-            "severity": None,
-        }, context_id=context_id)
 
-        return ("Data received", 200)
+@app.route("/logingestion/remote/bulk", methods=["POST"])
+def receiver_bulk():
+    mongo = get_mongo()
+    context_id = resolve_ingestion_key(request, mongo)
 
-    except Exception as e:
-        print(f"[✗] Mongo insert failed: {e}")
-        return ("Insert failed", 500)
+    if context_id is None:
+        print("[✗] Invalid ingestion key")
+        return ("Invalid ingestion key", 403)
+
+    payload = request.get_json(silent=True)
+
+    if not payload:
+        return ("No data received", 400)
+
+    events = payload.get("events")
+
+    if not isinstance(events, list) or not events:
+        return ('Missing non-empty "events" array', 400)
+
+    writer = get_writer()
+    accepted = 0
+    dropped = 0
+
+    for event in events:
+        if not isinstance(event, dict):
+            dropped += 1
+            continue
+
+        data = event.get("data")
+        source_addr = event.get("source_addr") or payload.get("source_addr") or "remote"
+
+        if data is None:
+            dropped += 1
+            continue
+
+        if writer.enqueue(data, source_addr, "remote", context_id):
+            accepted += 1
+        else:
+            dropped += 1
+
+    status = 200 if dropped == 0 else 207
+
+    return jsonify({
+        "accepted": accepted,
+        "dropped": dropped,
+    }), status
 
 
 def start_remote_receiver():
-
     print("Receiver type set to REMOTE")
     print("Listening on container port 7004")
+
+    get_writer()
 
     app.run(
         host="0.0.0.0",

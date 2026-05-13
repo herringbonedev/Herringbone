@@ -36,7 +36,6 @@ def forward_data(route, data, source_addr):
     try:
         audit = get_audit_logger()
     except Exception:
-        # audit logging should never break ingestion
         audit = None
 
     payload = {

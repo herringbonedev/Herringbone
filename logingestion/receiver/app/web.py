@@ -1,12 +1,11 @@
-from flask import Flask, request
-from datetime import datetime, UTC
+from flask import Flask, request, jsonify
 import os
 import socket
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from app.keys import resolve_ingestion_key
-from app.forwarder import forward_data
-
+from logingestion.receiver.app.batcher import get_batch_writer
+from logingestion.receiver.app.keys import resolve_ingestion_key
+from logingestion.receiver.app.forwarder import forward_data
 
 app = Flask(__name__)
 
@@ -14,6 +13,7 @@ forward_route = os.environ.get("FORWARD_ROUTE")
 hostname = socket.gethostname()
 
 mongo = None
+batch_writer = None
 
 
 def get_mongo():
@@ -34,6 +34,15 @@ def get_mongo():
     return mongo
 
 
+def get_writer():
+    global batch_writer
+
+    if batch_writer is None:
+        batch_writer = get_batch_writer(get_mongo())
+
+    return batch_writer
+
+
 def _client_ip():
     xff = request.headers.get("X-Forwarded-For")
 
@@ -43,11 +52,40 @@ def _client_ip():
     return request.remote_addr
 
 
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({
+        "service": "herringbone-receiver",
+        "receiver_type": "HTTP",
+        "status": "ok",
+        "hostname": hostname,
+    }), 200
+
+
+@app.route("/ready", methods=["GET"])
+def ready():
+    try:
+        get_mongo()
+        stats = get_writer().stats() if not forward_route else {}
+        return jsonify({
+            "service": "herringbone-receiver",
+            "receiver_type": "HTTP",
+            "status": "ready",
+            "forwarding": bool(forward_route),
+            "stats": stats,
+        }), 200
+    except Exception as exc:
+        return jsonify({
+            "service": "herringbone-receiver",
+            "receiver_type": "HTTP",
+            "status": "not_ready",
+            "error": str(exc),
+        }), 503
+
+
 @app.route("/logingestion/receiver", methods=["POST"])
 def receiver():
-
     mongo = get_mongo()
-
     context_id = resolve_ingestion_key(request, mongo)
 
     if context_id is None:
@@ -61,52 +99,27 @@ def receiver():
 
     addr = _client_ip()
 
-    # Forwarding mode (edge receiver)
     if forward_route:
-
         result = forward_data(forward_route, data, addr)
 
         if result:
             return ("Forward succeed", 200)
 
         print("[✗] Forwarding failed")
-
         return ("Forward failed", 500)
 
-    # Local ingestion mode
-    try:
+    if not get_writer().enqueue(data, addr, "http", context_id):
+        return ("Receiver queue full", 503)
 
-        event_id = mongo.insert_event({
-            "raw": data,
-            "source": {
-                "address": addr,
-                "kind": "http",
-            },
-            "event_time": datetime.now(UTC),
-            "ingested_at": datetime.now(UTC),
-            "receiver": {
-                "hostname": hostname
-            }
-        }, context_id=context_id)
-
-        mongo.upsert_event_state(event_id, {
-            "parsed": False,
-            "enriched": False,
-            "detected": False,
-            "severity": None,
-        }, context_id=context_id)
-
-        return ("Data received", 200)
-
-    except Exception as e:
-        print(f"[✗] Mongo insert failed: {e}")
-        return ("Insert failed", 500)
+    return ("Data received", 200)
 
 
 def start_http_receiver():
-
     print("Receiver type set to HTTP")
     print("Listening on container port 7004")
+
+    if not forward_route:
+        get_writer()
 
     app.run(
         host="0.0.0.0",
