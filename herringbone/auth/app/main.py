@@ -30,3 +30,15 @@ try:
     register_enterprise(app)
 except ImportError:
     print("Core Mode.")
+
+
+def print_loaded_routes(app: FastAPI):
+    print("Loaded FastAPI routes:")
+    for route in sorted(app.routes, key=lambda r: getattr(r, "path", "")):
+        path = getattr(route, "path", "")
+        methods = sorted(getattr(route, "methods", []) or [])
+        name = getattr(route, "name", "")
+        print(f"{','.join(methods):20} {path} -> {name}")
+
+
+print_loaded_routes(app)
