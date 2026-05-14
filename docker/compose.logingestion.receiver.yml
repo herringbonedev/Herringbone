@@ -1,27 +1,28 @@
 services:
   logingestion-receiver:
     container_name: logingestion-receiver
-    image: quay.io/herringbone/receiver:9c117071@sha256:5b273d08179d8f7a2c70ec62134bd7123b703a1de3c9134c231cd3194ec0de1e
+    image: quay.io/herringbone/receiver:alpha-0.4.0
     restart: unless-stopped
-    depends_on:
-      - mongodb
     networks:
       - herringbone
     ports:
       - "7004:7004"
       - "7004:7004/udp"
     environment:
-      MONGO_HOST: ${MONGO_HOST}
-      MONGO_PORT: ${MONGO_PORT}
-      MONGO_USER: ${MONGO_USER}
+      MONGO_HOST: ${MONGO_HOST:-mongodb}
+      MONGO_PORT: ${MONGO_PORT:-27017}
+      MONGO_USER: ${MONGO_USER:-admin}
       MONGO_PASS: ${MONGO_PASS}
-      DB_NAME: ${DB_NAME}
-      AUTH_DB: ${AUTH_DB}
+      DB_NAME: ${DB_NAME:-herringbone}
+      AUTH_DB: ${AUTH_DB:-admin}
+
       COLLECTION_NAME: "events"
       EVENTS_COLLECTION: "events"
       EVENT_STATE_COLLECTION: "event_state"
-      RECEIVER_TYPE: ${RECEIVER_TYPE}
+
+      RECEIVER_TYPE: ${RECEIVER_TYPE:-UDP}
       CONTEXT_ID: ${CONTEXT_ID:-default}
+
       RECEIVER_QUEUE: ${RECEIVER_QUEUE:-50000}
       RECEIVER_WORKERS: ${RECEIVER_WORKERS:-4}
       RECEIVER_BATCH_SIZE: ${RECEIVER_BATCH_SIZE:-500}
@@ -29,13 +30,13 @@ services:
       UDP_BUFFER: ${UDP_BUFFER:-8192}
       UDP_SOCKET_RCVBUF: ${UDP_SOCKET_RCVBUF:-16777216}
       BATCH_DIRECT_MONGO: ${BATCH_DIRECT_MONGO:-true}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
+
 networks:
   herringbone:
     external: true
+    name: herringbone_net
