@@ -2,16 +2,24 @@ from fastapi import HTTPException
 
 from app.query_parser import parse_q_string
 from app.filters import build_range_filters
+from datetime import datetime
+from bson import ObjectId
+
 from app.pagination import coerce_after, apply_after
 from app.serializer import serialize
-from app.config import SORTABLE_FIELDS
+from app.config import SORTABLE_FIELDS, MAX_ENUM_VALUES
 
 
 def search_collection_service(mongo, collection, params, context_id: str):
     filter_query = parse_q_string(params.q)
 
+    sort_field = params.sort or "_id"
+    if sort_field not in SORTABLE_FIELDS.get(collection, set()):
+        raise HTTPException(400, "Sorting by this field is not allowed")
+
     after_oid = coerce_after(params.after)
-    filter_query = apply_after(filter_query, after_oid)
+    if after_oid and sort_field != "_id":
+        raise HTTPException(400, "Cursor pagination is only supported when sorting by _id")
 
     filter_query = build_range_filters(
         collection=collection,
@@ -28,9 +36,7 @@ def search_collection_service(mongo, collection, params, context_id: str):
         filter_value=params.filter_value,
     )
 
-    sort_field = params.sort or "_id"
-    if sort_field not in SORTABLE_FIELDS.get(collection, set()):
-        raise HTTPException(400, "Sorting by this field is not allowed")
+    filter_query = apply_after(filter_query, after_oid, params.order)
 
     sort_dir = 1 if params.order == "asc" else -1
 
@@ -53,28 +59,63 @@ def search_collection_service(mongo, collection, params, context_id: str):
     return results, next_after
 
 
-def extract_fields_from_docs(docs, prefix="", out=None):
-    if out is None:
-        out = set()
+def _field_type(value):
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return "number"
+    if isinstance(value, datetime):
+        return "date"
+    if isinstance(value, ObjectId):
+        return "objectid"
+    if isinstance(value, dict):
+        return "object"
+    if isinstance(value, list):
+        return "array"
+    return "string"
+
+
+def _add_sample(stats, path, value):
+    entry = stats.setdefault(path, {"types": set(), "enum": set(), "enum_closed": False})
+    entry["types"].add(_field_type(value))
+
+    if isinstance(value, (str, int, float, bool)) and not entry["enum_closed"]:
+        entry["enum"].add(value)
+        if len(entry["enum"]) > MAX_ENUM_VALUES:
+            entry["enum"].clear()
+            entry["enum_closed"] = True
+
+
+def extract_field_stats_from_docs(docs, prefix="", stats=None):
+    if stats is None:
+        stats = {}
 
     for doc in docs:
         if isinstance(doc, dict):
             for k, v in doc.items():
                 path = f"{prefix}.{k}" if prefix else k
-                out.add(path)
+                _add_sample(stats, path, v)
 
                 if isinstance(v, dict):
-                    extract_fields_from_docs([v], path, out)
-                elif isinstance(v, list) and v and isinstance(v[0], dict):
-                    extract_fields_from_docs(v, path, out)
+                    extract_field_stats_from_docs([v], path, stats)
+                elif isinstance(v, list):
+                    for item in v[:10]:
+                        if isinstance(item, dict):
+                            extract_field_stats_from_docs([item], path, stats)
+                        else:
+                            _add_sample(stats, path, item)
 
-    return out
+    return stats
 
 
-def infer_field_type(path: str):
+def infer_field_type(path: str, types=None):
+    if types:
+        ordered = ["number", "date", "boolean", "objectid", "array", "object", "string"]
+        return [t for t in ordered if t in types] or ["string"]
+
     lower = path.lower()
 
-    if lower in {"severity", "priority_score", "score", "risk_score"}:
+    if lower in {"severity", "priority", "priority_score", "score", "risk_score"}:
         return ["number"]
 
     if lower.endswith("_at") or lower.endswith("_time") or lower in {
@@ -86,6 +127,7 @@ def infer_field_type(path: str):
         "event_time",
         "parsed_at",
         "enriched_at",
+        "timestamp",
     }:
         return ["date"]
 
@@ -104,13 +146,23 @@ def get_collection_schema(mongo, collection: str, context_id: str, sample_size: 
         limit=sample_size,
     )
 
-    fields = sorted(extract_fields_from_docs(docs))
+    stats = extract_field_stats_from_docs(docs)
+    fields = []
 
-    return [
-        {
+    for field in sorted(stats):
+        if field == "_id" or field == "context_id":
+            continue
+
+        entry = stats[field]
+        item = {
             "path": field,
-            "types": infer_field_type(field),
+            "types": infer_field_type(field, entry.get("types")),
         }
-        for field in fields
-        if field != "_id"
-    ]
+
+        enum_values = entry.get("enum") or set()
+        if enum_values and not entry.get("enum_closed"):
+            item["enum"] = sorted(enum_values, key=lambda x: str(x))
+
+        fields.append(item)
+
+    return fields

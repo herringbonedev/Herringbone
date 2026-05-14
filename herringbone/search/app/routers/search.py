@@ -43,10 +43,12 @@ class SearchParams(BaseModel):
 
 def get_mongo():
     return HerringboneMongoDatabase(
-        user=os.environ.get("MONGO_USER", ""),
-        password=os.environ.get("MONGO_PASS", ""),
+        user=os.environ.get("MONGO_USER", "admin"),
+        password=os.environ.get("MONGO_PASS", "secret"),
         database=os.environ.get("DB_NAME", "herringbone"),
         host=os.environ.get("MONGO_HOST", "localhost"),
+        port=int(os.environ.get("MONGO_PORT", 27017)),
+        auth_source=os.environ.get("AUTH_DB", "herringbone"),
     )
 
 
@@ -90,6 +92,21 @@ def get_params(
         filter_value=filter_value,
     )
 
+
+
+
+@router.get("/livez")
+async def livez():
+    return {"status": "ok"}
+
+
+@router.get("/readyz")
+async def readyz(mongo=Depends(get_mongo)):
+    try:
+        mongo.find_one("events", {})
+        return {"ready": True}
+    except Exception:
+        return JSONResponse(content={"ready": False}, status_code=503)
 
 @router.get("/{collection}/schema")
 async def collection_schema(
@@ -201,17 +218,3 @@ async def search_collection(
             },
         )
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/livez")
-async def livez():
-    return {"status": "ok"}
-
-
-@router.get("/readyz")
-async def readyz(mongo=Depends(get_mongo)):
-    try:
-        mongo.find_one("events", {})
-        return {"ready": True}
-    except Exception:
-        return JSONResponse(content={"ready": False}, status_code=503)
