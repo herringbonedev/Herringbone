@@ -3,9 +3,9 @@ import os
 import socket
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from logingestion.receiver.app.batcher import get_batch_writer
-from logingestion.receiver.app.keys import resolve_ingestion_key
-from logingestion.receiver.app.forwarder import forward_data
+from app.batcher import get_batch_writer
+from app.keys import resolve_ingestion_key
+from app.forwarder import forward_data
 
 app = Flask(__name__)
 

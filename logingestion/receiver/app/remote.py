@@ -3,8 +3,8 @@ import os
 import socket
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from logingestion.receiver.app.batcher import get_batch_writer
-from logingestion.receiver.app.keys import resolve_ingestion_key
+from app.batcher import get_batch_writer
+from app.keys import resolve_ingestion_key
 
 app = Flask(__name__)
 

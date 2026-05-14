@@ -4,8 +4,8 @@ import socket
 import threading
 
 from modules.database.mongo_db import HerringboneMongoDatabase
-from logingestion.receiver.app.batcher import get_batch_writer
-from logingestion.receiver.app.forwarder import forward_data
+from app.batcher import get_batch_writer
+from app.forwarder import forward_data
 
 forward_route = os.environ.get("FORWARD_ROUTE")
 
