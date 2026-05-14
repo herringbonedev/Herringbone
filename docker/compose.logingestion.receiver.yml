@@ -1,6 +1,6 @@
 services:
   logingestion-receiver:
-    image: quay.io/herringbone/receiver:alpha-0.4.0
+    image: quay.io/herringbone/receiver:d14797d3@sha256:022146365de5017990b668847cc07d3ebaee9c5c883f6ef5ff3b2aaee719c2c6
     restart: unless-stopped
     networks:
       - herringbone
@@ -14,20 +14,16 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME:-herringbone}
       AUTH_DB: ${AUTH_DB:-admin}
-
       COLLECTION_NAME: ${COLLECTION_NAME:-events}
       EVENTS_COLLECTION: ${EVENTS_COLLECTION:-events}
       EVENT_STATE_COLLECTION: ${EVENT_STATE_COLLECTION:-event_state}
-
       RECEIVER_TYPE: ${RECEIVER_TYPE:-UDP}
       RECEIVER_MODE: ${RECEIVER_MODE:-local}
       FORWARD_ROUTE: ${FORWARD_ROUTE:-}
       PORT: ${CONTAINER_PORT:-7004}
       CONTEXT_ID: ${CONTEXT_ID:-default}
-
       HB_ENTERPRISE: ${HB_ENTERPRISE:-false}
       INGESTION_KEY: ${INGESTION_KEY:-}
-
       RECEIVER_QUEUE: ${RECEIVER_QUEUE:-50000}
       RECEIVER_WORKERS: ${RECEIVER_WORKERS:-4}
       RECEIVER_BATCH_SIZE: ${RECEIVER_BATCH_SIZE:-500}
@@ -42,7 +38,6 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
-
 networks:
   herringbone:
     external: true
