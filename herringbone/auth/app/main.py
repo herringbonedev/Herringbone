@@ -40,5 +40,4 @@ def print_loaded_routes(app: FastAPI):
         name = getattr(route, "name", "")
         print(f"{','.join(methods):20} {path} -> {name}")
 
-
 print_loaded_routes(app)
