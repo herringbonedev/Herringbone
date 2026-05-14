@@ -30,7 +30,7 @@ services:
       RECEIVER_BATCH_FLUSH_MS: ${RECEIVER_BATCH_FLUSH_MS:-250}
       UDP_BUFFER: ${UDP_BUFFER:-8192}
       UDP_SOCKET_RCVBUF: ${UDP_SOCKET_RCVBUF:-16777216}
-      BATCH_DIRECT_MONGO: ${BATCH_DIRECT_MONGO:-true}
+      BATCH_DIRECT_MONGO: ${BATCH_DIRECT_MONGO:-false}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     read_only: true
