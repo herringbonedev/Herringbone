@@ -1,18 +1,17 @@
 services:
   parser-enrichment:
-    container_name: parser-enrichment
     image: quay.io/herringbone/parser-enrichment:10ac235b@sha256:00a0d1d362d3bea9a47bb25860898da0da4693b884c85805d5ebbbe65ebc44cc
     restart: unless-stopped
-    user: "65532:65532"
+    user: 65532:65532
     read_only: true
     tmpfs:
-      - /tmp
+    - /tmp
     security_opt:
-      - no-new-privileges:true
+    - no-new-privileges:true
     cap_drop:
-      - ALL
+    - ALL
     networks:
-      - herringbone
+    - herringbone
     working_dir: /app-root
     environment:
       PYTHONPATH: /app-root:/python-packages:/modules
@@ -25,15 +24,16 @@ services:
       COLLECTION_NAME: logs
       METADATA_SVC: http://parser-cardset:7005/parser/cardset/pull_cards
       EXTRACTOR_SVC: http://parser-extractor:7006/parser/extractor/parse
-      # Context
       HERRINGBONE_SERVICE: parser-enrichment
       HERRINGBONE_UNIT: parser
       HERRINGBONE_ELEMENT: enrichment
     secrets:
-      - service_token
-      - service_jwt_public_key
+    - service_token
+    - service_jwt_public_key
     depends_on:
-      - mongodb
+    - mongodb
+    deploy:
+      replicas: ${PARSER_ENRICHMENT_REPLICAS:-3}
 secrets:
   service_token:
     file: ./secrets/runtime/parser_enrichment_service_token

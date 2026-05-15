@@ -1,12 +1,11 @@
 services:
   incidents-correlator:
-    container_name: incidents-correlator
     image: quay.io/herringbone/incidents-correlator:573da897@sha256:5b43ab5e477f6cc60a0ca4231b99425a1e1eb6f0ffb4b677ea5f458ae1f84741
     restart: unless-stopped
     networks:
-      - herringbone
+    - herringbone
     expose:
-      - "7012"
+    - "7012"
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -14,21 +13,22 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-      COLLECTION_NAME: "incidents"
-      EVENTS_API_BASE: "http://herringbone-logs:7010/herringbone/logs/events"
-      # Context
+      COLLECTION_NAME: incidents
+      EVENTS_API_BASE: http://herringbone-logs:7010/herringbone/logs/events
       HERRINGBONE_SERVICE: incidents-correlator
       HERRINGBONE_UNIT: incidents
       HERRINGBONE_ELEMENT: correlator
     read_only: true
     tmpfs:
-      - /tmp
+    - /tmp
     security_opt:
-      - no-new-privileges:true
+    - no-new-privileges:true
     secrets:
-      - service_token
-      - service_jwt_public_key
-      - jwt_secret
+    - service_token
+    - service_jwt_public_key
+    - jwt_secret
+    deploy:
+      replicas: ${INCIDENTS_CORRELATOR_REPLICAS:-1}
 secrets:
   service_token:
     file: ./secrets/runtime/incidents_correlator_service_token
