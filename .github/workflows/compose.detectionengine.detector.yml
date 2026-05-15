@@ -1,0 +1,44 @@
+services:
+  detectionengine-detector:
+    image: quay.io/herringbone/detectionengine-detector:5e4cac18@sha256:187a8153165247481115e3042bc24326280ab8be7aeeed13380049bbccd2dc75
+    restart: unless-stopped
+    networks:
+    - herringbone
+    environment:
+      MONGO_HOST: ${MONGO_HOST}
+      MONGO_PORT: ${MONGO_PORT}
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASS: ${MONGO_PASS}
+      DB_NAME: ${DB_NAME}
+      AUTH_DB: ${AUTH_DB}
+      EVENTS_COLLECTION_NAME: events
+      EVENT_STATUS_COLLECTION_NAME: event_state
+      RULES_COLLECTION_NAME: rules
+      DETECTIONS_COLLECTION_NAME: detections
+      MATCHER_API: http://detectionengine-matcher:7003/detectionengine/matcher/find_match
+      ORCHESTRATOR_URL: http://incidents-orchestrator:7013/incidents/orchestrator/process_detection
+      HERRINGBONE_SERVICE: detectionengine-detector
+      HERRINGBONE_UNIT: detectionengine
+      HERRINGBONE_ELEMENT: detector
+    read_only: true
+    tmpfs:
+    - /tmp
+    security_opt:
+    - no-new-privileges:true
+    secrets:
+    - service_token
+    - service_jwt_public_key
+    - jwt_secret
+    deploy:
+      replicas: ${DETECTIONENGINE_DETECTOR_REPLICAS:-1}
+secrets:
+  service_token:
+    file: ./secrets/runtime/detectionengine_detector_service_token
+  service_jwt_public_key:
+    file: ./secrets/runtime/service_jwt_public_key
+  jwt_secret:
+    file: ./secrets/runtime/jwt_secret
+networks:
+  herringbone:
+    external: true
+    name: herringbone_net

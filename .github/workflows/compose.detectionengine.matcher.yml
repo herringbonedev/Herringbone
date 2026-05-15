@@ -1,0 +1,34 @@
+services:
+  detectionengine-matcher:
+    image: quay.io/herringbone/detectionengine-matcher:71250fcd@sha256:6e0c7c214d256181d202758601c367f591e276f28e6dc3c60b57287a124600ca
+    restart: unless-stopped
+    networks:
+    - herringbone
+    expose:
+    - "7003"
+    environment:
+      HERRINGBONE_SERVICE: detectionengine-matcher
+      HERRINGBONE_UNIT: detectionengine
+      HERRINGBONE_ELEMENT: matcher
+    read_only: true
+    tmpfs:
+    - /tmp
+    security_opt:
+    - no-new-privileges:true
+    secrets:
+    - service_token
+    - service_jwt_public_key
+    - jwt_secret
+    deploy:
+      replicas: ${DETECTIONENGINE_MATCHER_REPLICAS:-3}
+secrets:
+  service_token:
+    file: ./secrets/runtime/detectionengine_matcher_service_token
+  service_jwt_public_key:
+    file: ./secrets/runtime/service_jwt_public_key
+  jwt_secret:
+    file: ./secrets/runtime/jwt_secret
+networks:
+  herringbone:
+    external: true
+    name: herringbone_net
