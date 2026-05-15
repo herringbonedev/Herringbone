@@ -6,7 +6,7 @@ pytestmark = pytest.mark.integration
 
 def test_event_state_transition_persisted(run_once):
     mongo = FakeMongo(
-        state={"event_id": "evt-1", "parsed": False},
+        state={"event_id": "evt-1", "parsed": False, "claimed": False, "claimed_by": ""},
         event={"_id": "evt-1", "raw": "hello"},
         cards=[{
             "name": "test-card",

@@ -10,7 +10,7 @@ def _assert_common_fields(doc: dict):
 def test_parse_results_document_schema_success(run_once):
     mongo = run_once(
         fake_mongo=FakeMongo(
-            state={"event_id": "evt1", "parsed": False},
+            state={"event_id": "evt1", "parsed": False, "claimed": False, "claimed_by": ""},
             event={"_id": "evt1", "raw": "foo", "source": {"address": "1.2.3.4"}},
             cards=[{"name": "c1", "selector": {"type": "raw", "value": "foo"}, "regex": []}],
         ),
@@ -37,7 +37,7 @@ def test_parse_results_document_schema_success(run_once):
 def test_parse_results_document_schema_error(run_once):
     mongo = run_once(
         fake_mongo=FakeMongo(
-            state={"event_id": "evt2", "parsed": False},
+            state={"event_id": "evt2", "parsed": False, "claimed": False, "claimed_by": ""},
             event={"_id": "evt2", "raw": "foo", "source": {"address": "1.2.3.4"}},
             cards=[{"name": "c1", "selector": {"type": "raw", "value": "foo"}, "regex": []}],
         ),

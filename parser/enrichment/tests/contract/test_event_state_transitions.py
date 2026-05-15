@@ -5,7 +5,7 @@ def test_event_state_parsed_transitions_once_per_event(run_once):
     # Two matching cards should still produce exactly one parsed=True transition.
     mongo = run_once(
         fake_mongo=FakeMongo(
-            state={"event_id": "evt3", "parsed": False},
+            state={"event_id": "evt3", "parsed": False, "claimed": False, "claimed_by": ""},
             event={"_id": "evt3", "raw": "abc foo def", "source": {"address": "9.9.9.9"}},
             cards=[
                 {"name": "c1", "selector": {"type": "raw", "value": "foo"}, "regex": []},
@@ -24,7 +24,7 @@ def test_event_state_parsed_transitions_once_per_event(run_once):
 def test_event_not_found_marks_parsed_once(run_once):
     mongo = run_once(
         fake_mongo=FakeMongo(
-            state={"event_id": "evt_missing", "parsed": False},
+            state={"event_id": "evt_missing", "parsed": False, "claimed": False, "claimed_by": ""},
             event=None,
             cards=[],
         ),
