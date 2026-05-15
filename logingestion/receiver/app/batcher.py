@@ -219,7 +219,8 @@ class MongoBatchWriter:
 
             self.mongo.upsert_event_state(event_id, {
                 "parsed": False,
-                "enriched": False,
+                "claimed": False,
+                "claimed_by": "",
                 "detected": False,
                 "severity": None,
             }, context_id=context_id)

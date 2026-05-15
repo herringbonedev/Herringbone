@@ -2,17 +2,20 @@ from datetime import datetime, timezone
 import os
 import time
 import requests
+import socket
 from time import time as now
 
 from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.audit.logger import AuditLogger
 
 
-POLL_INTERVAL = float(os.environ.get("ENRICHMENT_POLL_INTERVAL", 1.0))
+POLL_INTERVAL = float(os.environ.get("ENRICHMENT_POLL_INTERVAL", 0.01))
+CARD_CACHE_SECONDS = float(os.environ.get("CARD_CACHE_SECONDS", 30.0))
 EXTRACTOR_SVC = os.environ.get("EXTRACTOR_SVC")
 USE_TEST = EXTRACTOR_SVC == "test.service"
 
 SERVICE_TOKEN_PATH = "/run/secrets/service_token"
+INSTANCE_ID = socket.gethostname()
 
 audit = AuditLogger()
 
@@ -21,6 +24,12 @@ _metrics = {
     "matched_cards": 0,
     "failed": 0,
     "last_log": 0.0,
+}
+
+_card_cache = {
+    "context_id": None,
+    "cards": [],
+    "loaded_at": 0.0,
 }
 
 print("[*] Enrichment service has started")
@@ -121,6 +130,29 @@ def call_extractor(card: dict, raw_log: str, context_id: str) -> dict:
     raise RuntimeError("Extractor returned invalid result shape")
 
 
+def get_cards_cached(mongo, context_id: str):
+    t = now()
+
+    if (
+        _card_cache["context_id"] == context_id
+        and _card_cache["cards"]
+        and t - _card_cache["loaded_at"] < CARD_CACHE_SECONDS
+    ):
+        return _card_cache["cards"]
+
+    cards = mongo.find_with_context(
+        "parse_cards",
+        {},
+        context_id=context_id,
+    )
+
+    _card_cache["context_id"] = context_id
+    _card_cache["cards"] = cards
+    _card_cache["loaded_at"] = t
+
+    return cards
+
+
 def normalize_results(results: dict) -> dict:
     normalized = {}
     for k, v in results.items():
@@ -166,11 +198,7 @@ def process_event(mongo, state: dict):
         _maybe_log()
         return
 
-    cards = mongo.find_with_context(
-        "parse_cards",
-        {},
-        context_id=context_id,
-    )
+    cards = get_cards_cached(mongo, context_id)
 
     for card in cards:
 
@@ -241,7 +269,7 @@ def process_event(mongo, state: dict):
 
     mongo.upsert_event_state(
         event["_id"],
-        {"parsed": True},
+        {"parsed": True, "claimed": False, "claimed_by":"", "parsed_by": INSTANCE_ID},
         context_id=context_id,
     )
 
@@ -262,7 +290,7 @@ def main():
 
     while True:
 
-        state = mongo.find_one("event_state", {"parsed": False})
+        state = mongo.find_one("event_state", {"parsed": False, "claimed": False})
 
         if not state:
             _maybe_log()
@@ -270,6 +298,11 @@ def main():
             continue
 
         try:
+            mongo.upsert_event_state(
+                state["event_id"],
+                {"claimed": True, "claimed_by": INSTANCE_ID},
+                context_id=state["context_id"],
+            )
             process_event(mongo, state)
         except Exception as e:
 
