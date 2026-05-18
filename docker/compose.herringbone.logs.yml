@@ -1,6 +1,6 @@
 services:
   herringbone-logs:
-    image: docker-herringbone-logs:latest 
+    image: quay.io/herringbone/detectionengine-logs
     restart: unless-stopped
     depends_on:
       mongodb:
