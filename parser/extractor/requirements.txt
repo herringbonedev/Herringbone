@@ -2,5 +2,5 @@ fastapi>=0.110
 uvicorn>=0.30
 jsonpath-ng==1.7.0
 python-jose[cryptography]==3.5.0
-pymongo>=4,<5
+pymongo>=4.17.0,<5
 orjson>=3.10,<4
