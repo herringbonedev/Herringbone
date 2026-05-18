@@ -1,14 +1,14 @@
 services:
   herringbone-logs:
-    image: quay.io/herringbone/herringbone-logs:c61eb2b6@sha256:ae33ca9b44bf637ad2e0a07968c186f49fef9900c03d741715cc0375a588055d
+    image: quay.io/herringbone/herringbone-logs:f5e574e4@sha256:669a8b937c853e3f559807511226fce2161c52280690aa34e591b7f6cd3a32e8
     restart: unless-stopped
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
-    - herringbone
+      - herringbone
     expose:
-    - "7010"
+      - "7010"
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -22,11 +22,11 @@ services:
       HERRINGBONE_ELEMENT: logs
     read_only: true
     tmpfs:
-    - /tmp
+      - /tmp
     security_opt:
-    - no-new-privileges:true
+      - no-new-privileges:true
     secrets:
-    - jwt_secret
+      - jwt_secret
     deploy:
       replicas: ${HERRINGBONE_LOGS_REPLICAS:-3}
 networks:
