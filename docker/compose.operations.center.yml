@@ -1,6 +1,6 @@
 services:
   operations-center:
-    image: docker-herringbone-logs:latest
+    image: quay.io/herringbone/operations-center
     restart: unless-stopped
     profiles:
     - ops

@@ -1,6 +1,6 @@
 services:
   detectionengine-matcher:
-    image: docker-detectionengine-matcher:latest 
+    image: quay.io/herringbone/detectionengine-matcher
     restart: unless-stopped
     networks:
     - herringbone
