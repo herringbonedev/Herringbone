@@ -30,14 +30,18 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+
     secrets:
       - service_jwt_public_key
+
     deploy:
       replicas: ${PARSER_EXTRACTOR_REPLICAS:-3}
+
 networks:
   herringbone:
     external: true
     name: herringbone_net
+
 secrets:
   service_jwt_public_key:
     file: ./secrets/runtime/service_jwt_public_key
