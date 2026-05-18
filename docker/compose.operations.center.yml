@@ -1,6 +1,6 @@
 services:
   operations-center:
-    image: docker-herringbone-logs:latest
+    image: quay.io/herringbone/operations-center:a3dfe877@sha256:5e91c703c8e1b13064303614029eaf3bcf69456965c5d56f518e2b71f679ab9d
     restart: unless-stopped
     profiles:
     - ops

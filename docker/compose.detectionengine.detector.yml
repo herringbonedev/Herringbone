@@ -1,6 +1,6 @@
 services:
   detectionengine-detector:
-    image: docker-detectionengine-detector:latest
+    image: quay.io/herringbone/detectionengine-detector:5e4cac18@sha256:187a8153165247481115e3042bc24326280ab8be7aeeed13380049bbccd2dc75
     restart: unless-stopped
     networks:
       - herringbone
