@@ -1,11 +1,11 @@
 services:
   detectionengine-matcher:
-    image: quay.io/herringbone/detectionengine-matcher:71250fcd@sha256:6e0c7c214d256181d202758601c368f591e276f28e6dc3c60b57287a124600ca
+    image: quay.io/herringbone/detectionengine-matcher:5fba37db@sha256:ad4a100a70a43953616ec7e257b1117ac604fbb8ebc0bf7bf8688b0f626e640c
     restart: unless-stopped
     networks:
-    - herringbone
+      - herringbone
     expose:
-    - "7003"
+      - "7003"
     environment:
       HERRINGBONE_SERVICE: detectionengine-matcher
       HERRINGBONE_UNIT: detectionengine
@@ -14,13 +14,13 @@ services:
       MATCHER_REGEX_CACHE_SIZE: ${MATCHER_REGEX_CACHE_SIZE:-4096}
     read_only: true
     tmpfs:
-    - /tmp
+      - /tmp
     security_opt:
-    - no-new-privileges:true
+      - no-new-privileges:true
     secrets:
-    - service_token
-    - service_jwt_public_key
-    - jwt_secret
+      - service_token
+      - service_jwt_public_key
+      - jwt_secret
     deploy:
       replicas: ${DETECTIONENGINE_MATCHER_REPLICAS:-3}
 secrets:
