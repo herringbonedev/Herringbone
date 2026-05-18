@@ -175,6 +175,28 @@ def get_raw_db(mongo):
     return None
 
 
+def _json_safe(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+
+    if isinstance(value, dict):
+        return {
+            k: _json_safe(v)
+            for k, v in value.items()
+            if not str(k).startswith("_")
+        }
+
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+
+    # Compiled regex objects are not JSON serializable.
+    # They are runtime-only cache fields and should never be sent to extractor.
+    if hasattr(value, "pattern") and hasattr(value, "search"):
+        return getattr(value, "pattern", str(value))
+
+    return value
+
+
 def sanitize_card(card: dict) -> dict:
     return {
         k: _json_safe(v)
@@ -223,10 +245,34 @@ def selector_matches(selector: dict, event: dict) -> bool:
     value = selector.get("value")
     if not value:
         return False
+
+    raw = event.get("raw", "") or ""
+
+    # Existing behavior: exact source.address match
     if stype == "source_address":
         return event.get("source", {}).get("address") == value
+
+    # Existing behavior: simple raw substring match
     if stype == "raw":
-        return value in event.get("raw", "")
+        return str(value) in raw
+
+    # New behavior: regex selector against raw log
+    if stype == "raw_regex":
+        try:
+            return re.search(str(value), raw) is not None
+        except re.error as e:
+            audit.log(
+                event="parser_selector_regex_failed",
+                result="failure",
+                severity="WARNING",
+                metadata={
+                    "selector_type": stype,
+                    "pattern": str(value),
+                    "error": str(e),
+                },
+            )
+            return False
+
     return False
 
 
