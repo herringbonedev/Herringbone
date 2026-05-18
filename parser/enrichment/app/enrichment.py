@@ -218,16 +218,62 @@ def safe_result_card_label(result: dict) -> str:
     return str(value)
 
 
-def selector_matches(selector: dict, event: dict) -> bool:
+def _selector_positive_matches(selector: dict, event: dict) -> bool:
+    if not isinstance(selector, dict):
+        return False
+
     stype = selector.get("type")
     value = selector.get("value")
-    if not value:
+
+    if value is None or value == "":
         return False
+
+    raw = event.get("raw", "") or ""
+    
     if stype == "source_address":
         return event.get("source", {}).get("address") == value
+    
     if stype == "raw":
-        return value in event.get("raw", "")
+        return str(value) in raw
+    
+    if stype == "raw_regex":
+        try:
+            return re.search(str(value), raw) is not None
+        except re.error as e:
+            audit.log(
+                event="parser_selector_regex_failed",
+                result="failure",
+                severity="WARNING",
+                metadata={
+                    "selector_type": stype,
+                    "pattern": str(value),
+                    "error": str(e),
+                },
+            )
+            return False
+
     return False
+
+
+def selector_matches(selector: dict, event: dict) -> bool:
+    if not _selector_positive_matches(selector, event):
+        return False
+
+    negative_rules = selector.get("not") or selector.get("and_not") or []
+
+    if isinstance(negative_rules, dict):
+        negative_rules = [negative_rules]
+
+    if not isinstance(negative_rules, list):
+        return True
+
+    for negative_selector in negative_rules:
+        if not isinstance(negative_selector, dict):
+            continue
+        if _selector_positive_matches(negative_selector, event):
+            return False
+
+    return True
 
 
 def normalize_results(results: dict) -> dict:
@@ -392,14 +438,17 @@ def compile_card_regex(card: dict) -> dict:
 def prepare_cards(cards: List[dict]) -> dict:
     """
     Pre-group cards so each event does not blindly scan all selectors where possible.
-    This stays generic to card selector types:
+    Existing cards keep working:
       - source_address selector: O(1) lookup
       - raw selector: substring checks only for raw selector cards
       - other selector types: conservative fallback list
+      - raw_regex selector: regex match against raw log
+      - selector.not / selector.and_not: optional negative match rules
     """
     prepared = {
         "source_address": {},
         "raw": [],
+        "raw_regex": [],
         "other": [],
         "total": len(cards),
     }
@@ -407,17 +456,27 @@ def prepare_cards(cards: List[dict]) -> dict:
     for card in cards:
         card = compile_card_regex(card)
         selector = card.get("selector") or {}
-        stype = selector.get("type")
-        value = selector.get("value")
-        if not value:
+
+        if not isinstance(selector, dict):
             prepared["other"].append(card)
             continue
+
+        stype = selector.get("type")
+        value = selector.get("value")
+
+        if value is None or value == "":
+            prepared["other"].append(card)
+            continue
+
         if stype == "source_address":
             prepared["source_address"].setdefault(value, []).append(card)
         elif stype == "raw":
             prepared["raw"].append(card)
+        elif stype == "raw_regex":
+            prepared["raw_regex"].append(card)
         else:
             prepared["other"].append(card)
+
     return prepared
 
 
@@ -444,11 +503,17 @@ def matching_cards_for_event(prepared: dict, event: dict) -> List[dict]:
     matched: List[dict] = []
 
     if source_address:
-        matched.extend(prepared.get("source_address", {}).get(source_address, []))
+        for card in prepared.get("source_address", {}).get(source_address, []):
+            if selector_matches(card.get("selector", {}), event):
+                matched.append(card)
 
     for card in prepared.get("raw", []):
         value = (card.get("selector") or {}).get("value")
-        if value and value in raw:
+        if value and str(value) in raw and selector_matches(card.get("selector", {}), event):
+            matched.append(card)
+
+    for card in prepared.get("raw_regex", []):
+        if selector_matches(card.get("selector", {}), event):
             matched.append(card)
 
     for card in prepared.get("other", []):

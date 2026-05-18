@@ -5,7 +5,7 @@ import json
 from typing import Any, Dict, List, Optional
 from bson import json_util
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from app.schema import CardSchema
 from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.auth import require_scopes, get_context
@@ -25,6 +25,8 @@ audit = AuditLogger()
 
 
 class SelectorModel(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     type: str
     value: str
 
