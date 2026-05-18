@@ -11,8 +11,6 @@ ALLOWED_COLLECTIONS = {
     "incidents",
     "detections",
     "parse_results",
-    "incident_events",
-    "enrichment_results",
 }
 
 SORTABLE_FIELDS = {
@@ -21,8 +19,6 @@ SORTABLE_FIELDS = {
     "detections": {"severity", "inserted_at", "created_at", "_id"},
     "incidents": {"created_at", "updated_at", "last_updated", "priority", "_id"},
     "parse_results": {"created_at", "parsed_at", "_id"},
-    "incident_events": {"created_at", "_id"},
-    "enrichment_results": {"created_at", "enriched_at", "_id"},
 }
 
 # Prefer the first field for sorting; use all fields for time-range filtering.
@@ -32,8 +28,6 @@ COLLECTION_TIME_FIELDS = {
     "detections": ("inserted_at", "created_at"),
     "incidents": ("created_at", "updated_at", "last_updated"),
     "parse_results": ("created_at", "parsed_at"),
-    "incident_events": ("created_at",),
-    "enrichment_results": ("created_at", "enriched_at"),
 }
 
 DATE_FIELD_NAMES = {
@@ -65,4 +59,5 @@ ALLOWED_OPERATORS = {
     "$options",
     "$and",
     "$or",
+    "$nor"
 }

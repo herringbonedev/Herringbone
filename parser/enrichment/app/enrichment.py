@@ -177,9 +177,9 @@ def get_raw_db(mongo):
 
 def sanitize_card(card: dict) -> dict:
     return {
-        k: (v.isoformat() if isinstance(v, datetime) else v)
+        k: _json_safe(v)
         for k, v in card.items()
-        if k != "_id"
+        if k != "_id" and not str(k).startswith("_")
     }
 
 

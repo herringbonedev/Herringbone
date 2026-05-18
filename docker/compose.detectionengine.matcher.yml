@@ -1,6 +1,6 @@
 services:
   detectionengine-matcher:
-    image: quay.io/herringbone/detectionengine-matcher:71250fcd@sha256:6e0c7c214d256181d202758601c367f591e276f28e6dc3c60b57287a124600ca
+    image: docker-detectionengine-matcher:latest 
     restart: unless-stopped
     networks:
     - herringbone
@@ -10,6 +10,8 @@ services:
       HERRINGBONE_SERVICE: detectionengine-matcher
       HERRINGBONE_UNIT: detectionengine
       HERRINGBONE_ELEMENT: matcher
+      MATCHER_DEBUG: ${MATCHER_DEBUG:-false}
+      MATCHER_REGEX_CACHE_SIZE: ${MATCHER_REGEX_CACHE_SIZE:-4096}
     read_only: true
     tmpfs:
     - /tmp

@@ -1,6 +1,6 @@
 services:
   parser-extractor:
-    image: quay.io/herringbone/parser-extractor:837fbfb4@sha256:9fe5f1899c2b04818cf0a8e14aee48b6c83a08900a39e436f3aeca1ce2b8a5c8
+    image: quay.io/herringbone/parser-extractor:096586aa@sha256:991db956c9146fbb0844f73954889e1ef89e9fd149486a5dc7b68c2de8081350
     restart: unless-stopped
     networks:
       - herringbone

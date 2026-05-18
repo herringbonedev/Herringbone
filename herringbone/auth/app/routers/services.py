@@ -1,23 +1,21 @@
 import inspect
-import os, secrets
+import os
 from datetime import datetime, UTC
-from typing import Optional
+from typing import Optional, Sequence
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request
 
 from modules.database.mongo_db import HerringboneMongoDatabase
 from modules.auth.auth import (
     require_scopes,
     get_identity,
-    get_context
+    get_context,
 )
 
 from modules.audit import AuditLogger
 
-from app.security import (
-    create_service_token,
-)
+from app.security import create_service_token
 
 from app.schemas import (
     ServiceTokenRequest,
@@ -30,6 +28,8 @@ router = APIRouter(prefix="/herringbone/auth", tags=["services"])
 identity = Depends(get_identity)
 admin = Depends(require_scopes("platform:admin"))
 root_admin = Depends(require_scopes("*"))
+
+DEFAULT_CONTEXT_ID = "default"
 
 
 def get_mongo():
@@ -47,7 +47,94 @@ def get_audit_logger():
     return AuditLogger(get_mongo())
 
 
+def is_enterprise_mode() -> bool:
+    """
+    Core/free should allow customer-owned service accounts in context_id="default".
+
+    Enterprise should require an organization context for customer-owned service
+    accounts so one tenant cannot create/list/token/delete service accounts in
+    another tenant's context.
+
+    Set HB_ENTERPRISE=true in enterprise deployments.
+    """
+    return os.environ.get("HB_ENTERPRISE", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "y",
+        "on",
+    }
+
+
+def set_request_context(request: Request, context_id: str) -> None:
+    """
+    Keep audit logs context-safe even when a route is using a root/platform
+    dependency instead of get_context().
+    """
+    try:
+        request.state.context_id = context_id
+    except Exception:
+        pass
+
+
+def normalize_scopes(scopes: Optional[Sequence[str]]) -> list[str]:
+    if not scopes:
+        return []
+    return sorted(set(str(scope).strip() for scope in scopes if str(scope).strip()))
+
+
+def require_user_identity(identity_doc: dict, request: Request, audit: AuditLogger, event: str) -> None:
+    if identity_doc.get("type") != "user":
+        audit.log(
+            event=event,
+            identity=identity_doc,
+            result="failure",
+            severity="WARNING",
+            metadata={"reason": "non_user_identity"},
+            request=request,
+        )
+        raise HTTPException(status_code=403, detail="user identity required")
+
+
+def get_customer_context_or_raise(
+    *,
+    context: dict,
+    request: Request,
+    audit: AuditLogger,
+    deny_event: str,
+) -> tuple[dict, str]:
+    """
+    Context policy:
+
+    - Core/free: context_id defaults to "default" and customer-owned service
+      accounts live in the default tenant.
+    - Enterprise: customer-owned service accounts require a non-default org
+      context. Platform/internal service accounts still live in "default".
+    """
+    identity_doc = context["identity"]
+    context_id = context.get("context_id") or DEFAULT_CONTEXT_ID
+    set_request_context(request, context_id)
+
+    require_user_identity(identity_doc, request, audit, deny_event)
+
+    if is_enterprise_mode() and context_id == DEFAULT_CONTEXT_ID:
+        audit.log(
+            event=deny_event,
+            identity=identity_doc,
+            result="failure",
+            severity="WARNING",
+            metadata={"reason": "org_context_required", "context_id": context_id},
+            request=request,
+        )
+        raise HTTPException(status_code=403, detail="organization context required")
+
+    return identity_doc, context_id
+
+
 def validate_admin_scope_assignment(requested_scopes, caller_scopes):
+    requested_scopes = normalize_scopes(requested_scopes)
+    caller_scopes = normalize_scopes(caller_scopes)
+
     if "*" in requested_scopes or "platform:admin" in requested_scopes:
         if "*" not in caller_scopes and "platform:admin" not in caller_scopes:
             raise HTTPException(
@@ -79,23 +166,35 @@ def load_bootstrap_token() -> Optional[str]:
 
 def is_bootstrap_required(mongo: HerringboneMongoDatabase) -> bool:
     try:
-        return len(mongo.find_with_context("users", {}, context_id="default")) == 0
+        return len(mongo.find_with_context("users", {}, context_id=DEFAULT_CONTEXT_ID)) == 0
     except Exception:
         return True
 
 
-def create_service_token_for_context(*, service_id: str, service_name: str, scopes: list, context_id: str):
-    kwargs = {
-        "service_id": service_id,
-        "service_name": service_name,
-        "scopes": scopes,
-        "context_id": context_id,
-    }
+def create_service_token_for_context(
+    *,
+    service_id: str,
+    service_name: str,
+    scopes: list[str],
+    context_id: str,
+):
+    """
+    Refuse to mint service tokens if app.security.create_service_token cannot
+    carry context_id. A context-less service token is not safe for multitenancy.
+    """
+    signature = inspect.signature(create_service_token)
+    if "context_id" not in signature.parameters:
+        raise HTTPException(
+            status_code=500,
+            detail="create_service_token must accept context_id for context-safe service tokens",
+        )
 
-    if "context_id" in inspect.signature(create_service_token).parameters:
-        kwargs["context_id"] = context_id
-
-    return create_service_token(**kwargs)
+    return create_service_token(
+        service_id=service_id,
+        service_name=service_name,
+        scopes=normalize_scopes(scopes),
+        context_id=context_id,
+    )
 
 
 @router.post("/services/internal/register")
@@ -105,8 +204,16 @@ async def register_internal_service(
     identity=root_admin,
     audit: AuditLogger = Depends(get_audit_logger),
 ):
-    mongo = get_mongo()
+    """
+    Register platform/internal Herringbone services.
 
+    This route is intentionally platform-scoped and stored under the default
+    context. It should exist in Core and Enterprise.
+    """
+    mongo = get_mongo()
+    set_request_context(request, DEFAULT_CONTEXT_ID)
+
+    scopes = normalize_scopes(payload.scopes)
     service_id = getattr(payload, "service_id", None) or payload.service_name
 
     if mongo.find_one_with_context(
@@ -114,8 +221,9 @@ async def register_internal_service(
         {
             "service_name": payload.service_name,
             "owner_type": "platform",
+            "internal": True,
         },
-        context_id="default",
+        context_id=DEFAULT_CONTEXT_ID,
     ):
         raise HTTPException(status_code=400, detail="Service already exists")
 
@@ -124,13 +232,13 @@ async def register_internal_service(
         "service_id": service_id,
         "owner_type": "platform",
         "internal": True,
-        "context_id": "default",
-        "scopes": payload.scopes,
+        "context_id": DEFAULT_CONTEXT_ID,
+        "scopes": scopes,
         "enabled": True,
         "created_at": datetime.now(UTC),
     }
 
-    svc_id = mongo.insert_one("service_accounts", svc_doc, context_id="default")
+    svc_id = mongo.insert_one("service_accounts", svc_doc, context_id=DEFAULT_CONTEXT_ID)
 
     audit.log(
         event="internal_service_registered",
@@ -138,6 +246,7 @@ async def register_internal_service(
         metadata={
             "service_name": payload.service_name,
             "service_id": service_id,
+            "context_id": DEFAULT_CONTEXT_ID,
         },
         request=request,
     )
@@ -147,6 +256,7 @@ async def register_internal_service(
         "service_id": str(svc_id),
         "service_account_id": service_id,
         "service_name": payload.service_name,
+        "context_id": DEFAULT_CONTEXT_ID,
     }
 
 
@@ -157,40 +267,31 @@ async def register_customer_service(
     context=Depends(get_context),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
-    identity = context["identity"]
-    mongo = get_mongo()
+    """
+    Register customer/user-created service accounts.
 
+    Core/free: allowed in context_id="default".
+    Enterprise: requires non-default org context.
+    """
+    mongo = get_mongo()
     require_scopes("orgs:keys:write")(context)
 
-    if identity.get("type") != "user":
-        audit.log(
-            event="customer_service_register_denied",
-            identity=identity,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "non_user_identity"},
-            request=request,
-        )
-        raise HTTPException(403, "user identity required")
+    identity_doc, context_id = get_customer_context_or_raise(
+        context=context,
+        request=request,
+        audit=audit,
+        deny_event="customer_service_register_denied",
+    )
 
-    context_id = context.get("context_id")
-
-    if not context_id or context_id == "default":
-        audit.log(
-            event="customer_service_register_denied",
-            identity=identity,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "org_context_required"},
-            request=request,
-        )
-        raise HTTPException(403, "organization context required")
+    scopes = normalize_scopes(payload.scopes)
+    validate_admin_scope_assignment(scopes, identity_doc.get("scopes", []))
 
     if mongo.find_one_with_context(
         "service_accounts",
         {
             "service_name": payload.service_name,
             "owner_type": "customer",
+            "internal": {"$ne": True},
         },
         context_id=context_id,
     ):
@@ -202,17 +303,17 @@ async def register_customer_service(
         "owner_type": "customer",
         "internal": False,
         "context_id": context_id,
-        "scopes": payload.scopes,
+        "scopes": scopes,
         "enabled": True,
         "created_at": datetime.now(UTC),
-        "created_by": identity.get("email"),
+        "created_by": identity_doc.get("email"),
     }
 
     svc_id = mongo.insert_one("service_accounts", svc_doc, context_id=context_id)
 
     audit.log(
         event="customer_service_registered",
-        identity=identity,
+        identity=identity_doc,
         metadata={
             "service_name": payload.service_name,
             "context_id": context_id,
@@ -234,34 +335,15 @@ async def list_services(
     context=Depends(get_context),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
-    identity = context["identity"]
     mongo = get_mongo()
-
     require_scopes("orgs:keys:read")(context)
 
-    if identity.get("type") != "user":
-        audit.log(
-            event="services_list_denied",
-            identity=identity,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "non_user_identity"},
-            request=request,
-        )
-        raise HTTPException(403, "user identity required")
-
-    context_id = context.get("context_id")
-
-    if not context_id or context_id == "default":
-        audit.log(
-            event="services_list_denied",
-            identity=identity,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "org_context_required"},
-            request=request,
-        )
-        raise HTTPException(403, "organization context required")
+    identity_doc, context_id = get_customer_context_or_raise(
+        context=context,
+        request=request,
+        audit=audit,
+        deny_event="services_list_denied",
+    )
 
     services = mongo.find_with_context(
         "service_accounts",
@@ -274,7 +356,7 @@ async def list_services(
 
     audit.log(
         event="customer_services_listed",
-        identity=identity,
+        identity=identity_doc,
         metadata={
             "count": len(services),
             "context_id": context_id,
@@ -284,6 +366,7 @@ async def list_services(
 
     return {
         "count": len(services),
+        "context_id": context_id,
         "services": [
             {
                 "id": str(s.get("_id")),
@@ -294,6 +377,7 @@ async def list_services(
                 "enabled": s.get("enabled", True),
                 "created_at": s.get("created_at"),
                 "created_by": s.get("created_by"),
+                "context_id": s.get("context_id"),
             }
             for s in services
         ],
@@ -307,34 +391,15 @@ async def set_service_scopes(
     context=Depends(get_context),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
-    identity = context["identity"]
     mongo = get_mongo()
-
     require_scopes("orgs:keys:write")(context)
 
-    if identity.get("type") != "user":
-        audit.log(
-            event="service_scope_update_denied",
-            identity=identity,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "non_user_identity"},
-            request=request,
-        )
-        raise HTTPException(403, "user identity required")
-
-    context_id = context.get("context_id")
-
-    if not context_id or context_id == "default":
-        audit.log(
-            event="service_scope_update_denied",
-            identity=identity,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "org_context_required"},
-            request=request,
-        )
-        raise HTTPException(403, "organization context required")
+    identity_doc, context_id = get_customer_context_or_raise(
+        context=context,
+        request=request,
+        audit=audit,
+        deny_event="service_scope_update_denied",
+    )
 
     svc = mongo.find_one_with_context(
         "service_accounts",
@@ -349,7 +414,7 @@ async def set_service_scopes(
     if not svc:
         audit.log(
             event="service_lookup_failed",
-            identity=identity,
+            identity=identity_doc,
             result="failure",
             severity="WARNING",
             metadata={
@@ -360,27 +425,27 @@ async def set_service_scopes(
         )
         raise HTTPException(status_code=404, detail="Service not found")
 
-    caller_scopes = identity.get("scopes", [])
-    validate_admin_scope_assignment(payload.scopes, caller_scopes)
+    scopes = normalize_scopes(payload.scopes)
+    validate_admin_scope_assignment(scopes, identity_doc.get("scopes", []))
 
     mongo.update_one(
         "service_accounts",
         {"_id": svc["_id"]},
         {
             "$set": {
-                "scopes": payload.scopes,
+                "scopes": scopes,
                 "updated_at": datetime.now(UTC),
             }
         },
-        context_id=context_id
+        context_id=context_id,
     )
 
     audit.log(
         event="customer_service_scopes_updated",
-        identity=identity,
+        identity=identity_doc,
         metadata={
             "service": payload.service_name,
-            "scopes": payload.scopes,
+            "scopes": scopes,
             "context_id": context_id,
         },
         request=request,
@@ -389,7 +454,8 @@ async def set_service_scopes(
     return {
         "ok": True,
         "service": payload.service_name,
-        "scopes": payload.scopes,
+        "scopes": scopes,
+        "context_id": context_id,
     }
 
 
@@ -400,34 +466,15 @@ async def create_service_token_api(
     context=Depends(get_context),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
-    identity = context["identity"]
     mongo = get_mongo()
-
     require_scopes("orgs:keys:write")(context)
 
-    if identity.get("type") != "user":
-        audit.log(
-            event="service_token_denied",
-            identity=identity,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "non_user_identity"},
-            request=request,
-        )
-        raise HTTPException(403, "user identity required")
-
-    context_id = context.get("context_id")
-
-    if not context_id or context_id == "default":
-        audit.log(
-            event="service_token_denied",
-            identity=identity,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "org_context_required"},
-            request=request,
-        )
-        raise HTTPException(403, "organization context required")
+    identity_doc, context_id = get_customer_context_or_raise(
+        context=context,
+        request=request,
+        audit=audit,
+        deny_event="service_token_denied",
+    )
 
     svc = mongo.find_one_with_context(
         "service_accounts",
@@ -443,7 +490,7 @@ async def create_service_token_api(
     if not svc:
         audit.log(
             event="service_lookup_failed",
-            identity=identity,
+            identity=identity_doc,
             result="failure",
             severity="WARNING",
             metadata={
@@ -454,8 +501,8 @@ async def create_service_token_api(
         )
         raise HTTPException(status_code=404, detail="Service not found or disabled")
 
-    requested_scopes = payload.scopes or []
-    allowed_scopes = set(svc.get("scopes", []))
+    requested_scopes = normalize_scopes(payload.scopes)
+    allowed_scopes = set(normalize_scopes(svc.get("scopes", [])))
 
     if "*" not in allowed_scopes:
         invalid_scopes = [
@@ -466,7 +513,7 @@ async def create_service_token_api(
         if invalid_scopes:
             audit.log(
                 event="service_token_scope_denied",
-                identity=identity,
+                identity=identity_doc,
                 result="failure",
                 severity="WARNING",
                 metadata={
@@ -476,7 +523,7 @@ async def create_service_token_api(
                 },
                 request=request,
             )
-            raise HTTPException(403, "requested scopes exceed service account grants")
+            raise HTTPException(status_code=403, detail="requested scopes exceed service account grants")
 
     token = create_service_token_for_context(
         service_id=str(svc["_id"]),
@@ -487,7 +534,7 @@ async def create_service_token_api(
 
     audit.log(
         event="customer_service_token_created",
-        identity=identity,
+        identity=identity_doc,
         metadata={
             "service": payload.service,
             "scopes": requested_scopes,
@@ -499,6 +546,7 @@ async def create_service_token_api(
     return {
         "access_token": token,
         "token_type": "bearer",
+        "context_id": context_id,
     }
 
 
@@ -510,6 +558,7 @@ async def create_internal_service_token_api(
     audit: AuditLogger = Depends(get_audit_logger),
 ):
     mongo = get_mongo()
+    set_request_context(request, DEFAULT_CONTEXT_ID)
 
     svc = mongo.find_one_with_context(
         "service_accounts",
@@ -519,7 +568,7 @@ async def create_internal_service_token_api(
             "internal": True,
             "enabled": True,
         },
-        context_id="default",
+        context_id=DEFAULT_CONTEXT_ID,
     )
 
     if not svc:
@@ -528,13 +577,16 @@ async def create_internal_service_token_api(
             identity=identity,
             result="failure",
             severity="WARNING",
-            metadata={"service_name": payload.service},
+            metadata={
+                "service_name": payload.service,
+                "context_id": DEFAULT_CONTEXT_ID,
+            },
             request=request,
         )
         raise HTTPException(status_code=404, detail="Internal service not found or disabled")
 
-    requested_scopes = payload.scopes or []
-    allowed_scopes = set(svc.get("scopes", []))
+    requested_scopes = normalize_scopes(payload.scopes)
+    allowed_scopes = set(normalize_scopes(svc.get("scopes", [])))
 
     if "*" not in allowed_scopes:
         invalid_scopes = [
@@ -550,17 +602,18 @@ async def create_internal_service_token_api(
                 severity="WARNING",
                 metadata={
                     "service": payload.service,
+                    "context_id": DEFAULT_CONTEXT_ID,
                     "invalid_scopes": invalid_scopes,
                 },
                 request=request,
             )
-            raise HTTPException(403, "requested scopes exceed service account grants")
+            raise HTTPException(status_code=403, detail="requested scopes exceed service account grants")
 
     token = create_service_token_for_context(
         service_id=str(svc["_id"]),
         service_name=svc["service_name"],
         scopes=requested_scopes,
-        context_id="default",
+        context_id=DEFAULT_CONTEXT_ID,
     )
 
     audit.log(
@@ -569,6 +622,7 @@ async def create_internal_service_token_api(
         metadata={
             "service": payload.service,
             "scopes": requested_scopes,
+            "context_id": DEFAULT_CONTEXT_ID,
         },
         request=request,
     )
@@ -576,6 +630,7 @@ async def create_internal_service_token_api(
     return {
         "access_token": token,
         "token_type": "bearer",
+        "context_id": DEFAULT_CONTEXT_ID,
     }
 
 
@@ -586,34 +641,15 @@ async def delete_service(
     context=Depends(get_context),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
-    identity = context["identity"]
     mongo = get_mongo()
-
     require_scopes("orgs:keys:write")(context)
 
-    if identity.get("type") != "user":
-        audit.log(
-            event="service_delete_denied",
-            identity=identity,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "non_user_identity"},
-            request=request,
-        )
-        raise HTTPException(403, "user identity required")
-
-    context_id = context.get("context_id")
-
-    if not context_id or context_id == "default":
-        audit.log(
-            event="service_delete_denied",
-            identity=identity,
-            result="failure",
-            severity="WARNING",
-            metadata={"reason": "org_context_required"},
-            request=request,
-        )
-        raise HTTPException(403, "organization context required")
+    identity_doc, context_id = get_customer_context_or_raise(
+        context=context,
+        request=request,
+        audit=audit,
+        deny_event="service_delete_denied",
+    )
 
     svc = mongo.find_one_with_context(
         "service_accounts",
@@ -628,7 +664,7 @@ async def delete_service(
     if not svc:
         audit.log(
             event="service_lookup_failed",
-            identity=identity,
+            identity=identity_doc,
             result="failure",
             severity="WARNING",
             metadata={
@@ -642,12 +678,12 @@ async def delete_service(
     mongo.delete_one(
         "service_accounts",
         {"_id": svc["_id"]},
-        context_id=context_id
+        context_id=context_id,
     )
 
     audit.log(
         event="customer_service_deleted",
-        identity=identity,
+        identity=identity_doc,
         metadata={
             "service_name": service_name,
             "context_id": context_id,
@@ -658,4 +694,5 @@ async def delete_service(
     return {
         "ok": True,
         "deleted": service_name,
+        "context_id": context_id,
     }

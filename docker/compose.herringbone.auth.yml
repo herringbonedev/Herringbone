@@ -1,15 +1,15 @@
 services:
   herringbone-auth:
-    image: quay.io/herringbone/herringbone-auth:1dc635f1@sha256:a8d30b13807a58d20ad26ca202c91057674a6a8b3f2ffa0fb5e33951c550662e
+    image: quay.io/herringbone/herringbone-auth:45d9bca8@sha256:47a55fd2900cad0c5dbeec6ba272efd3e0481dab1c9772ee100b0777bb8191c2
     user: 65532:65532
     restart: unless-stopped
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
-    - herringbone
+      - herringbone
     expose:
-    - "7001"
+      - "7001"
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -25,17 +25,17 @@ services:
       HERRINGBONE_UNIT: herringbone
       HERRINGBONE_ELEMENT: auth
     secrets:
-    - jwt_secret
-    - service_jwt_private_key
-    - service_jwt_public_key
-    - bootstrap_token
+      - jwt_secret
+      - service_jwt_private_key
+      - service_jwt_public_key
+      - bootstrap_token
     read_only: true
     tmpfs:
-    - /tmp
+      - /tmp
     security_opt:
-    - no-new-privileges:true
+      - no-new-privileges:true
     cap_drop:
-    - ALL
+      - ALL
     deploy:
       replicas: ${HERRINGBONE_AUTH_REPLICAS:-3}
 secrets:

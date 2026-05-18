@@ -14,7 +14,53 @@ class CardSchema:
                     "type": "object",
                     "properties": {
                         "type": {"type": "string"},
-                        "value": {"type": "string"}
+                        "value": {"type": "string"},
+                        "not": {
+                            "anyOf": [
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {"type": "string"},
+                                        "value": {"type": "string"}
+                                    },
+                                    "required": ["type", "value"]
+                                },
+                                {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "type": {"type": "string"},
+                                            "value": {"type": "string"}
+                                        },
+                                        "required": ["type", "value"]
+                                    }
+                                }
+                            ]
+                        },
+                        "and_not": {
+                            "anyOf": [
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {"type": "string"},
+                                        "value": {"type": "string"}
+                                    },
+                                    "required": ["type", "value"]
+                                },
+                                {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "type": {"type": "string"},
+                                            "value": {"type": "string"}
+                                        },
+                                        "required": ["type", "value"]
+                                    }
+                                }
+                            ]
+                        }
                     },
                     "required": ["type", "value"]
                 },

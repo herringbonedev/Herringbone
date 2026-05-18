@@ -17,17 +17,96 @@ from app.routers.cardset import (
 
 
 class FakeMongo:
-    def find_one(self, *args, **kwargs):
-        return None
+    store = []
 
-    def find(self, *args, **kwargs):
-        return []
+    def __init__(self):
+        pass
 
-    def insert_one(self, *args, **kwargs):
+    @staticmethod
+    def _get_nested(doc, dotted_key):
+        value = doc
+        for part in dotted_key.split("."):
+            if not isinstance(value, dict):
+                return None
+            value = value.get(part)
+        return value
+
+    @classmethod
+    def _matches(cls, doc, query):
+        for key, expected in (query or {}).items():
+            actual = cls._get_nested(doc, key) if "." in key else doc.get(key)
+
+            if isinstance(expected, dict):
+                if "$ne" in expected and actual == expected["$ne"]:
+                    return False
+                continue
+
+            if actual != expected:
+                return False
+
         return True
 
-    def upsert_one(self, *args, **kwargs):
-        return "fake_id"
+    def find_one(self, collection, query=None, *args, **kwargs):
+        return self.find_one_with_context(
+            collection,
+            query or {},
+            context_id=kwargs.get("context_id", "default"),
+        )
+
+    def find(self, collection, query=None, *args, **kwargs):
+        return self.find_with_context(
+            collection,
+            query or {},
+            context_id=kwargs.get("context_id", "default"),
+            limit=kwargs.get("limit"),
+        )
+
+    def find_one_with_context(self, collection, query=None, context_id="default", *args, **kwargs):
+        rows = self.find_with_context(collection, query or {}, context_id=context_id, limit=1)
+        return rows[0] if rows else None
+
+    def find_with_context(self, collection, query=None, context_id="default", limit=None, *args, **kwargs):
+        rows = []
+        for doc in self.store:
+            if doc.get("_collection") != collection:
+                continue
+            if doc.get("context_id", "default") != (context_id or "default"):
+                continue
+            if self._matches(doc, query or {}):
+                rows.append(dict(doc))
+                if limit and len(rows) >= limit:
+                    break
+        return rows
+
+    def insert_one(self, collection, document, context_id="default", *args, **kwargs):
+        doc = dict(document)
+        doc.setdefault("_id", f"fake-{len(self.store) + 1}")
+        doc.setdefault("_collection", collection)
+        doc.setdefault("context_id", context_id or "default")
+        self.store.append(doc)
+        return doc["_id"]
+
+    def upsert_one(self, collection, filter_query, update, context_id="default", *args, **kwargs):
+        for doc in self.store:
+            if doc.get("_collection") == collection and doc.get("context_id", "default") == (context_id or "default") and self._matches(doc, filter_query):
+                doc.update(update)
+                return doc.get("_id", "fake_id")
+
+        doc = dict(update)
+        doc.setdefault("_id", f"fake-{len(self.store) + 1}")
+        doc.setdefault("_collection", collection)
+        doc.setdefault("context_id", context_id or "default")
+
+        # Preserve selector fields from dotted filter queries for simple test readbacks.
+        if "selector.type" in filter_query or "selector.value" in filter_query:
+            doc.setdefault("selector", {})
+            if "selector.type" in filter_query:
+                doc["selector"]["type"] = filter_query["selector.type"]
+            if "selector.value" in filter_query:
+                doc["selector"]["value"] = filter_query["selector.value"]
+
+        self.store.append(doc)
+        return doc["_id"]
 
 
 def override_mongo():
@@ -116,6 +195,8 @@ def integration_mongo_env(mongo_container):
 def client(request, mongo_container):
 
     is_integration = request.node.get_closest_marker("integration") is not None
+    if not is_integration:
+        FakeMongo.store = []
 
     # root auth override (required for require_context)
     app.dependency_overrides[get_identity] = fake_read_identity

@@ -36,9 +36,15 @@ def app(fake_identity):
     # override root auth dependency
     app.dependency_overrides[get_identity] = lambda: fake_identity
 
-    # override route-level scope dependencies
-    app.dependency_overrides[search.search_query_auth] = lambda: fake_identity
-    app.dependency_overrides[search.search_schema_auth] = lambda: fake_identity
+    # override route-level scope dependencies when exported by the router
+    search_query_auth = getattr(search, "search_query_auth", None)
+    search_schema_auth = getattr(search, "search_schema_auth", None)
+
+    if search_query_auth is not None:
+        app.dependency_overrides[search_query_auth] = lambda: fake_identity
+
+    if search_schema_auth is not None:
+        app.dependency_overrides[search_schema_auth] = lambda: fake_identity
 
     app.include_router(search.router)
 

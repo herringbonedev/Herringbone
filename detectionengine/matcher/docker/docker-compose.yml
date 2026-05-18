@@ -1,12 +1,10 @@
-version: "3.8"
-
 services:
   detectionengine-matcher:
     container_name: detectionengine-matcher
 
     build:
       context: ../../..
-      dockerfile: herringbone/matcher/docker/Dockerfile
+      dockerfile: detectionengine/matcher/docker/Dockerfile
 
     restart: unless-stopped
 
