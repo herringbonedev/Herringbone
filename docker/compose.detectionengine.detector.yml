@@ -4,7 +4,6 @@ services:
     restart: unless-stopped
     networks:
       - herringbone
-
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -12,67 +11,49 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-
       EVENTS_COLLECTION_NAME: events
       EVENT_STATUS_COLLECTION_NAME: event_state
       RULES_COLLECTION_NAME: rules
       DETECTIONS_COLLECTION_NAME: detections
-
       MATCHER_API: http://detectionengine-matcher:7003/detectionengine/matcher/find_match
       MATCHER_BATCH_API: http://detectionengine-matcher:7003/detectionengine/matcher/find_matches_batch
-
       ORCHESTRATOR_URL: http://incidents-orchestrator:7013/incidents/orchestrator/process_detection
-
       HERRINGBONE_SERVICE: detectionengine-detector
       HERRINGBONE_UNIT: detectionengine
       HERRINGBONE_ELEMENT: detector
-
       CONTEXT_ID: ${CONTEXT_ID:-default}
       HB_ENTERPRISE: ${HB_ENTERPRISE:-false}
       INCLUDE_MISSING_DEFAULT_CONTEXT: ${INCLUDE_MISSING_DEFAULT_CONTEXT:-false}
-
       DETECTOR_BATCH_SIZE: ${DETECTOR_BATCH_SIZE:-250}
       DETECTOR_EVENT_WORKERS: ${DETECTOR_EVENT_WORKERS:-8}
       DETECTOR_MATCH_WORKERS: ${DETECTOR_MATCH_WORKERS:-32}
       DETECTOR_POLL_INTERVAL: ${DETECTOR_POLL_INTERVAL:-0.01}
       DETECTOR_CLAIM_LEASE_SECONDS: ${DETECTOR_CLAIM_LEASE_SECONDS:-300}
-
       DETECTOR_USE_MATCHER_BATCH: ${DETECTOR_USE_MATCHER_BATCH:-true}
       DETECTOR_MATCHER_BATCH_FALLBACK: ${DETECTOR_MATCHER_BATCH_FALLBACK:-true}
       MATCHER_HTTP_POOL_SIZE: ${MATCHER_HTTP_POOL_SIZE:-64}
       MATCHER_BATCH_TIMEOUT: ${MATCHER_BATCH_TIMEOUT:-30}
-
       DETECTOR_NOTIFY_ORCHESTRATOR: ${DETECTOR_NOTIFY_ORCHESTRATOR:-true}
       DETECTOR_WRITE_DETECTIONS: ${DETECTOR_WRITE_DETECTIONS:-true}
-
       MONGO_MAX_POOL_SIZE: ${MONGO_MAX_POOL_SIZE:-100}
-
     read_only: true
-
     tmpfs:
       - /tmp
-
     security_opt:
       - no-new-privileges:true
-
     secrets:
       - service_token
       - service_jwt_public_key
       - jwt_secret
-
     deploy:
       replicas: ${DETECTIONENGINE_DETECTOR_REPLICAS:-3}
-
 secrets:
   service_token:
     file: ./secrets/runtime/detectionengine_detector_service_token
-
   service_jwt_public_key:
     file: ./secrets/runtime/service_jwt_public_key
-
   jwt_secret:
     file: ./secrets/runtime/jwt_secret
-
 networks:
   herringbone:
     external: true
