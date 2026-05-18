@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from app.matchengine import MatchEngine
 
-from modules.auth.auth import require_internal_scopes, get_context
+from modules.auth.auth import require_internal_scopes
 from modules.audit.logger import AuditLogger
 
 
@@ -21,10 +21,6 @@ audit = AuditLogger()
 
 
 class RuleMatchRequest(BaseModel):
-    """
-    Input to the matcher microservice.
-    Contains the rule JSON and the log JSON.
-    """
     rule: Dict[str, Any] = Field(..., description="Rule JSON")
     log_data: Dict[str, Any] = Field(..., description="Log JSON to evaluate")
 
@@ -32,13 +28,39 @@ class RuleMatchRequest(BaseModel):
 
 
 class RuleMatchResponse(BaseModel):
-    """
-    Output from the matcher microservice.
-    """
     matched: bool
     details: str
     rule: Dict[str, Any]
     log_data: Dict[str, Any]
+
+
+class BatchRuleMatchItem(BaseModel):
+    item_id: Optional[str | int] = None
+    rule: Dict[str, Any] = Field(..., description="Rule JSON")
+    log_data: Dict[str, Any] = Field(..., description="Log JSON to evaluate")
+
+    model_config = ConfigDict(extra="allow")
+
+
+class BatchRuleMatchRequest(BaseModel):
+    items: List[BatchRuleMatchItem] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="allow")
+
+
+class BatchRuleMatchResult(BaseModel):
+    item_id: Optional[str | int] = None
+    matched: bool
+    details: str
+    status: int = 200
+    rule: Dict[str, Any]
+    log_data: Dict[str, Any]
+
+
+class BatchRuleMatchResponse(BaseModel):
+    count: int
+    matched_count: int
+    results: List[BatchRuleMatchResult]
 
 
 @router.post("/find_match", response_model=RuleMatchResponse)
@@ -47,12 +69,7 @@ async def find_match(
     request: Request,
     identity=Depends(run_matchengine),
 ):
-    """
-    Uses a rule and log entry to find any matches.
-    """
-
     try:
-
         result = matchengine(payload.rule, payload.log_data)
 
         body = RuleMatchResponse(
@@ -69,6 +86,7 @@ async def find_match(
             metadata={
                 "matched": result["is_matched"],
                 "status": result["status"],
+                "batch": False,
             },
         )
 
@@ -78,30 +96,64 @@ async def find_match(
         )
 
     except Exception as e:
-
         audit.log(
             event="matcher_rule_failed",
             identity=identity,
             request=request,
             result="failure",
             severity="ERROR",
-            metadata={"error": str(e)},
+            metadata={"error": str(e), "batch": False},
+        )
+        raise
+
+
+@router.post("/find_matches_batch", response_model=BatchRuleMatchResponse)
+async def find_matches_batch(
+    payload: BatchRuleMatchRequest,
+    request: Request,
+    identity=Depends(run_matchengine),
+):
+    try:
+        raw_items = [item.model_dump() for item in payload.items]
+        results = matchengine.match_many(raw_items)
+        matched_count = sum(1 for item in results if item.get("matched"))
+
+        body = BatchRuleMatchResponse(
+            count=len(results),
+            matched_count=matched_count,
+            results=[BatchRuleMatchResult(**item) for item in results],
         )
 
+        audit.log(
+            event="matcher_batch_evaluated",
+            identity=identity,
+            request=request,
+            metadata={
+                "count": len(results),
+                "matched_count": matched_count,
+                "batch": True,
+            },
+        )
+
+        return body
+
+    except Exception as e:
+        audit.log(
+            event="matcher_batch_failed",
+            identity=identity,
+            request=request,
+            result="failure",
+            severity="ERROR",
+            metadata={"error": str(e), "batch": True},
+        )
         raise
 
 
 @router.get("/livez")
 async def livez():
-    """
-    Liveness probe endpoint.
-    """
     return {"status": "ok"}
 
 
 @router.get("/readyz")
 async def readyz():
-    """
-    Readiness probe endpoint.
-    """
     return {"ready": True}

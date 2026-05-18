@@ -175,11 +175,33 @@ def get_raw_db(mongo):
     return None
 
 
+def _json_safe(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+
+    if isinstance(value, dict):
+        return {
+            k: _json_safe(v)
+            for k, v in value.items()
+            if not str(k).startswith("_")
+        }
+
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+
+    # Compiled regex objects are not JSON serializable.
+    # They are runtime-only cache fields and should never be sent to extractor.
+    if hasattr(value, "pattern") and hasattr(value, "search"):
+        return getattr(value, "pattern", str(value))
+
+    return value
+
+
 def sanitize_card(card: dict) -> dict:
     return {
-        k: (v.isoformat() if isinstance(v, datetime) else v)
+        k: _json_safe(v)
         for k, v in card.items()
-        if k != "_id"
+        if k != "_id" and not str(k).startswith("_")
     }
 
 
@@ -229,13 +251,16 @@ def _selector_positive_matches(selector: dict, event: dict) -> bool:
         return False
 
     raw = event.get("raw", "") or ""
-    
+
+    # Existing behavior: exact source.address match
     if stype == "source_address":
         return event.get("source", {}).get("address") == value
-    
+
+    # Existing behavior: simple raw substring match
     if stype == "raw":
         return str(value) in raw
-    
+
+    # New behavior: regex selector against raw log
     if stype == "raw_regex":
         try:
             return re.search(str(value), raw) is not None
@@ -442,6 +467,8 @@ def prepare_cards(cards: List[dict]) -> dict:
       - source_address selector: O(1) lookup
       - raw selector: substring checks only for raw selector cards
       - other selector types: conservative fallback list
+
+    New:
       - raw_regex selector: regex match against raw log
       - selector.not / selector.and_not: optional negative match rules
     """

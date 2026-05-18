@@ -244,3 +244,85 @@ defaultScopes.forEach(scope => {
 
 print("Default org ensured")
 print("Scopes seeded or updated")
+
+db.events.createIndex(
+  { context_id: 1, _id: -1 },
+  { name: "idx_events_context_id_desc" }
+)
+
+db.events.createIndex(
+  { context_id: 1, ingested_at: -1 },
+  { name: "idx_events_context_ingested_at_desc" }
+)
+
+db.event_state.createIndex(
+  {
+    context_id: 1,
+    parsed: 1,
+    claimed: 1,
+    lease_expires_at: 1,
+    created_at: 1,
+    _id: 1
+  },
+  { name: "idx_event_state_parser_claim" }
+)
+
+db.event_state.createIndex(
+  {
+    context_id: 1,
+    parsed: 1,
+    detected: 1,
+    detection_claimed: 1,
+    detection_lease_expires_at: 1,
+    created_at: 1,
+    _id: 1
+  },
+  { name: "idx_event_state_detector_claim" }
+)
+
+db.event_state.createIndex(
+  { context_id: 1, event_id: 1 },
+  { name: "idx_event_state_context_event_id" }
+)
+
+db.event_state.createIndex(
+  { context_id: 1, parsed: 1, detected: 1 },
+  { name: "idx_event_state_context_parsed_detected" }
+)
+
+db.parse_cards.createIndex(
+  { context_id: 1 },
+  { name: "idx_parse_cards_context" }
+)
+
+db.parse_cards.createIndex(
+  { context_id: 1, "selector.type": 1, "selector.value": 1 },
+  { name: "idx_parse_cards_context_selector" }
+)
+
+db.parse_results.createIndex(
+  { context_id: 1, event_id: 1 },
+  { name: "idx_parse_results_context_event_id" }
+)
+
+db.rules.createIndex(
+  { context_id: 1 },
+  { name: "idx_rules_context" }
+)
+
+db.detections.createIndex(
+  { context_id: 1, event_id: 1, rule_id: 1 },
+  { name: "idx_detections_context_event_rule" }
+)
+
+db.detections.createIndex(
+  { context_id: 1, inserted_at: -1 },
+  { name: "idx_detections_context_inserted_at_desc" }
+)
+
+db.incidents.createIndex(
+  { context_id: 1, created_at: -1 },
+  { name: "idx_incidents_context_created_at_desc" }
+)
+
+print("Performance indexes ensured")

@@ -1,15 +1,26 @@
+import os
 import re
+from functools import lru_cache
 from typing import Any, Iterable
 
-class MatchEngine:
 
+DEBUG_MATCHER = os.environ.get("MATCHER_DEBUG", "false").lower() == "true"
+REGEX_CACHE_SIZE = int(os.environ.get("MATCHER_REGEX_CACHE_SIZE", 4096))
+
+
+@lru_cache(maxsize=REGEX_CACHE_SIZE)
+def _compile_regex(pattern: str):
+    return re.compile(pattern)
+
+
+class MatchEngine:
     def __call__(self, rule: dict, log: dict) -> dict:
-        print(f"[*] Incoming log to match\n{log}\n[*] Rule\n{rule}")
+        if DEBUG_MATCHER:
+            print(f"[*] Incoming log to match\n{log}\n[*] Rule\n{rule}")
         return self.match(rule, log)
 
     def match(self, rule: dict, log: dict) -> dict:
         if "regex" in rule:
-            print("[*] Regex rule detected")
             return self._match_regex(rule, log)
 
         return {
@@ -17,6 +28,37 @@ class MatchEngine:
             "details": "Could not find valid rule type",
             "status": 400,
         }
+
+    def match_many(self, items: list[dict]) -> list[dict]:
+        results = []
+        for idx, item in enumerate(items):
+            item_id = item.get("item_id", idx)
+            rule = item.get("rule") or {}
+            log_data = item.get("log_data") or {}
+            try:
+                result = self.match(rule, log_data)
+                results.append(
+                    {
+                        "item_id": item_id,
+                        "matched": bool(result.get("is_matched")),
+                        "details": result.get("details", ""),
+                        "status": int(result.get("status", 200)),
+                        "rule": rule,
+                        "log_data": log_data,
+                    }
+                )
+            except Exception as e:
+                results.append(
+                    {
+                        "item_id": item_id,
+                        "matched": False,
+                        "details": str(e),
+                        "status": 500,
+                        "rule": rule,
+                        "log_data": log_data,
+                    }
+                )
+        return results
 
     def _resolve_key_path(self, key_path: str, log: dict) -> Any:
         if not key_path:
@@ -34,9 +76,6 @@ class MatchEngine:
         return value
 
     def _values_as_iterable(self, value: Any) -> Iterable[str]:
-        """
-        Normalize value to iterable of strings.
-        """
         if isinstance(value, str):
             return [value]
 
@@ -48,11 +87,17 @@ class MatchEngine:
     def _match_regex(self, rule: dict, log: dict) -> dict:
         regex = rule.get("regex")
         key_path = rule.get("key")
-        
+
+        if not regex:
+            return {
+                "is_matched": False,
+                "details": "Missing regex",
+                "status": 400,
+            }
+
         value = self._resolve_key_path(key_path, log)
 
         if value is None:
-            print("[!] Key path not found, falling back to raw")
             value = log.get("raw")
 
         values = self._values_as_iterable(value)
@@ -65,10 +110,9 @@ class MatchEngine:
             }
 
         try:
-            matched = any(re.search(regex, v) for v in values)
-
-            print(f"[✓] Regex evaluated against {values}")
-            print(f"[✓] Match result: {matched}")
+            safe_pattern = re.escape(str(regex))
+            compiled = _compile_regex(safe_pattern)
+            matched = any(compiled.search(v) for v in values)
 
             return {
                 "is_matched": matched,
@@ -77,9 +121,6 @@ class MatchEngine:
             }
 
         except re.error as e:
-
-            print(f"[✗] Error: {e}")
-            
             return {
                 "is_matched": False,
                 "details": f"Regex error: {str(e)}",
