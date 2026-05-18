@@ -1,6 +1,6 @@
 services:
   parser-enrichment:
-    image: quay.io/herringbone/parser-enrichment:10ac235b@sha256:00a0d1d362d3bea9a47bb25860898da0da4693b884c85805d5ebbbe65ebc44cc
+    image: quay.io/herringbone/parser-enrichment:096586aa@sha256:649a4dc6b8e452e1635d60de642d74da3959bf659e5ec0ecd03eeeadb9a4cd20
     restart: unless-stopped
     user: 65532:65532
     read_only: true
@@ -15,7 +15,6 @@ services:
     working_dir: /app-root
     environment:
       PYTHONPATH: /app-root:/python-packages:/modules
-
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
       MONGO_USER: ${MONGO_USER}
@@ -40,17 +39,13 @@ services:
       EXTRACTOR_FALLBACK_ENABLED: ${EXTRACTOR_FALLBACK_ENABLED:-true}
       DEBUG_BATCH_CLAIMS: ${DEBUG_BATCH_CLAIMS:-false}
       DEBUG_BATCH_COUNTS: ${DEBUG_BATCH_COUNTS:-false}
-
     secrets:
       - service_token
       - service_jwt_public_key
-
     depends_on:
       - mongodb
-
     deploy:
       replicas: ${PARSER_ENRICHMENT_REPLICAS:-3}
-
 secrets:
   service_token:
     file: ./secrets/runtime/parser_enrichment_service_token
