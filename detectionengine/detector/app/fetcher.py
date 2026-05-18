@@ -124,6 +124,106 @@ def fetch_events_for_statuses(statuses: list[dict], context_id: str) -> dict[str
     return by_key
 
 
+def _all_event_id_forms(event_id: Any) -> list[Any]:
+    """
+    Return both string and ObjectId forms for event lookups. Herringbone has
+    historically stored event linkage as either events._id ObjectId, stringified
+    ObjectId, event_id, or event_object_id depending on service/version.
+    """
+    forms = []
+    if event_id is None:
+        return forms
+
+    forms.append(event_id)
+    forms.append(str(event_id))
+
+    if isinstance(event_id, str) and ObjectId.is_valid(event_id):
+        forms.append(ObjectId(event_id))
+
+    normalized = normalize_event_lookup_id(event_id)
+    forms.append(normalized)
+    forms.append(str(normalized))
+
+    out = []
+    seen = set()
+    for item in forms:
+        key = f"{type(item).__name__}:{item}"
+        if key not in seen:
+            out.append(item)
+            seen.add(key)
+    return out
+
+
+def fetch_parse_results_for_statuses(statuses: list[dict], context_id: str) -> dict[str, dict]:
+    """
+    Load parser output for the claimed events and return:
+        {str(event_id): {field: [values...]}}
+
+    Detector was waiting for event_state.parsed=True, but only sent the raw
+    event document to the matcher. That meant rules targeting parsed fields
+    such as parsed.command, parsed.run_as, etc. could never match even though
+    parse_results contained the expected values.
+    """
+    collection = os.environ.get("PARSE_RESULTS_COLLECTION", "parse_results")
+    raw_event_ids = [s.get("event_id") for s in statuses if s.get("event_id") is not None]
+
+    lookup_ids = []
+    seen = set()
+    for eid in raw_event_ids:
+        for form in _all_event_id_forms(eid):
+            key = f"{type(form).__name__}:{form}"
+            if key not in seen:
+                lookup_ids.append(form)
+                seen.add(key)
+
+    if not lookup_ids:
+        return {}
+
+    query = {
+        "$or": [
+            {"event_id": {"$in": lookup_ids}},
+            {"event_object_id": {"$in": lookup_ids}},
+        ]
+    }
+
+    try:
+        mongo = mongo_db()
+        rows = mongo.find_with_context(collection, query, context_id=context_id)
+    except Exception as e:
+        print(f"[WARN] detector parse_results fetch unavailable: {e}")
+        rows = []
+
+    parsed_by_event: dict[str, dict] = {}
+    seen_docs: set[str] = set()
+
+    for row in rows or []:
+        doc_id = str(row.get("_id"))
+        if doc_id in seen_docs:
+            continue
+        seen_docs.add(doc_id)
+
+        event_refs = []
+        for ref in (row.get("event_id"), row.get("event_object_id")):
+            if ref is not None:
+                event_refs.extend(_all_event_id_forms(ref))
+
+        if not event_refs:
+            continue
+
+        for event_ref in event_refs:
+            key = str(event_ref)
+            parsed = parsed_by_event.setdefault(key, {})
+
+            for field, values in (row.get("results") or {}).items():
+                dest = parsed.setdefault(field, [])
+                incoming = values if isinstance(values, list) else [values]
+                for value in incoming:
+                    if value not in dest:
+                        dest.append(value)
+
+    return parsed_by_event
+
+
 def release_claims(statuses: list[dict], context_id: str, reason: str = "released"):
     if not statuses:
         return 0

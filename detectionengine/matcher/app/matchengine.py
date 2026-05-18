@@ -110,8 +110,10 @@ class MatchEngine:
             }
 
         try:
-            safe_pattern = re.escape(str(regex))
-            compiled = _compile_regex(safe_pattern)
+            # This is a regex matcher, so do not escape the rule pattern.
+            # Escaping here made patterns like \d+, .* and alternation behave
+            # like plain text and caused obvious rule matches to miss.
+            compiled = _compile_regex(str(regex))
             matched = any(compiled.search(v) for v in values)
 
             return {

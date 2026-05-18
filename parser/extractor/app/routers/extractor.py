@@ -2,6 +2,11 @@ import json
 import os
 import time
 import traceback
+
+try:
+    import orjson
+except Exception:  # optional fast-path dependency
+    orjson = None
 from collections import Counter, defaultdict
 from typing import Any, Dict, List, Optional, Union
 
@@ -268,12 +273,25 @@ JSONP_PARSER = CardParser("jsonp")
 class Selector(BaseModel):
     type: str
     value: str
+    # Excludes live inside selector according to CardSchema.
+    # Pydantic model is only used by /parse; /parse/batch uses raw dicts.
+    not_: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = Field(default=None, alias="not")
+    and_not: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = Field(default=None)
+    excludes: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = Field(default=None)
+    exclude: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = Field(default=None)
+
+    class Config:
+        populate_by_name = True
+        extra = "allow"
 
 
 class Card(BaseModel):
     selector: Selector
     regex: Optional[List[Dict[str, str]]] = Field(default=None)
     jsonp: Optional[List[Dict[str, str]]] = Field(default=None)
+
+    class Config:
+        extra = "allow"
 
 
 class ExtractRequest(BaseModel):
@@ -323,7 +341,7 @@ def _response(content: Dict[str, Any], status_code: int = 200, headers: Optional
     and avoids the warning.
     """
     headers = headers or {}
-    if EXTRACTOR_USE_ORJSON:
+    if EXTRACTOR_USE_ORJSON and orjson is not None:
         try:
             return Response(
                 content=orjson.dumps(content),
@@ -393,11 +411,77 @@ def _card_signature(card: Dict[str, Any], card_name: Optional[str] = None) -> st
             "selector": selector,
             "regex": regex_rules,
             "jsonp": jsonp_rules,
+            "excludes": card.get("excludes") or card.get("exclude") or [],
         },
         sort_keys=True,
         default=str,
         separators=(",", ":"),
     )
+
+
+def _normalize_selector_list(value: Any) -> List[dict]:
+    if not value:
+        return []
+    if isinstance(value, dict):
+        return [value]
+    if isinstance(value, list):
+        return [v for v in value if isinstance(v, dict)]
+    return []
+
+
+def _selector_matches_input(selector: Dict[str, Any], input_data: Union[str, Dict[str, Any]]) -> bool:
+    if not isinstance(selector, dict):
+        return False
+
+    stype = str(selector.get("type") or "").strip().lower()
+    value = selector.get("value")
+    if value is None or value == "":
+        return False
+
+    text = input_data if isinstance(input_data, str) else json.dumps(input_data, default=str)
+    value_s = str(value)
+
+    if stype in {"raw", "contains", "raw_contains", "substring"}:
+        return value_s in text
+    if stype in {"not_contains", "raw_not_contains"}:
+        return value_s not in text
+    if stype in {"equals", "raw_equals"}:
+        return text == value_s
+    if stype in {"startswith", "starts_with", "raw_startswith", "raw_starts_with"}:
+        return text.startswith(value_s)
+    if stype in {"endswith", "ends_with", "raw_endswith", "raw_ends_with"}:
+        return text.endswith(value_s)
+    if stype in {"raw_regex", "regex", "matches"}:
+        return re.search(value_s, text, flags=re.IGNORECASE) is not None
+
+    # source/path-style exclusions are usually enforced in enrichment where the
+    # full event document exists. In extractor we only have the input payload.
+    return False
+
+
+def _is_excluded(card: Dict[str, Any], input_data: Union[str, Dict[str, Any]]) -> bool:
+    selector = card.get("selector") or {}
+    if not isinstance(selector, dict):
+        return False
+
+    negative_rules: List[dict] = []
+    negative_rules.extend(_normalize_selector_list(selector.get("not")))
+    negative_rules.extend(_normalize_selector_list(selector.get("and_not")))
+    negative_rules.extend(_normalize_selector_list(selector.get("excludes")))
+    negative_rules.extend(_normalize_selector_list(selector.get("exclude")))
+    negative_rules.extend(_normalize_selector_list(card.get("excludes")))
+    negative_rules.extend(_normalize_selector_list(card.get("exclude")))
+
+    for negative_selector in negative_rules:
+        try:
+            if _selector_matches_input(negative_selector, input_data):
+                return True
+        except Exception:
+            # Exclude evaluation must never break extraction. Bad exclude rules
+            # simply fail closed as non-matches.
+            continue
+
+    return False
 
 
 def _run_card(card: Dict[str, Any], input_data: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
@@ -410,6 +494,9 @@ def _run_card(card: Dict[str, Any], input_data: Union[str, Dict[str, Any]]) -> D
       - Avoids JSON parsing unless jsonp rules exist.
     """
     results: Dict[str, Any] = {}
+
+    if _is_excluded(card, input_data):
+        return results
 
     regex_rules = card.get("regex")
     if regex_rules:

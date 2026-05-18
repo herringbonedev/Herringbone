@@ -11,7 +11,7 @@ _LOCK = Lock()
 
 
 def mongo_db() -> HerringboneMongoDatabase:
-    
+
     global _MONGO_DB
 
     if _MONGO_DB is not None:
@@ -32,10 +32,6 @@ def mongo_db() -> HerringboneMongoDatabase:
 def mongo_bulk() -> HerringboneMongoBulkOperations:
     """
     Bulk wrapper using the same auth style as the old detector, cached per process.
-
-    This avoids constructing HerringboneMongoBulkOperations on every polling loop.
-    mongodb_bulk.py prints "BULK MONGO DB" in __init__, so repeated log spam means
-    repeated wrapper construction.
     """
     global _MONGO_BULK
 

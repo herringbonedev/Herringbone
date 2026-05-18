@@ -240,30 +240,65 @@ def safe_result_card_label(result: dict) -> str:
     return str(value)
 
 
+def _get_path_value(data: Any, path: str) -> Any:
+    """Small dot-path getter used by selector/exclude matching."""
+    if not path:
+        return None
+
+    cur = data
+    for part in str(path).split("."):
+        if isinstance(cur, dict):
+            cur = cur.get(part)
+        else:
+            return None
+    return cur
+
+
+def _value_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        return str(value)
+    return str(value)
+
+
 def _selector_positive_matches(selector: dict, event: dict) -> bool:
     if not isinstance(selector, dict):
         return False
 
-    stype = selector.get("type")
+    stype = str(selector.get("type") or "").strip().lower()
     value = selector.get("value")
 
     if value is None or value == "":
         return False
 
     raw = event.get("raw", "") or ""
+    value_s = str(value)
 
-    # Existing behavior: exact source.address match
-    if stype == "source_address":
-        return event.get("source", {}).get("address") == value
+    # Source aliases. Keep old source_address behavior and support UI-style names.
+    if stype in {"source_address", "source.address", "source_ip", "ip"}:
+        return event.get("source", {}).get("address") == value_s
 
-    # Existing behavior: simple raw substring match
-    if stype == "raw":
-        return str(value) in raw
+    # Raw substring aliases. This is what UI "contains" excludes usually mean.
+    if stype in {"raw", "contains", "raw_contains", "substring"}:
+        return value_s in raw
 
-    # New behavior: regex selector against raw log
-    if stype == "raw_regex":
+    if stype in {"not_contains", "raw_not_contains"}:
+        return value_s not in raw
+
+    if stype in {"equals", "raw_equals"}:
+        return raw == value_s
+
+    if stype in {"startswith", "starts_with", "raw_startswith", "raw_starts_with"}:
+        return raw.startswith(value_s)
+
+    if stype in {"endswith", "ends_with", "raw_endswith", "raw_ends_with"}:
+        return raw.endswith(value_s)
+
+    # Regex aliases. The schema only says type/value, so accept both names.
+    if stype in {"raw_regex", "regex", "matches"}:
         try:
-            return re.search(str(value), raw) is not None
+            return re.search(value_s, raw) is not None
         except re.error as e:
             audit.log(
                 event="parser_selector_regex_failed",
@@ -271,30 +306,43 @@ def _selector_positive_matches(selector: dict, event: dict) -> bool:
                 severity="WARNING",
                 metadata={
                     "selector_type": stype,
-                    "pattern": str(value),
+                    "pattern": value_s,
                     "error": str(e),
                 },
             )
             return False
 
+    # Simple dot-path selector support, useful for structured events.
+    if stype in {"field", "path", "json", "jsonpath"}:
+        field = selector.get("field") or selector.get("path")
+        candidate = _value_text(_get_path_value(event, str(field or "")))
+        return value_s in candidate
+
     return False
+
+
+def _normalize_selector_list(value: Any) -> List[dict]:
+    if not value:
+        return []
+    if isinstance(value, dict):
+        return [value]
+    if isinstance(value, list):
+        return [v for v in value if isinstance(v, dict)]
+    return []
 
 
 def selector_matches(selector: dict, event: dict) -> bool:
     if not _selector_positive_matches(selector, event):
         return False
 
-    negative_rules = selector.get("not") or selector.get("and_not") or []
-
-    if isinstance(negative_rules, dict):
-        negative_rules = [negative_rules]
-
-    if not isinstance(negative_rules, list):
-        return True
+    # Support every exclude spelling your card schema/UI may emit.
+    negative_rules: List[dict] = []
+    negative_rules.extend(_normalize_selector_list(selector.get("not")))
+    negative_rules.extend(_normalize_selector_list(selector.get("and_not")))
+    negative_rules.extend(_normalize_selector_list(selector.get("excludes")))
+    negative_rules.extend(_normalize_selector_list(selector.get("exclude")))
 
     for negative_selector in negative_rules:
-        if not isinstance(negative_selector, dict):
-            continue
         if _selector_positive_matches(negative_selector, event):
             return False
 

@@ -4,7 +4,13 @@ from time import time
 
 from modules.audit.logger import AuditLogger
 
-from app.fetcher import claim_batch_undetected, fetch_events_for_statuses, event_lookup_keys, release_claims
+from app.fetcher import (
+    claim_batch_undetected,
+    fetch_events_for_statuses,
+    fetch_parse_results_for_statuses,
+    event_lookup_keys,
+    release_claims,
+)
 from app.rules import load_rules
 from app.analyzer import analyze_log_with_rules
 from app.updater import apply_results_bulk, set_failed
@@ -71,9 +77,16 @@ def _rule_id(analysis: dict):
     return None
 
 
-def _analyze_one(event: dict, status: dict, context_id: str, rules: list[dict]):
+def _analyze_one(event: dict, status: dict, context_id: str, rules: list[dict], parsed_map: dict | None = None):
     event_id = event.get("_id")
     to_send = _sanitize(event)
+
+    parsed = (parsed_map or {}).get(str(event_id)) or {}
+    if parsed:
+        # Expose parser output under a stable namespace for rules like:
+        # {"key": "parsed.command", "regex": "echo hi"}
+        to_send["parsed"] = parsed
+
     analysis = analyze_log_with_rules(to_send, rules)
     rule_id = _rule_id(analysis)
 
@@ -106,6 +119,7 @@ def process_batch(batch_size: int = 100, event_workers: int = 4):
 
     try:
         events_by_id = fetch_events_for_statuses(statuses, context_id)
+        parsed_by_event_id = fetch_parse_results_for_statuses(statuses, context_id)
         rules = load_rules(context_id)
 
         jobs = []
@@ -122,7 +136,7 @@ def process_batch(batch_size: int = 100, event_workers: int = 4):
                 missing.append(status)
                 continue
 
-            jobs.append((event, status, context_id, rules))
+            jobs.append((event, status, context_id, rules, parsed_by_event_id))
 
         results = []
         failures = []
@@ -133,7 +147,7 @@ def process_batch(batch_size: int = 100, event_workers: int = 4):
             future_map = {pool.submit(_analyze_one, *job): job for job in jobs}
 
             for future in as_completed(future_map):
-                event, status, ctx, _rules = future_map[future]
+                event, status, ctx, _rules, _parsed_map = future_map[future]
                 try:
                     result = future.result()
                     results.append(result)
