@@ -6,9 +6,9 @@ services:
       mongodb:
         condition: service_healthy
     networks:
-    - herringbone
+      - herringbone
     expose:
-    - "7010"
+      - "7010"
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -22,11 +22,11 @@ services:
       HERRINGBONE_ELEMENT: logs
     read_only: true
     tmpfs:
-    - /tmp
+      - /tmp
     security_opt:
-    - no-new-privileges:true
+      - no-new-privileges:true
     secrets:
-    - jwt_secret
+      - jwt_secret
     deploy:
       replicas: ${HERRINGBONE_LOGS_REPLICAS:-3}
 networks:

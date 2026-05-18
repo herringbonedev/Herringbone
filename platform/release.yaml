@@ -1,6 +1,6 @@
 version: alpha-0.5.0
 services:
-  herringbone-logs: quay.io/herringbone/herringbone-logs:c61eb2b6@sha256:ae33ca9b44bf637ad2e0a07968c186f49fef9900c03d741715cc0375a588055d
+  herringbone-logs: quay.io/herringbone/herringbone-logs:f5e574e4@sha256:669a8b937c853e3f559807511226fce2161c52280690aa34e591b7f6cd3a32e8
   herringbone-search: quay.io/herringbone/herringbone-search:de8abb26@sha256:d761163e0b0255616f9910f8d8ed301d8a6a9d9ba30eca60a0d33f69dd78bf81
   herringbone-auth: quay.io/herringbone/herringbone-auth:45d9bca8@sha256:47a55fd2900cad0c5dbeec6ba272efd3e0481dab1c9772ee100b0777bb8191c2
   detectionengine-detector: quay.io/herringbone/detectionengine-detector:90103508@sha256:7b2c1fae1407c6527017c6e8e99f449f1f40ff7fba7891f6d20547a5c8fd20bf
