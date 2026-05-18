@@ -11,12 +11,7 @@ _LOCK = Lock()
 
 
 def mongo_db() -> HerringboneMongoDatabase:
-    """
-    Original working detector auth path, cached per process.
-
-    Keep this intentionally simple. hbctl/compose already manages MONGO_* envs.
-    Do not force AUTH_DB or raw pymongo behavior here.
-    """
+    
     global _MONGO_DB
 
     if _MONGO_DB is not None:
