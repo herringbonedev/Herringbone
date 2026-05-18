@@ -6,5 +6,5 @@ resources:
   - service.yaml
 images:
   - name: quay.io/herringbone/detectionengine-matcher
-    newTag: a310d627
-    digest: sha256:7e4f26b0554c9fd8ac963f7e47a5d2721f84a34bc32e1d2887b9a711084c5b75
+    newTag: 3e85b495
+    digest: sha256:2af8674052c5597fdc9ab5b66dfc410519f699b7fb0e8e4d258c6548ecbd271e
