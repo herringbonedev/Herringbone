@@ -37,4 +37,4 @@ ENV PYTHONUNBUFFERED=1 \
 
 EXPOSE 7006
 
-ENTRYPOINT ["python","-m","uvicorn","app.main:app","--host","0.0.0.0","--port","7006"]
+ENTRYPOINT ["python","-m","uvicorn","app.main:app","--host","0.0.0.0","--port","7006","--no-access-log"]
