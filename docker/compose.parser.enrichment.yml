@@ -21,7 +21,10 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       DB_NAME: ${DB_NAME}
       AUTH_DB: ${AUTH_DB}
-      COLLECTION_NAME: logs
+      COLLECTION_NAME: events
+      EVENTS_COLLECTION: events
+      EVENT_STATE_COLLECTION: event_state
+      PARSE_RESULTS_COLLECTION: parse_results
       METADATA_SVC: http://parser-cardset:7005/parser/cardset/pull_cards
       EXTRACTOR_SVC: http://parser-extractor:7006/parser/extractor/parse
       EXTRACTOR_BATCH_SVC: http://parser-extractor:7006/parser/extractor/parse/batch
