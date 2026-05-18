@@ -110,7 +110,8 @@ class MatchEngine:
             }
 
         try:
-            compiled = _compile_regex(str(regex))
+            safe_pattern = re.escape(str(regex))
+            compiled = _compile_regex(safe_pattern)
             matched = any(compiled.search(v) for v in values)
 
             return {
