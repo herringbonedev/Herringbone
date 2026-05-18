@@ -1,6 +1,6 @@
 services:
   detectionengine-matcher:
-    image: quay.io/herringbone/detectionengine-matcher:5fba37db@sha256:ad4a100a70a43953616ec7e257b1117ac604fbb8ebc0bf7bf8688b0f626e640c
+    image: quay.io/herringbone/detectionengine-matcher:71250fcd@sha256:6e0c7c214d256181d202758601c368f591e276f28e6dc3c60b57287a124600ca
     restart: unless-stopped
     networks:
       - herringbone
