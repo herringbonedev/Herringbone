@@ -1,9 +1,9 @@
 services:
   logingestion-receiver:
-    image: quay.io/herringbone/receiver:f6573517@sha256:fb201ae1ddaf6261e5c6225f55a7c272a5c80a377c9ee4a2bfb28a8d7cda4938
+    image: quay.io/herringbone/receiver:096586aa@sha256:e04c8db0a5ef42c59219bc042822667ee2ba39c015d3bf9fa580748f21f74e8c
     restart: unless-stopped
     networks:
-    - herringbone
+      - herringbone
     environment:
       MONGO_HOST: ${MONGO_HOST:-mongodb}
       MONGO_PORT: ${MONGO_PORT:-27017}
@@ -29,14 +29,14 @@ services:
       UDP_SOCKET_RCVBUF: ${UDP_SOCKET_RCVBUF:-16777216}
       BATCH_DIRECT_MONGO: ${BATCH_DIRECT_MONGO:-false}
     extra_hosts:
-    - host.docker.internal:host-gateway
+      - host.docker.internal:host-gateway
     read_only: true
     tmpfs:
-    - /tmp
+      - /tmp
     security_opt:
-    - no-new-privileges:true
+      - no-new-privileges:true
     expose:
-    - "${CONTAINER_PORT:-7004}"
+      - "${CONTAINER_PORT:-7004}"
     deploy:
       replicas: ${LOGINGESTION_RECEIVER_REPLICAS:-3}
 networks:
