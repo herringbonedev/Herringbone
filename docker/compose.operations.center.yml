@@ -1,6 +1,6 @@
 services:
   operations-center:
-    image: quay.io/herringbone/operations-center
+    image: quay.io/herringbone/operations-center:15926a80@sha256:30b079d8c77f0fc07bc419601c67f1c087da373c9f56a16cb9b2ed8d0c20f9cf
     restart: unless-stopped
     profiles:
     - ops
