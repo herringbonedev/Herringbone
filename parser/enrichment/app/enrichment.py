@@ -302,7 +302,9 @@ def call_extractor_batch_with_retry(jobs, context_id, attempts=3):
             if attempt < attempts:
                 time.sleep(0.25 * attempt)
 
-    raise last_error
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("No retry attempts were executed or no retryable exception was captured")
 
 
 def call_extractor_compat(card: dict, raw_log: str, context_id: str) -> dict:
