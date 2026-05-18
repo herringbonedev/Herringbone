@@ -1,9 +1,12 @@
 import importlib
-import os
 import sys
 import types
 
 import pytest
+
+
+class StopLoop(Exception):
+    """Compatibility shim for older tests that imported StopLoop from conftest."""
 
 
 class DummyAuditLogger:
@@ -53,6 +56,7 @@ def _install_missing_dependency_stubs():
         def __init__(self, *args, **kwargs):
             self.args = args
             self.kwargs = kwargs
+            self.last_claim_stats = {}
 
     mongo_bulk_mod.HerringboneMongoBulkOperations = HerringboneMongoBulkOperations
     sys.modules.setdefault("modules.database.mongo_bulk", mongo_bulk_mod)
@@ -64,7 +68,7 @@ def _install_missing_dependency_stubs():
 
 @pytest.fixture(autouse=True)
 def enrichment_test_env(monkeypatch):
-    monkeypatch.setenv("EXTRACTOR_SVC", "test.service")
+    monkeypatch.setenv("EXTRACTOR_SVC", "http://test/parse")
     monkeypatch.setenv("EXTRACTOR_BATCH_SVC", "")
     monkeypatch.setenv("CONTEXT_ID", "default")
     monkeypatch.setenv("HB_ENTERPRISE", "false")
@@ -82,19 +86,57 @@ def enrichment(monkeypatch):
     svc = importlib.import_module("app.enrichment")
 
     svc.audit = DummyAuditLogger()
-    svc._metrics.update({"processed": 0, "matched_cards": 0, "failed": 0, "batches": 0, "last_log": 10**18})
-    svc._card_cache.update({"context_id": None, "cards": [], "prepared": None, "loaded_at": 0.0})
+    if hasattr(svc, "_metrics"):
+        svc._metrics.update({
+            "processed": 0,
+            "matched_cards": 0,
+            "failed": 0,
+            "batches": 0,
+            "last_log": 10**18,
+        })
+    if hasattr(svc, "_card_cache"):
+        svc._card_cache.update({
+            "context_id": None,
+            "cards": [],
+            "prepared": None,
+            "loaded_at": 0.0,
+        })
     return svc
 
 
 class FakeMongo:
-    def __init__(self, cards=None):
+    def __init__(self, state=None, event=None, cards=None):
+        self._state = state
+        self._event = event
         self.cards = cards or []
+        self.parse_results = []
+        self.state_updates = []
 
     def find_with_context(self, collection, query, *, context_id):
-        if collection == "parse_cards":
+        if collection in ("cards", "parse_cards"):
             return list(self.cards)
         return []
+
+    def find_one(self, collection, query):
+        if collection == "event_state":
+            state, self._state = self._state, None
+            return state
+        if collection == "events":
+            return self._event
+        return None
+
+    def find(self, collection, query):
+        if collection in ("cards", "parse_cards"):
+            return list(self.cards)
+        return []
+
+    def insert_parse_result(self, doc):
+        self.parse_results.append(doc)
+        return True
+
+    def upsert_event_state(self, event_id, payload, context_id="default"):
+        self.state_updates.append({"event_id": event_id, "context_id": context_id, **payload})
+        return True
 
 
 class FakeBulk:
@@ -103,7 +145,17 @@ class FakeBulk:
         self.inserted = []
         self.updates = []
 
-    def find_many_by_ids(self, collection, ids, *, context_id, id_field="_id", projection=None, preserve_order=False, include_missing_default_context=False):
+    def find_many_by_ids(
+        self,
+        collection,
+        ids,
+        *,
+        context_id,
+        id_field="_id",
+        projection=None,
+        preserve_order=False,
+        include_missing_default_context=False,
+    ):
         assert collection == "events"
         found = []
         for value in ids:
@@ -112,7 +164,7 @@ class FakeBulk:
                 found.append(dict(self.events[key]))
         return found
 
-    def insert_many_context(self, collection, docs, *, context_id, ordered=False):
+    def insert_many_context(self, collection, docs, *, context_id, ordered=False, clean_codec=False):
         assert collection == "parse_results"
         for doc in docs:
             item = dict(doc)
@@ -120,7 +172,17 @@ class FakeBulk:
             self.inserted.append(item)
         return True
 
-    def update_many_by_ids(self, collection, ids, set_fields, *, context_id, id_field="_id", include_missing_default_context=False):
+    def update_many_by_ids(
+        self,
+        collection,
+        ids,
+        set_fields,
+        *,
+        context_id,
+        id_field="_id",
+        unset_fields=None,
+        include_missing_default_context=False,
+    ):
         assert collection == "event_state"
         update = {
             "ids": list(ids),
@@ -131,7 +193,16 @@ class FakeBulk:
         self.updates.append(update)
         return len(update["ids"])
 
-    def release_batch_by_ids(self, collection, ids, release_fields, *, context_id, id_field="_id", include_missing_default_context=False):
+    def release_batch_by_ids(
+        self,
+        collection,
+        ids,
+        release_fields,
+        *,
+        context_id,
+        id_field="_id",
+        include_missing_default_context=False,
+    ):
         return self.update_many_by_ids(
             collection,
             ids,

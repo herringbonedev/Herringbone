@@ -9,26 +9,53 @@ line-length = 100
 target-version = ["py312"]
 
 
-# Linting and import rules
+# Ruff base configuration
 [tool.ruff]
 line-length = 100
 target-version = "py312"
 fix = false
-extend-select = ["E", "F", "I", "B", "UP"]
-ignore = ["E501"]
-exclude = [".git", ".venv", "build", "dist", "__pycache__"]
+exclude = [
+  ".git",
+  ".venv",
+  "build",
+  "dist",
+  "__pycache__",
+]
 
-# Import ordering
-[tool.ruff.isort]
-known-first-party = ["app"]
+
+# Ruff linting rules
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "B",
+  "UP",
+]
+ignore = [
+  "E501",
+]
 
 
-# Global pytest behavior
+# Ruff import ordering
+[tool.ruff.lint.isort]
+known-first-party = [
+  "app",
+]
+
+
+# Pytest configuration
 [tool.pytest.ini_options]
 minversion = "8.0"
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_functions = ["test_*"]
+testpaths = [
+  "tests",
+]
+python_files = [
+  "test_*.py",
+]
+python_functions = [
+  "test_*",
+]
 addopts = "-ra"
 filterwarnings = [
   "error::DeprecationWarning",
@@ -44,11 +71,17 @@ markers = [
 ]
 
 
-# Coverage configuration (not enforced yet)
+# Coverage configuration, not enforced yet
 [tool.coverage.run]
 branch = true
-source = ["app"]
-omit = ["tests/*", "**/__init__.py"]
+source = [
+  "app",
+]
+omit = [
+  "tests/*",
+  "**/__init__.py",
+]
+
 
 [tool.coverage.report]
 show_missing = true
