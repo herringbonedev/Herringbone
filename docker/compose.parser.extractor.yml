@@ -1,6 +1,6 @@
 services:
   parser-extractor:
-    image: quay.io/herringbone/parser-extractor:096586aa@sha256:991db956c9146fbb0844f73954889e1ef89e9fd149486a5dc7b68c2de8081350
+    image: quay.io/herringbone/parser-extractor:e5a97ad0@sha256:e122fb16846f3dd0f4919621d7fd4b996cfb4e6ce1593ef4470d081799779775
     restart: unless-stopped
     networks:
       - herringbone
@@ -30,18 +30,14 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-
     secrets:
       - service_jwt_public_key
-
     deploy:
       replicas: ${PARSER_EXTRACTOR_REPLICAS:-3}
-
 networks:
   herringbone:
     external: true
     name: herringbone_net
-
 secrets:
   service_jwt_public_key:
     file: ./secrets/runtime/service_jwt_public_key
