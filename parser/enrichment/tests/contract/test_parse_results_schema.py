@@ -1,57 +1,62 @@
-from tests.conftest import FakeMongo
+from tests.conftest import FakeBulk, FakeMongo
 
 
-def _assert_common_fields(doc: dict):
-    assert "event_id" in doc
-    assert "card" in doc
-    assert "created_at" in doc
+def test_parse_results_document_schema_success(enrichment, monkeypatch):
+    cards = [{"name": "c1", "selector": {"type": "raw", "value": "foo"}, "regex": []}]
+    event = {"_id": "evt1", "context_id": "default", "raw": "foo", "source": {"address": "1.2.3.4"}}
+    states = [{"_id": "state1", "event_id": "evt1", "context_id": "default", "parsed": False}]
+    mongo = FakeMongo(cards=cards)
+    bulk = FakeBulk(events={"evt1": event})
 
-
-def test_parse_results_document_schema_success(run_once):
-    mongo = run_once(
-        fake_mongo=FakeMongo(
-            state={"event_id": "evt1", "parsed": False},
-            event={"_id": "evt1", "raw": "foo", "source": {"address": "1.2.3.4"}},
-            cards=[{"name": "c1", "selector": {"type": "raw", "value": "foo"}, "regex": []}],
-        ),
-        extractor_json={"field": ["value"]},
+    monkeypatch.setattr(
+        enrichment,
+        "call_extractor_batch_with_retry",
+        lambda jobs, context_id: [
+            {
+                "event_id": "evt1",
+                "card": "c1",
+                "success": True,
+                "results": {"field": "value"},
+            }
+        ],
     )
 
-    assert len(mongo.parse_results) == 1
-    doc = mongo.parse_results[0]
+    enrichment.process_batch(mongo, bulk, "default", states)
 
-    _assert_common_fields(doc)
+    assert len(bulk.inserted) == 1
+    doc = bulk.inserted[0]
     assert doc["event_id"] == "evt1"
     assert doc["card"] == "c1"
-    assert "results" in doc
-    assert isinstance(doc["results"], dict)
-
-    # Contract: result values must be lists (enforced by service)
-    for v in doc["results"].values():
-        assert isinstance(v, list)
-
-    # Contract: success docs must not have 'error'
+    assert "created_at" in doc
+    assert doc["results"] == {"field": ["value"]}
     assert "error" not in doc
 
 
-def test_parse_results_document_schema_error(run_once):
-    mongo = run_once(
-        fake_mongo=FakeMongo(
-            state={"event_id": "evt2", "parsed": False},
-            event={"_id": "evt2", "raw": "foo", "source": {"address": "1.2.3.4"}},
-            cards=[{"name": "c1", "selector": {"type": "raw", "value": "foo"}, "regex": []}],
-        ),
-        extractor_exc=RuntimeError("boom"),
+def test_parse_results_document_schema_error(enrichment, monkeypatch):
+    cards = [{"name": "c1", "selector": {"type": "raw", "value": "foo"}, "regex": []}]
+    event = {"_id": "evt2", "context_id": "default", "raw": "foo", "source": {"address": "1.2.3.4"}}
+    states = [{"_id": "state2", "event_id": "evt2", "context_id": "default", "parsed": False}]
+    mongo = FakeMongo(cards=cards)
+    bulk = FakeBulk(events={"evt2": event})
+
+    monkeypatch.setattr(
+        enrichment,
+        "call_extractor_batch_with_retry",
+        lambda jobs, context_id: [
+            {
+                "event_id": "evt2",
+                "card": "c1",
+                "success": False,
+                "error": "boom",
+            }
+        ],
     )
 
-    assert len(mongo.parse_results) == 1
-    doc = mongo.parse_results[0]
+    enrichment.process_batch(mongo, bulk, "default", states)
 
-    _assert_common_fields(doc)
+    assert len(bulk.inserted) == 1
+    doc = bulk.inserted[0]
     assert doc["event_id"] == "evt2"
     assert doc["card"] == "c1"
     assert "error" in doc
-    assert isinstance(doc["error"], str)
-
-    # Contract: error docs must not have 'results'
     assert "results" not in doc

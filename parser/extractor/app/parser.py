@@ -1,6 +1,18 @@
 import re
+from functools import lru_cache
 from typing import Any, Dict, List, Union
+
 from jsonpath_ng import parse as jsonpath_parse
+
+
+@lru_cache(maxsize=8192)
+def _compile_regex(pattern: str):
+    return re.compile(pattern, flags=re.IGNORECASE)
+
+
+@lru_cache(maxsize=4096)
+def _compile_jsonpath(path: str):
+    return jsonpath_parse(path)
 
 
 class CardParser:
@@ -33,11 +45,12 @@ class CardParser:
         for rule in regex_rules:
             for field, pattern in rule.items():
                 try:
-                    match = re.search(pattern, text, flags=re.IGNORECASE)
+                    compiled = _compile_regex(pattern)
+                    match = compiled.search(text)
                     if not match:
                         continue
 
-                    # Prefer capture groups, otherwise full match
+                    # Prefer capture groups, otherwise full match.
                     if match.groups():
                         results[field] = match.group(1)
                     else:
@@ -45,6 +58,8 @@ class CardParser:
 
                 except re.error as e:
                     results[field] = f"[regex error: {e}]"
+                except Exception as e:
+                    results[field] = f"[regex parser error: {e}]"
 
         return results
 
@@ -58,10 +73,10 @@ class CardParser:
         for rule in jsonp_rules:
             for field, path in rule.items():
                 try:
-                    expr = jsonpath_parse(path)
+                    expr = _compile_jsonpath(path)
                     matches = [m.value for m in expr.find(json_data)]
 
-                    # Normalize single vs multi-value paths
+                    # Normalize single vs multi-value paths.
                     results[field] = matches[0] if len(matches) == 1 else matches
 
                 except Exception as e:

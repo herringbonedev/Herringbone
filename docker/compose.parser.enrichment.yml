@@ -5,16 +5,17 @@ services:
     user: 65532:65532
     read_only: true
     tmpfs:
-    - /tmp
+      - /tmp
     security_opt:
-    - no-new-privileges:true
+      - no-new-privileges:true
     cap_drop:
-    - ALL
+      - ALL
     networks:
-    - herringbone
+      - herringbone
     working_dir: /app-root
     environment:
       PYTHONPATH: /app-root:/python-packages:/modules
+
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
       MONGO_USER: ${MONGO_USER}
@@ -24,16 +25,32 @@ services:
       COLLECTION_NAME: logs
       METADATA_SVC: http://parser-cardset:7005/parser/cardset/pull_cards
       EXTRACTOR_SVC: http://parser-extractor:7006/parser/extractor/parse
+      EXTRACTOR_BATCH_SVC: http://parser-extractor:7006/parser/extractor/parse/batch
       HERRINGBONE_SERVICE: parser-enrichment
       HERRINGBONE_UNIT: parser
       HERRINGBONE_ELEMENT: enrichment
+      CONTEXT_ID: ${CONTEXT_ID:-default}
+      ENRICHMENT_BATCH_SIZE: ${ENRICHMENT_BATCH_SIZE:-500}
+      EXTRACTOR_BATCH_SIZE: ${EXTRACTOR_BATCH_SIZE:-250}
+      CLAIM_LEASE_SECONDS: ${CLAIM_LEASE_SECONDS:-300}
+      CARD_CACHE_SECONDS: ${CARD_CACHE_SECONDS:-300}
+      ENRICHMENT_POLL_INTERVAL: ${ENRICHMENT_POLL_INTERVAL:-0.001}
+      AUTO_DISCOVER_CONTEXTS: ${AUTO_DISCOVER_CONTEXTS:-false}
+      INCLUDE_MISSING_DEFAULT_CONTEXT: ${INCLUDE_MISSING_DEFAULT_CONTEXT:-false}
+      EXTRACTOR_FALLBACK_ENABLED: ${EXTRACTOR_FALLBACK_ENABLED:-true}
+      DEBUG_BATCH_CLAIMS: ${DEBUG_BATCH_CLAIMS:-false}
+      DEBUG_BATCH_COUNTS: ${DEBUG_BATCH_COUNTS:-false}
+
     secrets:
-    - service_token
-    - service_jwt_public_key
+      - service_token
+      - service_jwt_public_key
+
     depends_on:
-    - mongodb
+      - mongodb
+
     deploy:
       replicas: ${PARSER_ENRICHMENT_REPLICAS:-3}
+
 secrets:
   service_token:
     file: ./secrets/runtime/parser_enrichment_service_token

@@ -1,85 +1,213 @@
 import importlib
-import os
 import sys
+import types
+
 import pytest
+
+
+class StopLoop(Exception):
+    """Compatibility shim for older tests that imported StopLoop from conftest."""
+
+
+class DummyAuditLogger:
+    def __init__(self, *args, **kwargs):
+        self.records = []
+
+    def log(self, *args, **kwargs):
+        self.records.append({"args": args, "kwargs": kwargs})
+        return None
+
+
+def _install_missing_dependency_stubs():
+    """Keep tests independent of real Mongo/audit infrastructure."""
+    bson_mod = types.ModuleType("bson")
+
+    class ObjectId(str):
+        @classmethod
+        def is_valid(cls, value):
+            if not isinstance(value, str) or len(value) != 24:
+                return False
+            try:
+                int(value, 16)
+                return True
+            except ValueError:
+                return False
+
+    bson_mod.ObjectId = ObjectId
+    sys.modules.setdefault("bson", bson_mod)
+
+    sys.modules.setdefault("modules", types.ModuleType("modules"))
+    sys.modules.setdefault("modules.database", types.ModuleType("modules.database"))
+    sys.modules.setdefault("modules.audit", types.ModuleType("modules.audit"))
+
+    mongo_db_mod = types.ModuleType("modules.database.mongo_db")
+
+    class HerringboneMongoDatabase:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+    mongo_db_mod.HerringboneMongoDatabase = HerringboneMongoDatabase
+    sys.modules.setdefault("modules.database.mongo_db", mongo_db_mod)
+
+    mongo_bulk_mod = types.ModuleType("modules.database.mongo_bulk")
+
+    class HerringboneMongoBulkOperations:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+            self.last_claim_stats = {}
+
+    mongo_bulk_mod.HerringboneMongoBulkOperations = HerringboneMongoBulkOperations
+    sys.modules.setdefault("modules.database.mongo_bulk", mongo_bulk_mod)
+
+    audit_mod = types.ModuleType("modules.audit.logger")
+    audit_mod.AuditLogger = DummyAuditLogger
+    sys.modules.setdefault("modules.audit.logger", audit_mod)
+
+
+@pytest.fixture(autouse=True)
+def enrichment_test_env(monkeypatch):
+    monkeypatch.setenv("EXTRACTOR_SVC", "http://test/parse")
+    monkeypatch.setenv("EXTRACTOR_BATCH_SVC", "")
+    monkeypatch.setenv("CONTEXT_ID", "default")
+    monkeypatch.setenv("HB_ENTERPRISE", "false")
+    monkeypatch.setenv("EXTRACTOR_FALLBACK_ENABLED", "true")
+    monkeypatch.setenv("ENRICHMENT_POLL_INTERVAL", "0.001")
+    monkeypatch.setenv("ENRICHMENT_BATCH_SIZE", "500")
+    monkeypatch.setenv("EXTRACTOR_BATCH_SIZE", "250")
+    yield
+
+
+@pytest.fixture()
+def enrichment(monkeypatch):
+    _install_missing_dependency_stubs()
+    sys.modules.pop("app.enrichment", None)
+    svc = importlib.import_module("app.enrichment")
+
+    svc.audit = DummyAuditLogger()
+    if hasattr(svc, "_metrics"):
+        svc._metrics.update({
+            "processed": 0,
+            "matched_cards": 0,
+            "failed": 0,
+            "batches": 0,
+            "last_log": 10**18,
+        })
+    if hasattr(svc, "_card_cache"):
+        svc._card_cache.update({
+            "context_id": None,
+            "cards": [],
+            "prepared": None,
+            "loaded_at": 0.0,
+        })
+    return svc
 
 
 class FakeMongo:
     def __init__(self, state=None, event=None, cards=None):
         self._state = state
         self._event = event
-        self._cards = cards or []
+        self.cards = cards or []
         self.parse_results = []
         self.state_updates = []
 
+    def find_with_context(self, collection, query, *, context_id):
+        if collection in ("cards", "parse_cards"):
+            return list(self.cards)
+        return []
+
     def find_one(self, collection, query):
         if collection == "event_state":
-            s, self._state = self._state, None
-            return s
+            state, self._state = self._state, None
+            return state
         if collection == "events":
             return self._event
         return None
 
     def find(self, collection, query):
         if collection in ("cards", "parse_cards"):
-            return list(self._cards)
+            return list(self.cards)
         return []
 
     def insert_parse_result(self, doc):
         self.parse_results.append(doc)
         return True
 
-    def upsert_event_state(self, event_id, payload):
-        self.state_updates.append({"event_id": event_id, **payload})
+    def upsert_event_state(self, event_id, payload, context_id="default"):
+        self.state_updates.append({"event_id": event_id, "context_id": context_id, **payload})
         return True
 
 
-class StopLoop(Exception):
-    pass
+class FakeBulk:
+    def __init__(self, events=None):
+        self.events = events or {}
+        self.inserted = []
+        self.updates = []
 
+    def find_many_by_ids(
+        self,
+        collection,
+        ids,
+        *,
+        context_id,
+        id_field="_id",
+        projection=None,
+        preserve_order=False,
+        include_missing_default_context=False,
+    ):
+        assert collection == "events"
+        found = []
+        for value in ids:
+            key = str(value)
+            if key in self.events:
+                found.append(dict(self.events[key]))
+        return found
 
-@pytest.fixture()
-def run_once(monkeypatch):
-    def _runner(fake_mongo, extractor_json=None, extractor_exc=None):
-        # ---- REQUIRED: set env BEFORE import ----
-        monkeypatch.setenv("EXTRACTOR_SVC", "http://test/parse")
+    def insert_many_context(self, collection, docs, *, context_id, ordered=False, clean_codec=False):
+        assert collection == "parse_results"
+        for doc in docs:
+            item = dict(doc)
+            item["context_id"] = context_id
+            self.inserted.append(item)
+        return True
 
-        # ensure clean import (important if tests run multiple times)
-        sys.modules.pop("app.enrichment", None)
+    def update_many_by_ids(
+        self,
+        collection,
+        ids,
+        set_fields,
+        *,
+        context_id,
+        id_field="_id",
+        unset_fields=None,
+        include_missing_default_context=False,
+    ):
+        assert collection == "event_state"
+        update = {
+            "ids": list(ids),
+            "id_field": id_field,
+            "context_id": context_id,
+            "set_fields": dict(set_fields),
+        }
+        self.updates.append(update)
+        return len(update["ids"])
 
-        svc = importlib.import_module("app.enrichment")
-
-        # ---- patch internals ----
-        monkeypatch.setattr(
-            svc,
-            "service_auth_headers",
-            lambda: {"Authorization": "Bearer test"},
+    def release_batch_by_ids(
+        self,
+        collection,
+        ids,
+        release_fields,
+        *,
+        context_id,
+        id_field="_id",
+        include_missing_default_context=False,
+    ):
+        return self.update_many_by_ids(
+            collection,
+            ids,
+            release_fields,
+            context_id=context_id,
+            id_field=id_field,
+            include_missing_default_context=include_missing_default_context,
         )
-
-        monkeypatch.setattr(svc, "get_mongo", lambda: fake_mongo)
-
-        def _sleep(_):
-            raise StopLoop()
-
-        monkeypatch.setattr(svc.time, "sleep", _sleep)
-
-        if extractor_exc is not None:
-            monkeypatch.setattr(
-                svc,
-                "call_extractor",
-                lambda card, raw: (_ for _ in ()).throw(extractor_exc),
-            )
-        elif extractor_json is not None:
-            monkeypatch.setattr(
-                svc,
-                "call_extractor",
-                lambda card, raw: extractor_json,
-            )
-
-        # ---- run exactly one loop ----
-        with pytest.raises(StopLoop):
-            svc.main()
-
-        return fake_mongo
-
-    return _runner

@@ -1,65 +1,47 @@
-import importlib
-import sys
-import pytest
-
-from tests.conftest import FakeMongo, StopLoop
+from tests.conftest import FakeBulk, FakeMongo, StopLoop
 
 
-def import_enrichment(monkeypatch):
-    """
-    Import enrichment service only after required env is set.
-    This mirrors real service startup and avoids pytest collection failures.
-    """
-    monkeypatch.setenv("EXTRACTOR_SVC", "http://test/parse")
-
-    # Ensure a clean import every time
-    sys.modules.pop("app.enrichment", None)
-
-    return importlib.import_module("app.enrichment")
+def test_stoploop_compatibility_import():
+    assert issubclass(StopLoop, Exception)
 
 
-def test_failures_recorded_no_silent_data_loss(monkeypatch):
-    svc = import_enrichment(monkeypatch)
+def test_failures_recorded_no_silent_data_loss(enrichment, monkeypatch):
+    cards = [
+        {"name": "ok_card", "selector": {"type": "raw", "value": "foo"}, "regex": []},
+        {"name": "bad_card", "selector": {"type": "raw", "value": "foo"}, "regex": []},
+    ]
+    event = {"_id": "evt4", "context_id": "default", "raw": "foo bar", "source": {"address": "1.1.1.1"}}
+    states = [{"_id": "state4", "event_id": "evt4", "context_id": "default", "parsed": False}]
+    mongo = FakeMongo(cards=cards)
+    bulk = FakeBulk(events={"evt4": event})
 
-    mongo = FakeMongo(
-        state={"event_id": "evt4", "parsed": False},
-        event={"_id": "evt4", "raw": "foo bar", "source": {"address": "1.1.1.1"}},
-        cards=[
-            {"name": "ok_card", "selector": {"type": "raw", "value": "foo"}, "regex": []},
-            {"name": "bad_card", "selector": {"type": "raw", "value": "foo"}, "regex": []},
-        ],
-    )
+    def _extractor(jobs, context_id):
+        results = []
+        for job in jobs:
+            card = enrichment.safe_card_label(job["card"])
+            if card == "bad_card":
+                results.append({
+                    "event_id": job["event_id"],
+                    "card": card,
+                    "success": False,
+                    "error": "extractor failed",
+                })
+            else:
+                results.append({
+                    "event_id": job["event_id"],
+                    "card": card,
+                    "success": True,
+                    "results": {"field": "value"},
+                })
+        return results
 
-    # Patch service internals
-    monkeypatch.setattr(
-        svc,
-        "service_auth_headers",
-        lambda: {"Authorization": "Bearer test"},
-    )
+    monkeypatch.setattr(enrichment, "call_extractor_batch_with_retry", _extractor)
+    enrichment.process_batch(mongo, bulk, "default", states)
 
-    monkeypatch.setattr(svc, "get_mongo", lambda: mongo)
+    assert len(bulk.inserted) == 2
 
-    def _sleep(_):
-        raise StopLoop()
-
-    monkeypatch.setattr(svc.time, "sleep", _sleep)
-
-    def _call_extractor(card, raw):
-        if card.get("name") == "bad_card":
-            raise RuntimeError("extractor failed")
-        return {"field": ["value"]}
-
-    monkeypatch.setattr(svc, "call_extractor", _call_extractor)
-
-    # Run exactly one loop
-    with pytest.raises(StopLoop):
-        svc.main()
-
-    # ---- Assertions ----
-    assert len(mongo.parse_results) == 2
-
-    ok_docs = [d for d in mongo.parse_results if d.get("card") == "ok_card"]
-    bad_docs = [d for d in mongo.parse_results if d.get("card") == "bad_card"]
+    ok_docs = [d for d in bulk.inserted if d.get("card") == "ok_card"]
+    bad_docs = [d for d in bulk.inserted if d.get("card") == "bad_card"]
 
     assert len(ok_docs) == 1
     assert "results" in ok_docs[0]
