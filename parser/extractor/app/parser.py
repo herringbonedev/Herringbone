@@ -7,8 +7,7 @@ from jsonpath_ng import parse as jsonpath_parse
 
 @lru_cache(maxsize=8192)
 def _compile_regex(pattern: str):
-    safe_pattern = re.escape(pattern)
-    return re.compile(safe_pattern, flags=re.IGNORECASE)
+    return re.compile(pattern, flags=re.IGNORECASE)
 
 
 @lru_cache(maxsize=4096)
