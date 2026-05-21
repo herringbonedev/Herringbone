@@ -12,10 +12,27 @@ DEFAULT_CONTEXT_ID = os.environ.get("CONTEXT_ID", "default")
 INSTANCE_ID = os.environ.get("HOSTNAME") or socket.gethostname()
 CLAIM_LEASE_SECONDS = int(os.environ.get("DETECTOR_CLAIM_LEASE_SECONDS", 300))
 INCLUDE_MISSING_DEFAULT_CONTEXT = os.environ.get("INCLUDE_MISSING_DEFAULT_CONTEXT", "false").lower() == "true"
-
+AUTO_DISCOVER_CONTEXTS = os.environ.get("AUTO_DISCOVER_CONTEXTS", "false").lower() == "true"
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+def find_next_context_id() -> str:
+    if AUTO_DISCOVER_CONTEXTS:
+        try:
+            bulk = mongo_bulk()
+            row = bulk.find_next_context_with_work(
+                os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state"),
+                {"parsed": True, "detected": False},
+                oldest_field="created_at",
+            )
+            if row and row.get("context_id"):
+                return row["context_id"]
+        except Exception as e:
+            print(f"[WARN] detector context discovery failed: {e}")
+
+    return DEFAULT_CONTEXT_ID
 
 
 def normalize_event_lookup_id(event_id: Any):
@@ -48,7 +65,7 @@ def _claimable_filter():
 
 def claim_batch_undetected(limit: int | None = None) -> list[dict]:
     status_collection = os.environ.get("EVENT_STATUS_COLLECTION_NAME", "event_state")
-    context_id = DEFAULT_CONTEXT_ID
+    context_id = find_next_context_id()
     limit = max(1, int(limit or os.environ.get("DETECTOR_BATCH_SIZE", 100)))
 
     claim_patch = {
