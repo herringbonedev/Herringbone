@@ -6,14 +6,15 @@ import time
 from modules.database.mongo_db import HerringboneMongoDatabase
 from app.batcher import get_batch_writer
 from app.forwarder import forward_data, get_forward_batcher
+from app.keys import resolve_ingestion_key
 
-forward_route = os.environ.get("FORWARD_ROUTE")
+forward_route = os.environ.get("FORWARD_ROUTE", None)
 
 PORT = int(os.environ.get("PORT", os.environ.get("CONTAINER_PORT", 7004)))
 UDP_BUFFER = int(os.environ.get("UDP_BUFFER", 65535))
 UDP_SOCKET_RCVBUF = int(os.environ.get("UDP_SOCKET_RCVBUF", 32 * 1024 * 1024))
 WORKER_THREADS = int(os.environ.get("RECEIVER_WORKERS", 8))
-CONTEXT_ID = os.environ.get("CONTEXT_ID", "default")
+INGESTION_KEY = str(os.environ.get("INGESTION_KEY", None))
 DROP_LOG_INTERVAL = float(os.environ.get("RECEIVER_DROP_LOG_INTERVAL", "5.0"))
 TCP_BACKLOG = int(os.environ.get("TCP_BACKLOG", "1024"))
 TCP_RECV_BUFFER = int(os.environ.get("TCP_RECV_BUFFER", os.environ.get("UDP_BUFFER", "65535")))
@@ -42,6 +43,22 @@ def get_mongo():
         print("[✓] MongoDB client initialized", flush=True)
 
     return mongo
+
+
+if INGESTION_KEY is None:
+    print(f"Falling back to to default context.")
+    CONTEXT_ID = "default"
+else:
+    req = type("Req", (), {
+        "headers": {"X-Herringbone-Key": INGESTION_KEY}
+    })()
+
+    CONTEXT_ID = resolve_ingestion_key(req, get_mongo())
+    print(f"Loaded context_id {CONTEXT_ID}")
+
+    if CONTEXT_ID == None:
+        print(f"Provided Ingestion Key Ivalid.")
+        exit()
 
 
 def _log_drop(kind: str, forwarded: bool = False):
