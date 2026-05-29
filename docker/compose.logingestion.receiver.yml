@@ -1,6 +1,6 @@
 services:
   logingestion-receiver:
-    image: quay.io/herringbone/receiver:85a1cc03@sha256:4645beb48e1f7bb0f5ab969a42fab6c1dbc824ce094fe4924347a0ff97625249
+    image: quay.io/herringbone/receiver:1fecd5a4@sha256:cd7a45e464808dc5951263f09f654a8ff2450456d7aa6104a82754a1dd30aa4f
     restart: unless-stopped
     networks:
       - herringbone
