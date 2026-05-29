@@ -9,40 +9,65 @@ class CardSchema:
             "type": "object",
             "properties": {
                 "type": {"type": "string"},
-                "value": {"type": "string"},
-
-                # Structured selector fields. These allow enrichment to match
-                # against event/fingerprint fields instead of raw text only.
-                # Examples:
-                #   {"type":"jsonpath", "path":"$.fingerprint.source_name", "match":"exact", "value":"Cloudflare"}
-                #   {"type":"field", "field":"fingerprint.source_name", "match":"regex", "value":"(?i)^cloudflare$"}
-                "field": {"type": "string"},
-                "path": {"type": "string"},
-                "jsonpath": {"type": "string"},
-                "key": {"type": "string"},
+                # Legacy/simple selectors use value. Path selectors may omit it
+                # for exists/not_exists, and older clients may submit null.
+                "value": {"type": ["string", "null"]},
+                # Canonical field/path selector support.
+                "path": {"type": ["string", "null"]},
+                "field": {"type": ["string", "null"]},
                 "match": {
-                    "type": "string",
+                    "type": ["string", "null"],
                     "enum": [
-                        "exact", "eq", "equals", "==",
-                        "regex", "matches", "re",
-                        "contains", "substring", "in",
-                        "not_equals", "ne", "!=", "not_exact",
-                        "not_regex", "not_matches",
+                        "exact",
+                        "contains",
+                        "regex",
+                        "exists",
+                        "not_exists",
+                        None,
                     ],
                 },
-                "operator": {"type": "string"},
-                "compare": {"type": "string"},
             },
-            "required": ["type", "value"],
+            "required": ["type"],
             "additionalProperties": True,
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "enum": ["path", "field", "json", "jsonpath"]
+                            }
+                        }
+                    },
+                    "then": {
+                        "anyOf": [
+                            {"required": ["path"]},
+                            {"required": ["field"]},
+                        ]
+                    },
+                    "else": {
+                        "required": ["value"]
+                    },
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "match": {"enum": ["exact", "contains", "regex", None]}
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "value": {"type": "string"}
+                        },
+                        "required": ["value"]
+                    },
+                },
+            ],
         }
 
         self.schema = {
             "type": "object",
             "properties": {
-                "name": {
-                    "type": "string"
-                },
+                "name": {"type": "string"},
                 "selector": {
                     **selector_schema,
                     "properties": {
@@ -50,59 +75,43 @@ class CardSchema:
                         "not": {
                             "anyOf": [
                                 selector_schema,
-                                {
-                                    "type": "array",
-                                    "items": selector_schema,
-                                }
+                                {"type": "array", "items": selector_schema},
                             ]
                         },
                         "and_not": {
                             "anyOf": [
                                 selector_schema,
-                                {
-                                    "type": "array",
-                                    "items": selector_schema,
-                                }
-                            ]
-                        },
-                        "exclude": {
-                            "anyOf": [
-                                selector_schema,
-                                {
-                                    "type": "array",
-                                    "items": selector_schema,
-                                }
+                                {"type": "array", "items": selector_schema},
                             ]
                         },
                         "excludes": {
                             "anyOf": [
                                 selector_schema,
-                                {
-                                    "type": "array",
-                                    "items": selector_schema,
-                                }
+                                {"type": "array", "items": selector_schema},
+                            ]
+                        },
+                        "exclude": {
+                            "anyOf": [
+                                selector_schema,
+                                {"type": "array", "items": selector_schema},
                             ]
                         },
                     },
                 },
                 "regex": {
                     "type": "array",
-                    "items": {
-                        "type": "object"
-                    }
+                    "items": {"type": "object"},
                 },
                 "jsonp": {
                     "type": "array",
-                    "items": {
-                        "type": "object"
-                    }
-                }
+                    "items": {"type": "object"},
+                },
             },
             "required": ["selector"],
             "anyOf": [
                 {"required": ["regex"]},
-                {"required": ["jsonp"]}
-            ]
+                {"required": ["jsonp"]},
+            ],
         }
 
     def __call__(self, data: dict) -> dict:

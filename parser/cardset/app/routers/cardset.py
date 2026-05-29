@@ -28,21 +28,17 @@ class SelectorModel(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     type: str
-    value: str
-    field: Optional[str] = None
+    value: Optional[str] = None
     path: Optional[str] = None
-    jsonpath: Optional[str] = None
-    key: Optional[str] = None
+    field: Optional[str] = None
     match: Optional[str] = None
-    operator: Optional[str] = None
-    compare: Optional[str] = None
 
 
 class CardModel(BaseModel):
     name: str
     selector: SelectorModel
-    regex: Optional[List[Dict[str, str]]] = []
-    jsonp: Optional[List[Dict[str, str]]] = []
+    regex: Optional[List[Dict[str, Any]]] = []
+    jsonp: Optional[List[Dict[str, Any]]] = []
 
 
 class InsertCardResponse(BaseModel):
@@ -92,6 +88,48 @@ def cards_collection():
     return os.environ.get("COLLECTION_NAME", "cards")
 
 
+def _strip_none_values(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            k: _strip_none_values(v)
+            for k, v in value.items()
+            if v is not None
+        }
+    if isinstance(value, list):
+        return [_strip_none_values(v) for v in value]
+    return value
+
+
+def selector_display_value(selector: Dict[str, Any]) -> str:
+    if not isinstance(selector, dict):
+        return ""
+    value = selector.get("value")
+    if value not in (None, ""):
+        return str(value)
+    path = selector.get("path") or selector.get("field")
+    if path not in (None, ""):
+        return str(path)
+    return ""
+
+
+def selector_query(selector_type: str, selector_value: str) -> Dict[str, Any]:
+    if selector_type in {"path", "field", "json", "jsonpath"}:
+        return {
+            "$or": [
+                {"selector.type": selector_type, "selector.path": selector_value},
+                {"selector.type": selector_type, "selector.field": selector_value},
+                {"selector.type": selector_type, "selector.value": selector_value},
+            ],
+            "deleted": {"$ne": True},
+        }
+
+    return {
+        "selector.type": selector_type,
+        "selector.value": selector_value,
+        "deleted": {"$ne": True},
+    }
+
+
 @router.post("/insert_card", response_model=InsertCardResponse)
 async def insert_card(
     card: CardModel,
@@ -102,10 +140,11 @@ async def insert_card(
 
     context_id = request.state.context_id
 
-    payload = card.model_dump()
+    payload = _strip_none_values(card.model_dump())
 
-    payload["selector_type"] = payload["selector"]["type"]
-    payload["selector_value"] = payload["selector"]["value"]
+    selector = payload.get("selector") or {}
+    payload["selector_type"] = selector.get("type", "")
+    payload["selector_value"] = selector_display_value(selector)
 
     result = validator(payload)
 
@@ -123,7 +162,7 @@ async def insert_card(
 
     existing = mongo.find_one_with_context(
         cards_collection(),
-        {"selector": payload.get("selector")},
+        {"name": payload.get("name"), "deleted": {"$ne": True}},
         context_id=context_id
     )
 
@@ -136,7 +175,7 @@ async def insert_card(
             target=payload.get("name"),
             result="failure",
         )
-        return {"ok": False, "message": "Card with this selector already exists."}
+        return {"ok": False, "message": "Card with this name already exists."}
 
     payload["last_updated"] = datetime.now(UTC)
 
@@ -194,11 +233,7 @@ async def pull_cards(
         )
         raise HTTPException(status_code=400, detail="Type and value must be strings")
 
-    query = {
-        "selector.type": sel_type,
-        "selector.value": sel_value,
-        "deleted": {"$ne": True},
-    }
+    query = selector_query(sel_type, sel_value)
 
     try:
         docs = mongo.find_with_context(
