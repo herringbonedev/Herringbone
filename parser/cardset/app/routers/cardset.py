@@ -29,6 +29,13 @@ class SelectorModel(BaseModel):
 
     type: str
     value: str
+    field: Optional[str] = None
+    path: Optional[str] = None
+    jsonpath: Optional[str] = None
+    key: Optional[str] = None
+    match: Optional[str] = None
+    operator: Optional[str] = None
+    compare: Optional[str] = None
 
 
 class CardModel(BaseModel):

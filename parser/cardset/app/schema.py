@@ -1,9 +1,42 @@
 from jsonschema import validate, ValidationError
 
+
 class CardSchema:
     """Validates JSON data for a card entry supporting regex or jsonp definitions."""
 
     def __init__(self):
+        selector_schema = {
+            "type": "object",
+            "properties": {
+                "type": {"type": "string"},
+                "value": {"type": "string"},
+
+                # Structured selector fields. These allow enrichment to match
+                # against event/fingerprint fields instead of raw text only.
+                # Examples:
+                #   {"type":"jsonpath", "path":"$.fingerprint.source_name", "match":"exact", "value":"Cloudflare"}
+                #   {"type":"field", "field":"fingerprint.source_name", "match":"regex", "value":"(?i)^cloudflare$"}
+                "field": {"type": "string"},
+                "path": {"type": "string"},
+                "jsonpath": {"type": "string"},
+                "key": {"type": "string"},
+                "match": {
+                    "type": "string",
+                    "enum": [
+                        "exact", "eq", "equals", "==",
+                        "regex", "matches", "re",
+                        "contains", "substring", "in",
+                        "not_equals", "ne", "!=", "not_exact",
+                        "not_regex", "not_matches",
+                    ],
+                },
+                "operator": {"type": "string"},
+                "compare": {"type": "string"},
+            },
+            "required": ["type", "value"],
+            "additionalProperties": True,
+        }
+
         self.schema = {
             "type": "object",
             "properties": {
@@ -11,58 +44,46 @@ class CardSchema:
                     "type": "string"
                 },
                 "selector": {
-                    "type": "object",
+                    **selector_schema,
                     "properties": {
-                        "type": {"type": "string"},
-                        "value": {"type": "string"},
+                        **selector_schema["properties"],
                         "not": {
                             "anyOf": [
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "type": {"type": "string"},
-                                        "value": {"type": "string"}
-                                    },
-                                    "required": ["type", "value"]
-                                },
+                                selector_schema,
                                 {
                                     "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "type": {"type": "string"},
-                                            "value": {"type": "string"}
-                                        },
-                                        "required": ["type", "value"]
-                                    }
+                                    "items": selector_schema,
                                 }
                             ]
                         },
                         "and_not": {
                             "anyOf": [
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "type": {"type": "string"},
-                                        "value": {"type": "string"}
-                                    },
-                                    "required": ["type", "value"]
-                                },
+                                selector_schema,
                                 {
                                     "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "type": {"type": "string"},
-                                            "value": {"type": "string"}
-                                        },
-                                        "required": ["type", "value"]
-                                    }
+                                    "items": selector_schema,
                                 }
                             ]
-                        }
+                        },
+                        "exclude": {
+                            "anyOf": [
+                                selector_schema,
+                                {
+                                    "type": "array",
+                                    "items": selector_schema,
+                                }
+                            ]
+                        },
+                        "excludes": {
+                            "anyOf": [
+                                selector_schema,
+                                {
+                                    "type": "array",
+                                    "items": selector_schema,
+                                }
+                            ]
+                        },
                     },
-                    "required": ["type", "value"]
                 },
                 "regex": {
                     "type": "array",
@@ -83,7 +104,6 @@ class CardSchema:
                 {"required": ["jsonp"]}
             ]
         }
-
 
     def __call__(self, data: dict) -> dict:
         """

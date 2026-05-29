@@ -1,4 +1,4 @@
-version: alpha-0.5.1
+version: alpha-0.6.1
 services:
   herringbone-logs: quay.io/herringbone/herringbone-logs:fdd6e007@sha256:8abd8d1edf6936eb5cf0eb4a0473e8a703e7899d76445e9c7e908345f6b61bca
   herringbone-search: quay.io/herringbone/herringbone-search:de8abb26@sha256:d761163e0b0255616f9910f8d8ed301d8a6a9d9ba30eca60a0d33f69dd78bf81

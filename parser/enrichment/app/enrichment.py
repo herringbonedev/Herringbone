@@ -249,9 +249,120 @@ def _get_path_value(data: Any, path: str) -> Any:
     for part in str(path).split("."):
         if isinstance(cur, dict):
             cur = cur.get(part)
+        elif isinstance(cur, list) and part.isdigit():
+            idx = int(part)
+            if idx >= len(cur):
+                return None
+            cur = cur[idx]
         else:
             return None
     return cur
+
+
+def _jsonpath_tokens(path: str) -> List[Any]:
+    """
+    Parse a small, dependency-free JSONPath subset for selector matching.
+
+    Supported examples:
+      $.fingerprint.source_name
+      fingerprint.source_name
+      $.http.request.headers[0].name
+      $['fingerprint']['source_name']
+      $.items[*].name
+
+    This intentionally avoids full JSONPath complexity so selectors stay fast
+    and deterministic inside the enrichment hot path.
+    """
+    path = str(path or "").strip()
+    if not path:
+        return []
+    if path.startswith("$"):
+        path = path[1:]
+    if path.startswith("."):
+        path = path[1:]
+
+    tokens: List[Any] = []
+    i = 0
+    buf = ""
+
+    while i < len(path):
+        ch = path[i]
+
+        if ch == ".":
+            if buf:
+                tokens.append(buf)
+                buf = ""
+            i += 1
+            continue
+
+        if ch == "[":
+            if buf:
+                tokens.append(buf)
+                buf = ""
+
+            end = path.find("]", i + 1)
+            if end == -1:
+                return []
+
+            raw = path[i + 1:end].strip()
+            if raw == "*":
+                tokens.append("*")
+            elif (raw.startswith("'") and raw.endswith("'")) or (raw.startswith('"') and raw.endswith('"')):
+                tokens.append(raw[1:-1])
+            elif raw.isdigit():
+                tokens.append(int(raw))
+            else:
+                tokens.append(raw)
+
+            i = end + 1
+            continue
+
+        buf += ch
+        i += 1
+
+    if buf:
+        tokens.append(buf)
+
+    return [t for t in tokens if t != ""]
+
+
+def _jsonpath_values(data: Any, path: str) -> List[Any]:
+    """Return all values matching the supported JSONPath subset."""
+    tokens = _jsonpath_tokens(path)
+    if not tokens:
+        return []
+
+    current = [data]
+
+    for token in tokens:
+        nxt: List[Any] = []
+
+        for item in current:
+            if token == "*":
+                if isinstance(item, dict):
+                    nxt.extend(item.values())
+                elif isinstance(item, list):
+                    nxt.extend(item)
+                continue
+
+            if isinstance(item, dict):
+                if token in item:
+                    nxt.append(item[token])
+                continue
+
+            if isinstance(item, list):
+                if isinstance(token, int) and 0 <= token < len(item):
+                    nxt.append(item[token])
+                elif isinstance(token, str) and token.isdigit():
+                    idx = int(token)
+                    if 0 <= idx < len(item):
+                        nxt.append(item[idx])
+
+        current = nxt
+        if not current:
+            break
+
+    return current
 
 
 def _value_text(value: Any) -> str:
@@ -260,6 +371,61 @@ def _value_text(value: Any) -> str:
     if isinstance(value, (dict, list)):
         return str(value)
     return str(value)
+
+
+def _selector_compare(candidate: Any, expected: Any, mode: str, *, selector_type: str = "") -> bool:
+    """Compare one selector candidate using exact, regex, or contains semantics."""
+    mode = str(mode or "").strip().lower()
+    expected_s = str(expected)
+    candidate_s = _value_text(candidate)
+
+    if mode in {"", "auto"}:
+        # Preserve older field/path behavior unless callers explicitly ask for exact/regex.
+        mode = "contains" if selector_type in {"field", "path", "json"} else "exact"
+
+    if mode in {"exact", "eq", "equals", "=="}:
+        return candidate_s == expected_s
+
+    if mode in {"contains", "substring", "in"}:
+        return expected_s in candidate_s
+
+    if mode in {"regex", "matches", "re"}:
+        try:
+            return re.search(expected_s, candidate_s) is not None
+        except re.error as e:
+            audit.log(
+                event="parser_selector_regex_failed",
+                result="failure",
+                severity="WARNING",
+                metadata={
+                    "selector_type": selector_type,
+                    "pattern": expected_s,
+                    "error": str(e),
+                },
+            )
+            return False
+
+    if mode in {"not_equals", "ne", "!=", "not_exact"}:
+        return candidate_s != expected_s
+
+    if mode in {"not_regex", "not_matches"}:
+        try:
+            return re.search(expected_s, candidate_s) is None
+        except re.error as e:
+            audit.log(
+                event="parser_selector_regex_failed",
+                result="failure",
+                severity="WARNING",
+                metadata={
+                    "selector_type": selector_type,
+                    "pattern": expected_s,
+                    "error": str(e),
+                },
+            )
+            return False
+
+    # Unknown compare modes fail closed.
+    return False
 
 
 def _selector_positive_matches(selector: dict, event: dict) -> bool:
@@ -312,11 +478,32 @@ def _selector_positive_matches(selector: dict, event: dict) -> bool:
             )
             return False
 
-    # Simple dot-path selector support, useful for structured events.
+    # Structured selector support for fingerprint and parsed/JSON event fields.
+    # Preferred shape:
+    #   {"type":"jsonpath", "path":"$.fingerprint.source_name", "match":"exact", "value":"Cloudflare"}
+    # Backward-compatible shape:
+    #   {"type":"field", "field":"fingerprint.source_name", "value":"Cloudflare"}
     if stype in {"field", "path", "json", "jsonpath"}:
-        field = selector.get("field") or selector.get("path")
-        candidate = _value_text(_get_path_value(event, str(field or "")))
-        return value_s in candidate
+        path = (
+            selector.get("path")
+            or selector.get("field")
+            or selector.get("jsonpath")
+            or selector.get("key")
+        )
+        if not path:
+            return False
+
+        values = _jsonpath_values(event, str(path))
+        if not values and not str(path).lstrip().startswith("$"):
+            legacy_value = _get_path_value(event, str(path))
+            if legacy_value is not None:
+                values = [legacy_value]
+
+        match_mode = selector.get("match") or selector.get("operator") or selector.get("compare")
+        return any(
+            _selector_compare(candidate, value, str(match_mode or ""), selector_type=stype)
+            for candidate in values
+        )
 
     return False
 
