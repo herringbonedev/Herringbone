@@ -1,6 +1,6 @@
 services:
   parser-cardset:
-    image: quay.io/herringbone/parser-cardset:0d41c211@sha256:4a62ba7c2dbca9e0202102671cf1562772da71d97b79a718a54ad4a80656f305
+    image: quay.io/herringbone/parser-cardset:4d733cbc@sha256:6a0933bfa49ad8a8d4c4cc47164b944a447c46c434b34a4a53072593b745bea4
     restart: unless-stopped
     networks:
       - herringbone
