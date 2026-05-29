@@ -28,17 +28,20 @@ class SelectorModel(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     type: str
-    value: Optional[str] = None
+    value: Optional[Any] = None
     path: Optional[str] = None
     field: Optional[str] = None
     match: Optional[str] = None
 
 
 class CardModel(BaseModel):
-    name: str
+    model_config = ConfigDict(extra="allow")
+
+    name: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
     selector: SelectorModel
-    regex: Optional[List[Dict[str, Any]]] = []
-    jsonp: Optional[List[Dict[str, Any]]] = []
+    regex: Optional[List[Dict[str, str]]] = []
+    jsonp: Optional[List[Dict[str, str]]] = []
 
 
 class InsertCardResponse(BaseModel):
@@ -48,7 +51,7 @@ class InsertCardResponse(BaseModel):
 
 class PullCardsRequest(BaseModel):
     selector_type: str
-    selector_value: str
+    selector_value: Optional[str] = None
     limit: Optional[int] = None
 
 
@@ -59,8 +62,9 @@ class PullCardsResponse(BaseModel):
 
 
 class DeleteCardsRequest(BaseModel):
-    selector_type: str
-    selector_value: str
+    selector_type: Optional[str] = None
+    selector_value: Optional[str] = None
+    card_name: Optional[str] = None
 
 
 class DeleteCardsResponse(BaseModel):
@@ -88,46 +92,65 @@ def cards_collection():
     return os.environ.get("COLLECTION_NAME", "cards")
 
 
-def _strip_none_values(value: Any) -> Any:
+def strip_none(value: Any) -> Any:
     if isinstance(value, dict):
         return {
-            k: _strip_none_values(v)
+            k: strip_none(v)
             for k, v in value.items()
             if v is not None
         }
     if isinstance(value, list):
-        return [_strip_none_values(v) for v in value]
+        return [strip_none(v) for v in value if v is not None]
     return value
 
 
-def selector_display_value(selector: Dict[str, Any]) -> str:
-    if not isinstance(selector, dict):
-        return ""
+def selector_index_value(selector: Dict[str, Any]) -> str:
     value = selector.get("value")
-    if value not in (None, ""):
+    if value is not None:
         return str(value)
-    path = selector.get("path") or selector.get("field")
-    if path not in (None, ""):
-        return str(path)
+    for key in ("path", "field"):
+        if selector.get(key):
+            return str(selector[key])
     return ""
 
 
-def selector_query(selector_type: str, selector_value: str) -> Dict[str, Any]:
-    if selector_type in {"path", "field", "json", "jsonpath"}:
-        return {
-            "$or": [
-                {"selector.type": selector_type, "selector.path": selector_value},
-                {"selector.type": selector_type, "selector.field": selector_value},
-                {"selector.type": selector_type, "selector.value": selector_value},
-            ],
-            "deleted": {"$ne": True},
-        }
+def selector_query(selector_type: str, selector_value: Optional[str]) -> Dict[str, Any]:
+    query: Dict[str, Any] = {"selector.type": selector_type, "deleted": {"$ne": True}}
+    if selector_value is not None and selector_value != "":
+        query["$or"] = [
+            {"selector.value": selector_value},
+            {"selector.path": selector_value},
+            {"selector.field": selector_value},
+        ]
+    return query
 
-    return {
-        "selector.type": selector_type,
-        "selector.value": selector_value,
-        "deleted": {"$ne": True},
-    }
+
+def card_identity_query(payload: Dict[str, Any]) -> Dict[str, Any]:
+    name = str(payload.get("name") or "").strip()
+    if name:
+        return {"name": name, "deleted": {"$ne": True}}
+
+    selector = payload.get("selector") or {}
+    return selector_query(str(selector.get("type") or ""), selector_index_value(selector))
+
+
+def prepare_payload(card: CardModel) -> Dict[str, Any]:
+    payload = strip_none(card.model_dump(exclude_none=True))
+
+    selector = payload.get("selector") or {}
+    payload["selector_type"] = selector.get("type")
+    payload["selector_value"] = selector_index_value(selector)
+
+    metadata = payload.get("metadata")
+    if isinstance(metadata, dict):
+        tags = metadata.get("tags")
+        if isinstance(tags, str):
+            metadata["tags"] = [t.strip() for t in tags.split(",") if t.strip()]
+        payload["metadata"] = strip_none(metadata)
+        if not payload["metadata"]:
+            payload.pop("metadata", None)
+
+    return payload
 
 
 @router.post("/insert_card", response_model=InsertCardResponse)
@@ -139,12 +162,7 @@ async def insert_card(
 ):
 
     context_id = request.state.context_id
-
-    payload = _strip_none_values(card.model_dump())
-
-    selector = payload.get("selector") or {}
-    payload["selector_type"] = selector.get("type", "")
-    payload["selector_value"] = selector_display_value(selector)
+    payload = prepare_payload(card)
 
     result = validator(payload)
 
@@ -162,8 +180,8 @@ async def insert_card(
 
     existing = mongo.find_one_with_context(
         cards_collection(),
-        {"name": payload.get("name"), "deleted": {"$ne": True}},
-        context_id=context_id
+        card_identity_query(payload),
+        context_id=context_id,
     )
 
     if existing:
@@ -183,7 +201,7 @@ async def insert_card(
         mongo.insert_one(
             cards_collection(),
             payload,
-            context_id=context_id
+            context_id=context_id,
         )
     except Exception as e:
         audit.log(
@@ -203,7 +221,7 @@ async def insert_card(
         identity=identity,
         request=request,
         target=payload.get("name"),
-        metadata={"selector": payload.get("selector")},
+        metadata={"selector": payload.get("selector"), "card_metadata": payload.get("metadata")},
     )
 
     return {"ok": True, "message": "Valid card. Inserted into database."}
@@ -218,12 +236,11 @@ async def pull_cards(
 ):
 
     context_id = request.state.context_id
-
     sel_type = body.selector_type
     sel_value = body.selector_value
     limit = body.limit
 
-    if not isinstance(sel_type, str) or not isinstance(sel_value, str):
+    if not isinstance(sel_type, str):
         audit.log(
             event="card_query_invalid_selector",
             severity="WARNING",
@@ -231,7 +248,7 @@ async def pull_cards(
             request=request,
             result="failure",
         )
-        raise HTTPException(status_code=400, detail="Type and value must be strings")
+        raise HTTPException(status_code=400, detail="Type must be a string")
 
     query = selector_query(sel_type, sel_value)
 
@@ -240,7 +257,7 @@ async def pull_cards(
             cards_collection(),
             query,
             context_id=context_id,
-            limit=limit
+            limit=limit,
         )
     except Exception as e:
         audit.log(
@@ -283,7 +300,7 @@ async def pull_all_cards(
         docs = mongo.find_with_context(
             cards_collection(),
             {"deleted": {"$ne": True}},
-            context_id=context_id
+            context_id=context_id,
         )
     except Exception as e:
         audit.log(
@@ -323,25 +340,21 @@ async def delete_cards(
 
     context_id = request.state.context_id
 
-    sel_type = body.selector_type
-    sel_value = body.selector_value
-
-    if not isinstance(sel_type, str) or not isinstance(sel_value, str):
-        audit.log(
-            event="card_delete_invalid_selector",
-            severity="WARNING",
-            identity=identity,
-            request=request,
-            result="failure",
-        )
-        raise HTTPException(status_code=400, detail="Type and value must be strings")
+    if body.card_name and body.card_name.strip():
+        query = {"name": body.card_name.strip()}
+        metadata = {"card_name": body.card_name.strip()}
+    elif body.selector_type:
+        query = selector_query(body.selector_type, body.selector_value)
+        metadata = {"selector_type": body.selector_type, "selector_value": body.selector_value}
+    else:
+        raise HTTPException(status_code=400, detail="card_name or selector_type is required")
 
     try:
         res = mongo.upsert_one(
             cards_collection(),
-            {"selector.type": sel_type, "selector.value": sel_value},
+            query,
             {"deleted": True, "deleted_at": datetime.now(UTC)},
-            context_id=context_id
+            context_id=context_id,
         )
     except Exception as e:
         audit.log(
@@ -359,7 +372,7 @@ async def delete_cards(
         severity="INFO",
         identity=identity,
         request=request,
-        metadata={"selector_type": sel_type, "selector_value": sel_value},
+        metadata=metadata,
     )
 
     return {"ok": True, "deleted": 1 if res else 0}
@@ -374,8 +387,7 @@ async def update_card(
 ):
 
     context_id = request.state.context_id
-
-    payload = new_card.model_dump()
+    payload = prepare_payload(new_card)
     result = validator(payload)
 
     if not result.get("valid"):
@@ -390,20 +402,7 @@ async def update_card(
         )
         raise HTTPException(status_code=400, detail=f"Schema validation failed: {result.get('error')}")
 
-    sel = payload.get("selector") or {}
-    sel_type, sel_value = sel.get("type"), sel.get("value")
-
-    if not isinstance(sel_type, str) or not isinstance(sel_value, str):
-        audit.log(
-            event="card_update_invalid_selector",
-            severity="WARNING",
-            identity=identity,
-            request=request,
-            result="failure",
-        )
-        raise HTTPException(status_code=400, detail="selector.type and selector.value must be strings")
-
-    filter_query = {"selector.type": sel_type, "selector.value": sel_value}
+    filter_query = card_identity_query(payload)
 
     payload["last_updated"] = datetime.now(UTC)
     payload["deleted"] = False
@@ -434,7 +433,7 @@ async def update_card(
         identity=identity,
         request=request,
         target=payload.get("name"),
-        metadata={"selector": payload.get("selector")},
+        metadata={"selector": payload.get("selector"), "card_metadata": payload.get("metadata")},
     )
 
     return {
