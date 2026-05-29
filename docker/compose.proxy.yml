@@ -13,4 +13,3 @@ services:
 networks:
   herringbone:
     name: herringbone_net
-    external: true

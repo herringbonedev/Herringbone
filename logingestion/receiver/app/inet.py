@@ -1,4 +1,5 @@
 import os
+import sys
 import socket
 import threading
 import time
@@ -6,7 +7,7 @@ import time
 from modules.database.mongo_db import HerringboneMongoDatabase
 from app.batcher import get_batch_writer
 from app.forwarder import forward_data, get_forward_batcher
-from app.keys import resolve_ingestion_key
+from app.keys import resolve_ingestion_key_value, ingestion_key_hash_prefix
 
 forward_route = os.environ.get("FORWARD_ROUTE", None)
 
@@ -14,7 +15,9 @@ PORT = int(os.environ.get("PORT", os.environ.get("CONTAINER_PORT", 7004)))
 UDP_BUFFER = int(os.environ.get("UDP_BUFFER", 65535))
 UDP_SOCKET_RCVBUF = int(os.environ.get("UDP_SOCKET_RCVBUF", 32 * 1024 * 1024))
 WORKER_THREADS = int(os.environ.get("RECEIVER_WORKERS", 8))
-INGESTION_KEY = str(os.environ.get("INGESTION_KEY", None))
+INGESTION_KEY = (os.environ.get("INGESTION_KEY") or "").strip()
+ENTERPRISE_MODE = os.environ.get("HB_ENTERPRISE", "false").lower() in ("1", "true", "yes")
+DEFAULT_CONTEXT_ID = os.environ.get("CONTEXT_ID", "default")
 DROP_LOG_INTERVAL = float(os.environ.get("RECEIVER_DROP_LOG_INTERVAL", "5.0"))
 TCP_BACKLOG = int(os.environ.get("TCP_BACKLOG", "1024"))
 TCP_RECV_BUFFER = int(os.environ.get("TCP_RECV_BUFFER", os.environ.get("UDP_BUFFER", "65535")))
@@ -45,20 +48,24 @@ def get_mongo():
     return mongo
 
 
-if INGESTION_KEY is None:
-    print(f"Falling back to to default context.")
-    CONTEXT_ID = "default"
+if not INGESTION_KEY:
+    if ENTERPRISE_MODE:
+        print("[✗] INGESTION_KEY is required in enterprise mode for UDP/TCP receivers", flush=True)
+        sys.exit(1)
+
+    CONTEXT_ID = DEFAULT_CONTEXT_ID
+    print(f"[*] No INGESTION_KEY provided. Falling back to context_id={CONTEXT_ID}", flush=True)
 else:
-    req = type("Req", (), {
-        "headers": {"X-Herringbone-Key": INGESTION_KEY}
-    })()
+    CONTEXT_ID = resolve_ingestion_key_value(INGESTION_KEY, get_mongo())
+    print(
+        f"Loaded context_id {CONTEXT_ID} "
+        f"ingestion_key_hash_prefix={ingestion_key_hash_prefix(INGESTION_KEY)}",
+        flush=True,
+    )
 
-    CONTEXT_ID = resolve_ingestion_key(req, get_mongo())
-    print(f"Loaded context_id {CONTEXT_ID}")
-
-    if CONTEXT_ID == None:
-        print(f"Provided Ingestion Key Ivalid.")
-        exit()
+    if CONTEXT_ID is None:
+        print("[✗] Provided ingestion key invalid.", flush=True)
+        sys.exit(1)
 
 
 def _log_drop(kind: str, forwarded: bool = False):
