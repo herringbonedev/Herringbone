@@ -1,6 +1,6 @@
 services:
   herringbone-search:
-    image: quay.io/herringbone/herringbone-search:de8abb26@sha256:d761163e0b0255616f9910f8d8ed301d8a6a9d9ba30eca60a0d33f69dd78bf81
+    image: quay.io/herringbone/herringbone-search:ec5eb832@sha256:ee656c750c5f183465a1a8d80d4df1558b76da36d109d4e1477d9b8719c98fff
     restart: unless-stopped
     depends_on:
       mongodb:
