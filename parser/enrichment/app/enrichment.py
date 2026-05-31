@@ -24,6 +24,24 @@ AUTO_DISCOVER_CONTEXTS = os.environ.get("AUTO_DISCOVER_CONTEXTS", "false").lower
 INCLUDE_MISSING_DEFAULT_CONTEXT = os.environ.get("INCLUDE_MISSING_DEFAULT_CONTEXT", "false").lower() == "true"
 EXTRACTOR_FALLBACK_ENABLED = os.environ.get("EXTRACTOR_FALLBACK_ENABLED", "true").lower() == "true"
 
+# Fingerprint enrichment is intentionally fail-open by default.
+# If the fingerprint service is down, parsing/extraction should keep moving unless
+# FINGERPRINT_FAIL_OPEN=false is explicitly set.
+FINGERPRINT_ENABLED = os.environ.get("FINGERPRINT_ENABLED", "true").lower() == "true"
+FINGERPRINT_SVC = os.environ.get(
+    "FINGERPRINT_SVC",
+    "http://fingerprint-identifier:7051/fingerprint/identifier/fingerprint",
+)
+FINGERPRINT_BATCH_SVC = os.environ.get(
+    "FINGERPRINT_BATCH_SVC",
+    "http://fingerprint-identifier:7051/fingerprint/identifier/fingerprint/batch",
+)
+FINGERPRINT_BATCH_SIZE = int(os.environ.get("FINGERPRINT_BATCH_SIZE", ENRICHMENT_BATCH_SIZE))
+FINGERPRINT_TIMEOUT_SECONDS = float(os.environ.get("FINGERPRINT_TIMEOUT_SECONDS", 15.0))
+FINGERPRINT_FAIL_OPEN = os.environ.get("FINGERPRINT_FAIL_OPEN", "true").lower() == "true"
+FINGERPRINT_SKIP_EXISTING = os.environ.get("FINGERPRINT_SKIP_EXISTING", "true").lower() == "true"
+FINGERPRINT_STORE_ERRORS = os.environ.get("FINGERPRINT_STORE_ERRORS", "true").lower() == "true"
+
 EXTRACTOR_SVC = os.environ.get("EXTRACTOR_SVC")
 EXTRACTOR_BATCH_SVC = os.environ.get("EXTRACTOR_BATCH_SVC")
 USE_TEST = EXTRACTOR_SVC == "test.service"
@@ -39,6 +57,8 @@ _metrics = {
     "processed": 0,
     "matched_cards": 0,
     "failed": 0,
+    "fingerprinted": 0,
+    "fingerprint_failed": 0,
     "batches": 0,
     "last_log": 0.0,
 }
@@ -52,6 +72,13 @@ _card_cache = {
 
 print("[*] Enrichment service has started")
 print(f"[*] Batch mode enabled batch_size={ENRICHMENT_BATCH_SIZE} extractor_batch_size={EXTRACTOR_BATCH_SIZE}")
+print(
+    "[*] Fingerprint mode "
+    f"enabled={FINGERPRINT_ENABLED} "
+    f"batch_svc={FINGERPRINT_BATCH_SVC} "
+    f"batch_size={FINGERPRINT_BATCH_SIZE} "
+    f"fail_open={FINGERPRINT_FAIL_OPEN}"
+)
 
 if USE_TEST:
     print("[*] [Test Service] Started in test mode")
@@ -80,6 +107,8 @@ def _maybe_log(interval: float = 5.0):
             "processed": _metrics["processed"],
             "matched_cards": _metrics["matched_cards"],
             "failed": _metrics["failed"],
+            "fingerprinted": _metrics["fingerprinted"],
+            "fingerprint_failed": _metrics["fingerprint_failed"],
             "batches": _metrics["batches"],
             "rate_per_sec": round(rate, 2),
             "batch_size": ENRICHMENT_BATCH_SIZE,
@@ -89,6 +118,8 @@ def _maybe_log(interval: float = 5.0):
     _metrics["processed"] = 0
     _metrics["matched_cards"] = 0
     _metrics["failed"] = 0
+    _metrics["fingerprinted"] = 0
+    _metrics["fingerprint_failed"] = 0
     _metrics["batches"] = 0
     _metrics["last_log"] = t
 
@@ -240,50 +271,32 @@ def safe_result_card_label(result: dict) -> str:
     return str(value)
 
 
-def _get_path_value(data: Any, path: str) -> Any:
-    """Small dot-path getter used by selector/exclude matching."""
-    if not path:
-        return None
-
-    cur = data
-    for part in str(path).split("."):
-        if isinstance(cur, dict):
-            cur = cur.get(part)
-        elif isinstance(cur, list) and part.isdigit():
-            idx = int(part)
-            if idx >= len(cur):
-                return None
-            cur = cur[idx]
-        else:
-            return None
-    return cur
-
-
 def _jsonpath_tokens(path: str) -> List[Any]:
     """
-    Parse a small, dependency-free JSONPath subset for selector matching.
+    Tiny dependency-free JSONPath tokenizer for selector matching.
 
-    Supported examples:
+    Supported:
       $.fingerprint.source_name
       fingerprint.source_name
-      $.http.request.headers[0].name
       $['fingerprint']['source_name']
+      $.items[0].name
       $.items[*].name
 
-    This intentionally avoids full JSONPath complexity so selectors stay fast
-    and deterministic inside the enrichment hot path.
+    This is intentionally a safe subset for card selectors, not a full JSONPath
+    implementation.
     """
     path = str(path or "").strip()
     if not path:
         return []
+
     if path.startswith("$"):
         path = path[1:]
     if path.startswith("."):
         path = path[1:]
 
     tokens: List[Any] = []
-    i = 0
     buf = ""
+    i = 0
 
     while i < len(path):
         ch = path[i]
@@ -300,19 +313,25 @@ def _jsonpath_tokens(path: str) -> List[Any]:
                 tokens.append(buf)
                 buf = ""
 
-            end = path.find("]", i + 1)
+            end = path.find("]", i)
             if end == -1:
-                return []
+                if path[i + 1:]:
+                    tokens.append(path[i + 1:])
+                break
 
-            raw = path[i + 1:end].strip()
-            if raw == "*":
+            inner = path[i + 1:end].strip()
+            if inner == "*":
                 tokens.append("*")
-            elif (raw.startswith("'") and raw.endswith("'")) or (raw.startswith('"') and raw.endswith('"')):
-                tokens.append(raw[1:-1])
-            elif raw.isdigit():
-                tokens.append(int(raw))
+            elif (
+                (inner.startswith("'") and inner.endswith("'"))
+                or (inner.startswith('"') and inner.endswith('"'))
+            ):
+                tokens.append(inner[1:-1])
             else:
-                tokens.append(raw)
+                try:
+                    tokens.append(int(inner))
+                except ValueError:
+                    tokens.append(inner)
 
             i = end + 1
             continue
@@ -323,46 +342,67 @@ def _jsonpath_tokens(path: str) -> List[Any]:
     if buf:
         tokens.append(buf)
 
-    return [t for t in tokens if t != ""]
+    return tokens
 
 
-def _jsonpath_values(data: Any, path: str) -> List[Any]:
-    """Return all values matching the supported JSONPath subset."""
+def _flatten_values(value: Any) -> List[Any]:
+    if isinstance(value, list):
+        out: List[Any] = []
+        for item in value:
+            out.extend(_flatten_values(item))
+        return out
+    return [value]
+
+
+def _get_path_values(data: Any, path: str) -> List[Any]:
     tokens = _jsonpath_tokens(path)
     if not tokens:
         return []
 
-    current = [data]
+    current: List[Any] = [data]
 
     for token in tokens:
-        nxt: List[Any] = []
+        next_values: List[Any] = []
 
         for item in current:
             if token == "*":
                 if isinstance(item, dict):
-                    nxt.extend(item.values())
+                    next_values.extend(item.values())
                 elif isinstance(item, list):
-                    nxt.extend(item)
+                    next_values.extend(item)
+                continue
+
+            if isinstance(token, int):
+                if isinstance(item, list) and 0 <= token < len(item):
+                    next_values.append(item[token])
                 continue
 
             if isinstance(item, dict):
                 if token in item:
-                    nxt.append(item[token])
+                    next_values.append(item.get(token))
                 continue
 
             if isinstance(item, list):
-                if isinstance(token, int) and 0 <= token < len(item):
-                    nxt.append(item[token])
-                elif isinstance(token, str) and token.isdigit():
-                    idx = int(token)
-                    if 0 <= idx < len(item):
-                        nxt.append(item[idx])
+                for child in item:
+                    if isinstance(child, dict) and token in child:
+                        next_values.append(child.get(token))
 
-        current = nxt
+        current = next_values
+
         if not current:
-            break
+            return []
 
-    return current
+    return _flatten_values(current)
+
+
+def _get_path_value(data: Any, path: str) -> Any:
+    """Compatibility wrapper: return the first JSONPath/dot-path value."""
+    values = _get_path_values(data, path)
+    if not values:
+        return None
+    if len(values) == 1:
+        return values[0]
+    return values
 
 
 def _value_text(value: Any) -> str:
@@ -373,58 +413,54 @@ def _value_text(value: Any) -> str:
     return str(value)
 
 
-def _selector_compare(candidate: Any, expected: Any, mode: str, *, selector_type: str = "") -> bool:
-    """Compare one selector candidate using exact, regex, or contains semantics."""
-    mode = str(mode or "").strip().lower()
+def _selector_match_values(values: List[Any], expected: Any, match_mode: str, selector_type: str) -> bool:
     expected_s = str(expected)
-    candidate_s = _value_text(candidate)
+    match_mode = str(match_mode or "").strip().lower()
 
-    if mode in {"", "auto"}:
-        # Preserve older field/path behavior unless callers explicitly ask for exact/regex.
-        mode = "contains" if selector_type in {"field", "path", "json"} else "exact"
+    # Backward compatibility:
+    # - old field/path/json/jsonpath selectors behaved like substring contains.
+    # - new cards can explicitly ask for exact or regex.
+    if match_mode == "":
+        match_mode = "contains"
 
-    if mode in {"exact", "eq", "equals", "=="}:
-        return candidate_s == expected_s
+    if match_mode in {"equals", "eq"}:
+        match_mode = "exact"
+    elif match_mode in {"matches", "regexp"}:
+        match_mode = "regex"
+    elif match_mode in {"substring", "includes"}:
+        match_mode = "contains"
 
-    if mode in {"contains", "substring", "in"}:
-        return expected_s in candidate_s
+    for value in values:
+        candidate = _value_text(value)
 
-    if mode in {"regex", "matches", "re"}:
-        try:
-            return re.search(expected_s, candidate_s) is not None
-        except re.error as e:
-            audit.log(
-                event="parser_selector_regex_failed",
-                result="failure",
-                severity="WARNING",
-                metadata={
-                    "selector_type": selector_type,
-                    "pattern": expected_s,
-                    "error": str(e),
-                },
-            )
-            return False
+        if match_mode == "exact":
+            if candidate == expected_s:
+                return True
+            continue
 
-    if mode in {"not_equals", "ne", "!=", "not_exact"}:
-        return candidate_s != expected_s
+        if match_mode == "regex":
+            try:
+                if re.search(expected_s, candidate) is not None:
+                    return True
+            except re.error as e:
+                audit.log(
+                    event="parser_selector_regex_failed",
+                    result="failure",
+                    severity="WARNING",
+                    metadata={
+                        "selector_type": selector_type,
+                        "pattern": expected_s,
+                        "error": str(e),
+                    },
+                )
+                return False
+            continue
 
-    if mode in {"not_regex", "not_matches"}:
-        try:
-            return re.search(expected_s, candidate_s) is None
-        except re.error as e:
-            audit.log(
-                event="parser_selector_regex_failed",
-                result="failure",
-                severity="WARNING",
-                metadata={
-                    "selector_type": selector_type,
-                    "pattern": expected_s,
-                    "error": str(e),
-                },
-            )
-            return False
+        # Default and unknown match modes are conservative substring matches
+        # to preserve existing card behavior.
+        if expected_s in candidate:
+            return True
 
-    # Unknown compare modes fail closed.
     return False
 
 
@@ -478,31 +514,22 @@ def _selector_positive_matches(selector: dict, event: dict) -> bool:
             )
             return False
 
-    # Structured selector support for fingerprint and parsed/JSON event fields.
-    # Preferred shape:
-    #   {"type":"jsonpath", "path":"$.fingerprint.source_name", "match":"exact", "value":"Cloudflare"}
-    # Backward-compatible shape:
-    #   {"type":"field", "field":"fingerprint.source_name", "value":"Cloudflare"}
+    # Structured selector support.
+    #
+    # New style:
+    #   {"type":"jsonpath","path":"$.fingerprint.source_name","match":"exact","value":"Cloudflare"}
+    #   {"type":"jsonpath","path":"$.fingerprint.source_name","match":"regex","value":"(?i)^cloudflare$"}
+    #
+    # Backward-compatible style:
+    #   {"type":"field","field":"fingerprint.source_name","value":"Cloudflare"}
     if stype in {"field", "path", "json", "jsonpath"}:
-        path = (
-            selector.get("path")
-            or selector.get("field")
-            or selector.get("jsonpath")
-            or selector.get("key")
-        )
-        if not path:
-            return False
-
-        values = _jsonpath_values(event, str(path))
-        if not values and not str(path).lstrip().startswith("$"):
-            legacy_value = _get_path_value(event, str(path))
-            if legacy_value is not None:
-                values = [legacy_value]
-
-        match_mode = selector.get("match") or selector.get("operator") or selector.get("compare")
-        return any(
-            _selector_compare(candidate, value, str(match_mode or ""), selector_type=stype)
-            for candidate in values
+        field = selector.get("field") or selector.get("path") or selector.get("jsonpath")
+        values = _get_path_values(event, str(field or ""))
+        return _selector_match_values(
+            values,
+            value,
+            str(selector.get("match") or selector.get("operator") or ""),
+            stype,
         )
 
     return False
@@ -536,11 +563,76 @@ def selector_matches(selector: dict, event: dict) -> bool:
     return True
 
 
+def _normalize_result_values(value: Any) -> list:
+    """Return a stable, de-duplicated list of meaningful extracted values."""
+    values = value if isinstance(value, list) else [value]
+    output = []
+    seen = set()
+
+    for item in values:
+        if item is None:
+            continue
+        if isinstance(item, str) and item == "":
+            continue
+        if isinstance(item, list) and not item:
+            continue
+        if isinstance(item, dict) and not item:
+            continue
+
+        safe_item = _json_safe(item)
+        key = repr(safe_item)
+        if key in seen:
+            continue
+
+        seen.add(key)
+        output.append(safe_item)
+
+    return output
+
+
 def normalize_results(results: dict) -> dict:
     normalized = {}
-    for k, v in results.items():
-        normalized[k] = v if isinstance(v, list) else [v]
+    for k, v in (results or {}).items():
+        values = _normalize_result_values(v)
+        if values:
+            normalized[k] = values
     return normalized
+
+
+def has_normalized_results(results: dict) -> bool:
+    return bool(normalize_results(results))
+
+
+def _dedupe_key(value: Any) -> str:
+    return repr(_json_safe(value))
+
+
+def filter_new_result_values(results: dict, seen_by_field: Dict[str, set]) -> dict:
+    """
+    Normalize extracted values and keep only values not already emitted for this event.
+
+    Multiple cards can intentionally share the same selector. If several cards
+    extract common fields such as ray_id/client_ip/event_timestamp, downstream
+    event views that merge parse_results would otherwise show repeated values.
+    """
+    normalized = normalize_results(results)
+    filtered: Dict[str, list] = {}
+
+    for field, values in normalized.items():
+        seen = seen_by_field.setdefault(field, set())
+        output = []
+
+        for value in values:
+            key = _dedupe_key(value)
+            if key in seen:
+                continue
+            seen.add(key)
+            output.append(value)
+
+        if output:
+            filtered[field] = output
+
+    return filtered
 
 
 def run_regex_rules(card: dict, raw_log: str) -> dict:
@@ -560,6 +652,348 @@ def run_regex_rules(card: dict, raw_log: str) -> dict:
         if m:
             results[rule["name"]] = [m.group(0)]
     return results
+
+
+
+def _event_context_query(event_id: Any, context_id: str) -> dict:
+    """Build a context-safe events update query."""
+    query = {"_id": event_id}
+
+    if context_id == DEFAULT_CONTEXT_ID and not ENTERPRISE_MODE:
+        query["$or"] = [
+            {"context_id": context_id},
+            {"context_id": {"$exists": False}},
+            {"context_id": None},
+            {"context_id": ""},
+        ]
+    else:
+        query["context_id"] = context_id
+
+    return query
+
+
+def _compact_fingerprint_decision(decision: Any) -> dict:
+    """
+    Store a stable fingerprint object on the event.
+
+    The fingerprint service currently returns fields such as source_id,
+    source_name, status, confidence, score, threshold, gap, reason,
+    best_guess, and second_guess. Keep unknown future fields too, but pass
+    them through _json_safe so Mongo writes do not fail on odd values.
+    """
+    if not isinstance(decision, dict):
+        return {
+            "status": "unknown",
+            "confidence": "none",
+            "reason": "invalid_fingerprint_response",
+            "raw_response": _json_safe(decision),
+        }
+
+    return _json_safe(decision)
+
+
+def _fingerprint_jobs_for_events(events: List[dict]) -> List[dict]:
+    jobs: List[dict] = []
+
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+
+        event_id = event.get("_id")
+        raw_log = event.get("raw", "") or ""
+
+        if event_id is None or not raw_log:
+            continue
+
+        if FINGERPRINT_SKIP_EXISTING and isinstance(event.get("fingerprint"), dict):
+            continue
+
+        jobs.append({
+            "event_id": event_id,
+            "event_key": str(event_id),
+            "event": event,
+            "raw": raw_log,
+        })
+
+    return jobs
+
+
+def call_fingerprint(raw_log: str, context_id: str) -> dict:
+    if not FINGERPRINT_SVC:
+        raise RuntimeError("FINGERPRINT_SVC is not set")
+
+    resp = requests.post(
+        FINGERPRINT_SVC,
+        json={"raw": raw_log},
+        headers=service_auth_headers(context_id),
+        timeout=FINGERPRINT_TIMEOUT_SECONDS,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if not isinstance(data, dict):
+        raise RuntimeError("Fingerprint service returned invalid result shape")
+    return _compact_fingerprint_decision(data)
+
+
+def call_fingerprint_batch(jobs: List[dict], context_id: str) -> List[dict]:
+    if not jobs:
+        return []
+
+    if FINGERPRINT_BATCH_SVC:
+        resp = requests.post(
+            FINGERPRINT_BATCH_SVC,
+            json={"logs": [job.get("raw", "") for job in jobs]},
+            headers=service_auth_headers(context_id),
+            timeout=FINGERPRINT_TIMEOUT_SECONDS,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        if isinstance(data, dict) and isinstance(data.get("results"), list):
+            return [_compact_fingerprint_decision(item) for item in data["results"]]
+
+        if isinstance(data, list):
+            return [_compact_fingerprint_decision(item) for item in data]
+
+        raise RuntimeError("Batch fingerprint service returned invalid result shape")
+
+    return [call_fingerprint(job.get("raw", ""), context_id) for job in jobs]
+
+
+def call_fingerprint_batch_with_retry(jobs: List[dict], context_id: str, attempts: int = 3) -> List[dict]:
+    last_error: Optional[Exception] = None
+
+    for attempt in range(1, attempts + 1):
+        try:
+            return call_fingerprint_batch(jobs, context_id)
+
+        except requests.exceptions.RequestException as e:
+            last_error = e
+            audit.log(
+                event="fingerprint_batch_retryable_failure",
+                severity="WARNING" if attempt < attempts else "ERROR",
+                result="retry" if attempt < attempts else "failure",
+                metadata={
+                    "context_id": context_id,
+                    "attempt": attempt,
+                    "max_attempts": attempts,
+                    "jobs": len(jobs),
+                    "fingerprint_batch_svc": FINGERPRINT_BATCH_SVC,
+                    "error": str(e),
+                    "error_type": e.__class__.__name__,
+                    "sleep_seconds": round(0.25 * attempt, 3) if attempt < attempts else 0,
+                },
+            )
+
+            if attempt < attempts:
+                time.sleep(0.25 * attempt)
+
+        except Exception as e:
+            last_error = e
+            audit.log(
+                event="fingerprint_batch_failure",
+                severity="ERROR",
+                result="failure",
+                metadata={
+                    "context_id": context_id,
+                    "jobs": len(jobs),
+                    "fingerprint_batch_svc": FINGERPRINT_BATCH_SVC,
+                    "error": str(e),
+                    "error_type": e.__class__.__name__,
+                },
+            )
+            break
+
+    raise last_error or RuntimeError("Fingerprint batch failed")
+
+
+def update_event_fingerprint_docs(mongo, bulk, updates: List[dict], context_id: str) -> int:
+    """
+    Persist per-event fingerprint values to events.fingerprint.
+
+    The bulk wrapper's update_many_by_ids applies the same patch to every ID,
+    so per-event fingerprint values need either raw PyMongo update_one calls or
+    one wrapper call per event as a safe fallback.
+    """
+    if not updates:
+        return 0
+
+    db = get_raw_db(mongo)
+    modified = 0
+
+    if db is not None:
+        collection = db["events"]
+        for item in updates:
+            event_id = item.get("event_id")
+            patch = item.get("patch") or {}
+            if event_id is None or not patch:
+                continue
+            res = collection.update_one(
+                _event_context_query(event_id, context_id),
+                {"$set": patch},
+            )
+            modified += getattr(res, "modified_count", 0)
+        return modified
+
+    for item in updates:
+        event_id = item.get("event_id")
+        patch = item.get("patch") or {}
+        if event_id is None or not patch:
+            continue
+        try:
+            modified += bulk.update_many_by_ids(
+                "events",
+                [event_id],
+                patch,
+                context_id=context_id,
+                id_field="_id",
+                include_missing_default_context=False,
+            )
+        except Exception:
+            # Do not hide wrapper failures here; caller decides fail-open behavior.
+            raise
+
+    return modified
+
+
+def mark_event_fingerprint_error(mongo, bulk, events: List[dict], context_id: str, error: str) -> int:
+    if not FINGERPRINT_STORE_ERRORS or not events:
+        return 0
+
+    error_doc = {
+        "status": "error",
+        "confidence": "none",
+        "reason": "fingerprint_service_error",
+        "error": str(error),
+    }
+    stamped_at = utcnow()
+    updates = []
+
+    for event in events:
+        event_id = event.get("_id")
+        if event_id is None:
+            continue
+        patch = {
+            "fingerprint": error_doc,
+            "fingerprinted": False,
+            "fingerprint_error": str(error),
+            "fingerprinted_at": stamped_at,
+        }
+        event["fingerprint"] = error_doc
+        updates.append({"event_id": event_id, "patch": patch})
+
+    return update_event_fingerprint_docs(mongo, bulk, updates, context_id)
+
+
+def enrich_events_with_fingerprint(mongo, bulk, events: List[dict], context_id: str):
+    """
+    Add events.fingerprint before card selection/extraction.
+
+    This lets parse-card selectors use paths like fingerprint.source_id once the
+    event has been updated in memory and persisted back to MongoDB.
+    """
+    if not FINGERPRINT_ENABLED:
+        return
+
+    jobs = _fingerprint_jobs_for_events(events)
+    if not jobs:
+        return
+
+    total_updated = 0
+    total_attempted = 0
+
+    for job_chunk in chunks(jobs, FINGERPRINT_BATCH_SIZE):
+        chunk_events = [job["event"] for job in job_chunk]
+
+        try:
+            decisions = call_fingerprint_batch_with_retry(job_chunk, context_id)
+        except Exception as e:
+            _metrics["fingerprint_failed"] += len(job_chunk)
+            audit.log(
+                event="fingerprint_enrichment_failed",
+                result="failure" if not FINGERPRINT_FAIL_OPEN else "warning",
+                severity="ERROR" if not FINGERPRINT_FAIL_OPEN else "WARNING",
+                metadata={
+                    "context_id": context_id,
+                    "jobs": len(job_chunk),
+                    "error": str(e),
+                    "fail_open": FINGERPRINT_FAIL_OPEN,
+                },
+            )
+            mark_event_fingerprint_error(mongo, bulk, chunk_events, context_id, str(e))
+            if FINGERPRINT_FAIL_OPEN:
+                continue
+            raise
+
+        if len(decisions) != len(job_chunk):
+            audit.log(
+                event="fingerprint_result_count_mismatch",
+                result="warning",
+                severity="WARNING",
+                metadata={
+                    "context_id": context_id,
+                    "jobs": len(job_chunk),
+                    "results": len(decisions),
+                },
+            )
+
+        stamped_at = utcnow()
+        updates = []
+
+        for idx, job in enumerate(job_chunk):
+            if idx >= len(decisions):
+                _metrics["fingerprint_failed"] += 1
+                continue
+
+            decision = _compact_fingerprint_decision(decisions[idx])
+            event = job["event"]
+            event["fingerprint"] = decision
+            event["fingerprinted"] = True
+            event["fingerprinted_at"] = stamped_at
+
+            updates.append({
+                "event_id": job["event_id"],
+                "patch": {
+                    "fingerprint": decision,
+                    "fingerprinted": True,
+                    "fingerprint_error": None,
+                    "fingerprinted_at": stamped_at,
+                },
+            })
+
+        total_attempted += len(job_chunk)
+
+        try:
+            total_updated += update_event_fingerprint_docs(mongo, bulk, updates, context_id)
+            _metrics["fingerprinted"] += len(updates)
+        except Exception as e:
+            _metrics["fingerprint_failed"] += len(updates)
+            audit.log(
+                event="fingerprint_persist_failed",
+                result="failure" if not FINGERPRINT_FAIL_OPEN else "warning",
+                severity="ERROR" if not FINGERPRINT_FAIL_OPEN else "WARNING",
+                metadata={
+                    "context_id": context_id,
+                    "updates": len(updates),
+                    "error": str(e),
+                    "fail_open": FINGERPRINT_FAIL_OPEN,
+                },
+            )
+            if not FINGERPRINT_FAIL_OPEN:
+                raise
+
+    if DEBUG_BATCH_COUNTS:
+        audit.log(
+            event="fingerprint_enrichment_debug",
+            severity="INFO",
+            metadata={
+                "context_id": context_id,
+                "events": len(events),
+                "attempted": total_attempted,
+                "updated": total_updated,
+                "skip_existing": FINGERPRINT_SKIP_EXISTING,
+            },
+        )
 
 
 def call_extractor(card: dict, raw_log: str, context_id: str = DEFAULT_CONTEXT_ID) -> dict:
@@ -705,6 +1139,7 @@ def prepare_cards(cards: List[dict]) -> dict:
 
     New:
       - raw_regex selector: regex match against raw log
+      - field/jsonpath selectors: structured event matching using match=contains/exact/regex
       - selector.not / selector.and_not: optional negative match rules
     """
     prepared = {
@@ -1050,6 +1485,10 @@ def process_batch(mongo, bulk, context_id: str, states: List[dict]):
         _metrics["processed"] += len(missing_event_ids)
         _metrics["failed"] += len(missing_event_ids)
 
+    # Fingerprint first so selector_matches() can use paths such as
+    # fingerprint.source_id / fingerprint.confidence during the same pass.
+    enrich_events_with_fingerprint(mongo, bulk, list(events_by_id.values()), context_id)
+
     prepared_cards = get_prepared_cards_cached(mongo, context_id)
 
     if DEBUG_BATCH_COUNTS:
@@ -1068,18 +1507,24 @@ def process_batch(mongo, bulk, context_id: str, states: List[dict]):
 
     parse_docs: List[dict] = []
     extractor_jobs: List[dict] = []
+    seen_results_by_event: Dict[str, Dict[str, set]] = {}
 
     for event in events_by_id.values():
         raw_log = event.get("raw", "") or ""
+        event_key = event_id_for_result(event)
+        event_seen = seen_results_by_event.setdefault(event_key, {})
+
         for card in matching_cards_for_event(prepared_cards, event):
             try:
                 regex_results = run_regex_rules(card, raw_log)
-                if regex_results:
-                    parse_docs.append(build_success_doc(event, card, regex_results, context_id))
-                    _metrics["matched_cards"] += 1
+                if has_normalized_results(regex_results):
+                    filtered_results = filter_new_result_values(regex_results, event_seen)
+                    if filtered_results:
+                        parse_docs.append(build_success_doc(event, card, filtered_results, context_id))
+                        _metrics["matched_cards"] += 1
                 elif EXTRACTOR_FALLBACK_ENABLED:
                     extractor_jobs.append({
-                        "event_id": event_id_for_result(event),
+                        "event_id": event_key,
                         "event": event,
                         "card": card,
                         "raw": raw_log,
@@ -1137,7 +1582,16 @@ def process_batch(mongo, bulk, context_id: str, states: List[dict]):
                 _metrics["failed"] += 1
                 continue
 
-            parse_docs.append(build_success_doc(event, card, fields, context_id))
+            if not has_normalized_results(fields):
+                continue
+
+            event_key = event_id_for_result(event)
+            event_seen = seen_results_by_event.setdefault(event_key, {})
+            filtered_fields = filter_new_result_values(fields, event_seen)
+            if not filtered_fields:
+                continue
+
+            parse_docs.append(build_success_doc(event, card, filtered_fields, context_id))
             _metrics["matched_cards"] += 1
 
     insert_parse_results_bulk(bulk, parse_docs, context_id=context_id)
@@ -1182,6 +1636,12 @@ def main():
             "extractor": EXTRACTOR_SVC,
             "extractor_batch": EXTRACTOR_BATCH_SVC,
             "extractor_fallback_enabled": EXTRACTOR_FALLBACK_ENABLED,
+            "fingerprint_enabled": FINGERPRINT_ENABLED,
+            "fingerprint_svc": FINGERPRINT_SVC,
+            "fingerprint_batch_svc": FINGERPRINT_BATCH_SVC,
+            "fingerprint_batch_size": FINGERPRINT_BATCH_SIZE,
+            "fingerprint_fail_open": FINGERPRINT_FAIL_OPEN,
+            "fingerprint_skip_existing": FINGERPRINT_SKIP_EXISTING,
             "batch_size": ENRICHMENT_BATCH_SIZE,
             "extractor_batch_size": EXTRACTOR_BATCH_SIZE,
             "lease_seconds": CLAIM_LEASE_SECONDS,

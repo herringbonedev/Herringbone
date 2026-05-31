@@ -10,6 +10,19 @@ from app.serializer import serialize
 from app.config import SORTABLE_FIELDS, MAX_ENUM_VALUES
 
 
+def mongo_database(mongo):
+    """Return the PyMongo database using the public Mongo wrapper API."""
+    _, db = mongo.open_mongo_connection()
+    return db
+
+
+def with_context_filter(filter_query, context_id: str):
+    query = dict(filter_query or {})
+    if context_id:
+        query["context_id"] = context_id
+    return query
+
+
 def search_collection_service(mongo, collection, params, context_id: str):
     filter_query = parse_q_string(params.q)
 
@@ -58,6 +71,28 @@ def search_collection_service(mongo, collection, params, context_id: str):
 
     return results, next_after
 
+
+
+def count_collection_service(mongo, collection, params, context_id: str):
+    filter_query = parse_q_string(params.q)
+
+    filter_query = build_range_filters(
+        collection=collection,
+        filter_query=filter_query,
+        severity_min=params.severity_min,
+        severity_max=params.severity_max,
+        from_ts=params.from_ts,
+        to_ts=params.to_ts,
+        filter_field=params.filter_field,
+        filter_kind=params.filter_kind,
+        filter_min=params.filter_min,
+        filter_max=params.filter_max,
+        filter_in=params.filter_in,
+        filter_value=params.filter_value,
+    )
+
+    db = mongo_database(mongo)
+    return db[collection].count_documents(with_context_filter(filter_query, context_id))
 
 def _field_type(value):
     if isinstance(value, bool):

@@ -10,7 +10,7 @@ from modules.auth.auth import require_scopes
 from modules.audit.logger import AuditLogger
 
 from app.config import ALLOWED_COLLECTIONS, MAX_LIMIT, MAX_SCHEMA_SAMPLE
-from app.service import search_collection_service, get_collection_schema
+from app.service import search_collection_service, count_collection_service, get_collection_schema
 
 
 search_read = require_scopes("search:query")
@@ -157,6 +157,96 @@ async def collection_schema(
             },
         )
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _search_collection_count_response(
+    *,
+    collection: str,
+    request: Request,
+    params: SearchParams,
+    mongo,
+    identity,
+):
+    assert_allowed_collection(collection)
+
+    context_id = request.state.context_id
+
+    try:
+        count = count_collection_service(
+            mongo=mongo,
+            collection=collection,
+            params=params,
+            context_id=context_id,
+        )
+
+        audit.log(
+            event="search_collection_count",
+            identity=identity,
+            request=request,
+            metadata={
+                "collection": collection,
+                "query": params.q,
+                "count": count,
+                "context_id": context_id,
+            },
+        )
+
+        return {
+            "collection": collection,
+            "count": count,
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        audit.log(
+            event="search_collection_count_failed",
+            identity=identity,
+            request=request,
+            result="failure",
+            severity="ERROR",
+            metadata={
+                "collection": collection,
+                "context_id": context_id,
+                "error": str(e),
+            },
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/count/{collection}")
+async def search_collection_count_canonical(
+    collection: str,
+    request: Request,
+    params: SearchParams = Depends(get_params),
+    mongo=Depends(get_mongo),
+    identity=Depends(search_read),
+):
+    return await _search_collection_count_response(
+        collection=collection,
+        request=request,
+        params=params,
+        mongo=mongo,
+        identity=identity,
+    )
+
+
+@router.get("/{collection}/count")
+async def search_collection_count_legacy(
+    collection: str,
+    request: Request,
+    params: SearchParams = Depends(get_params),
+    mongo=Depends(get_mongo),
+    identity=Depends(search_read),
+):
+    return await _search_collection_count_response(
+        collection=collection,
+        request=request,
+        params=params,
+        mongo=mongo,
+        identity=identity,
+    )
 
 
 @router.get("/{collection}")
