@@ -2,6 +2,7 @@ services:
   mongodb:
     image: mongo:7.0
     restart: unless-stopped
+    container_name: mongodb
     networks:
     - herringbone
     ports:
