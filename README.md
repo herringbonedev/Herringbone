@@ -1,56 +1,130 @@
-# Herringbone  
+# Herringbone
 
-**Herringbone** is a modular framework for building SIEM and log management systems. It is designed to be flexible, composable, and deployable in many different ways, depending on your needs.
+**Herringbone** is a modular SIEM and log management platform built from small, independently deployable services.
 
-![Homepage screenshot](docs/images/homepage.png)
+It is designed for teams that want flexible log ingestion, parsing, search, detection, incident creation, and enrichment without being locked into a giant all-or-nothing platform.
 
-## Learn how to use Herringbone  
+Herringbone can run as a full stack, or you can run only the pieces you need.
 
-See the [Wiki](https://github.com/herringbonedev/Herringbone/wiki) for guides, concepts, and usage documentation.
+![Herringbone homepage](docs/images/homepage.png)
 
-## Overview  
+## What Herringbone Does
 
-Herringbone is built from small, independent services called **elements**.  
-Each element performs a single, well-defined function and can run on its own.
+Herringbone helps you collect, parse, search, detect, and respond to security-relevant logs.
 
-Related elements can be grouped into **Units**, which represent a larger capability or purpose. Units are organizational—not mandatory deployment boundaries.
+Core capabilities include:
 
-For example, the **Detection Engine Unit** includes the **Ruleset** and **Detector** elements:
-- **Ruleset** manages detection rules
-- **Detector** evaluates logs against those rules and produces detections
+- Log ingestion over TCP, UDP, and HTTP
+- Parser cards for turning raw logs into structured events
+- Search APIs for querying stored logs
+- Detection rules and detection results
+- Incident creation and correlation
+- Service-to-service authentication
+- Optional enterprise features for organizations, contexts, and multi-tenant deployments
+- Optional AI-assisted enrichment and classification workflows
 
-You can run these elements together, separately, or alongside other systems. You are never required to deploy a full Unit.
+## How It Is Organized
 
-## Core Principles  
+Herringbone is built from independent services called **elements**.
 
-All elements follow two core principles:
+An element is a single service with one job. Examples include:
 
-1. **Independence**  
-   Each element can run and scale on its own without tight coupling to other elements.
+- `logingestion-receiver`
+- `parser-extractor`
+- `parser-cardset`
+- `herringbone-search`
+- `detectionengine-ruleset`
+- `detectionengine-detector`
+- `incidents-orchestrator`
+- `herringbone-auth`
 
-2. **Interoperability**  
-   Elements communicate through consistent, well-defined inputs and outputs, making them easy to integrate with each other or with external systems.
+Related elements are grouped into **units**. Units are a way to organize the platform, not a requirement that everything must be deployed together.
 
-Because of this, Herringbone components can be deployed almost anywhere. While development and testing focus on Kubernetes, elements can run as standalone containers across different environments as long as they share access to the same data store.
+For example, the Detection Engine unit includes services for managing rules and evaluating logs against those rules.
 
-## Features  
+## Core vs Enterprise
 
-- Independent, composable elements  
-- Optional Units for organizing related functionality  
-- AI-assisted elements with Bring Your Own Model support  
-- Designed for Kubernetes but runnable in any container environment  
-- Consistent interfaces for integration and extension  
+Herringbone supports two deployment modes.
 
-## Getting Started  
+### Core
 
-1. Read the **Concepts** documentation to understand how Herringbone is structured  
-2. Review the available **Units** and **elements**  
-3. Deploy only what you need and expand over time  
+Core is the free/single-context deployment. It is meant for local deployments, labs, small environments, and users who want the basic Herringbone pipeline without enterprise organization management.
 
-## Contributing  
+### Enterprise
 
-Contributions are welcome. Please read the [Contributing guide](./CONTRIBUTING.md) before submitting issues or pull requests. All changes require review before merging.
+Enterprise adds organization and context-aware behavior for multi-tenant or customer-facing deployments.
 
-## License  
+Enterprise mode is intended for MSPs, hosted deployments, and environments where multiple organizations or customers need to share the same Herringbone platform safely.
+
+## Deployment
+
+Herringbone is container-first.
+
+Development and testing commonly use Docker Compose. Production deployments may use Kubernetes or another container orchestration platform.
+
+The included `hbctl` tool is the recommended way to manage local Compose-based deployments.
+
+Common commands:
+
+```bash
+hbctl start --all
+hbctl status
+hbctl stop --all
+hbctl upgrade --all
+```
+
+Enterprise mode:
+
+```bash
+hbctl start --all --enterprise
+hbctl upgrade --all --enterprise
+```
+
+Receivers are managed separately so each receiver can keep its own port and deployment shape:
+
+```bash
+hbctl receiver start --type udp --port 7004
+```
+
+## Getting Started
+
+For setup and usage documentation, see the project wiki:
+
+https://github.com/herringbonedev/Herringbone/wiki
+
+A typical local workflow is:
+
+```bash
+hbctl start --all
+hbctl receiver start --type udp --port 7004
+hbctl status
+```
+
+Then send logs to the receiver and use the UI or APIs to inspect parsed events, search results, detections, and incidents.
+
+## Project Goals
+
+Herringbone is built around a few practical goals:
+
+- Keep services small and understandable
+- Allow individual components to scale independently
+- Avoid forcing users into one deployment model
+- Make log parsing and detection workflows easy to extend
+- Support both simple single-context deployments and larger enterprise deployments
+- Keep operational control in the hands of the user
+
+## Status
+
+Herringbone is under active development.
+
+APIs, service boundaries, and deployment files may change between alpha releases. Use the release notes and wiki for upgrade guidance.
+
+## Contributing
+
+Contributions are welcome.
+
+Please read the [Contributing guide](./CONTRIBUTING.md) before submitting issues or pull requests.
+
+## License
 
 Herringbone is released under the [Apache 2.0 License](LICENSE).
