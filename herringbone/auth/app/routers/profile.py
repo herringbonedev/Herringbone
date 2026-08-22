@@ -27,7 +27,7 @@ from app.schemas import (
     UserProfileUpdateRequest
 )
 
-router = APIRouter(prefix="/herringbone/auth/user_profile", tags=["users"])
+router = APIRouter(prefix="/herringbone/auth/user_profile", tags=["profile"])
 
 identity = Depends(get_identity)
 admin = Depends(require_scopes("platform:admin"))
@@ -57,6 +57,8 @@ async def list_users(
     print(identity)
     print(context)
 
+    return(str(identity))
+
 
 @router.get("/set")
 async def list_users(
@@ -66,3 +68,5 @@ async def list_users(
 ):
     print(identity)
     print(context)
+
+    return(str(identity))
