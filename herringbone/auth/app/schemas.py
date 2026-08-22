@@ -41,3 +41,6 @@ class OrgMemberUpsertRequest(BaseModel):
     email: EmailStr
     role: str = "member"
     scopes: Optional[list[str]] = None
+
+class UserProfileUpdateRequest(BaseModel):
+    title: Optional[str] = None
