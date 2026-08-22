@@ -49,7 +49,7 @@ def get_audit_logger():
 
 
 @router.get("/get")
-async def list_users(
+async def get_user_profile(
     request: Request,
     context=Depends(get_context),
     audit: AuditLogger = Depends(get_audit_logger),
@@ -59,25 +59,23 @@ async def list_users(
     context_id = context.get("context_id")
     enterprise_enabled = context.get("enterprise_enabled", False)
 
-    return(
-        {
-            "user_id": str(identity["_id"]),
-            "email": identity["email"],
-            "first_name": identity.get("first_name", ""),
-            "last_name": identity.get("last_name", ""),
-            "organization_id": str(identity.get("organization_id", "")),
-            "organization_name": identity.get("organization_name", ""),
-            "scopes": identity.get("scopes", []),
-            "context_id": context_id,
-            "enterprise_enabled": enterprise_enabled,
-        }
-    )
+    return {
+        "user_id": identity.get("sub"),
+        "email": identity.get("email"),
+        "first_name": identity.get("first_name", ""),
+        "last_name": identity.get("last_name", ""),
+        "organization_id": identity.get("organization_id", ""),
+        "organization_name": identity.get("organization_name", ""),
+        "scopes": identity.get("scope", []),
+        "context_id": context_id,
+        "enterprise_enabled": enterprise_enabled,
+    }
 
     return(str(identity))
 
 
-@router.get("/set")
-async def list_users(
+@router.post("/set")
+async def set_user_profile(
     request: Request,
     context=Depends(get_context),
     audit: AuditLogger = Depends(get_audit_logger),
@@ -87,16 +85,14 @@ async def list_users(
     context_id = context.get("context_id")
     enterprise_enabled = context.get("enterprise_enabled", False)
 
-    return(
-        {
-            "user_id": str(identity["_id"]),
-            "email": identity["email"],
-            "first_name": identity.get("first_name", ""),
-            "last_name": identity.get("last_name", ""),
-            "organization_id": str(identity.get("organization_id", "")),
-            "organization_name": identity.get("organization_name", ""),
-            "scopes": identity.get("scopes", []),
-            "context_id": context_id,
-            "enterprise_enabled": enterprise_enabled,
-        }
-    )
+    return {
+        "user_id": identity.get("sub"),
+        "email": identity.get("email"),
+        "first_name": identity.get("first_name", ""),
+        "last_name": identity.get("last_name", ""),
+        "organization_id": identity.get("organization_id", ""),
+        "organization_name": identity.get("organization_name", ""),
+        "scopes": identity.get("scope", []),
+        "context_id": context_id,
+        "enterprise_enabled": enterprise_enabled,
+    }
