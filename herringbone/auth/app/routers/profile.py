@@ -73,6 +73,8 @@ async def list_users(
         }
     )
 
+    return(str(identity))
+
 
 @router.get("/set")
 async def list_users(
