@@ -57,6 +57,8 @@ async def list_users(
     print(identity)
     print(context)
 
+    return(str(identity))
+
 
 @router.get("/set")
 async def list_users(
@@ -66,3 +68,5 @@ async def list_users(
 ):
     print(identity)
     print(context)
+
+    return(str(identity))
