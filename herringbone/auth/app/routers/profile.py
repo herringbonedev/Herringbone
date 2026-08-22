@@ -27,7 +27,7 @@ from app.schemas import (
     UserProfileUpdateRequest
 )
 
-router = APIRouter(prefix="/herringbone/auth/user_profile", tags=["users"])
+router = APIRouter(prefix="/herringbone/auth/user_profile", tags=["profile"])
 
 identity = Depends(get_identity)
 admin = Depends(require_scopes("platform:admin"))

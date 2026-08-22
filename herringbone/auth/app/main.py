@@ -5,7 +5,8 @@ from app.routers import (
     auth,
     users,
     services,
-    ingestion
+    ingestion,
+    profile
 )
 
 app = FastAPI()
@@ -23,6 +24,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(services.router)
 app.include_router(ingestion.router)
+app.include_router(profile.router)
 
 # Enterprise extensions
 try:
