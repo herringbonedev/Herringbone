@@ -59,19 +59,12 @@ async def get_user_profile(
     context_id = context.get("context_id")
     enterprise_enabled = context.get("enterprise_enabled", False)
 
-    return {
-        "user_id": identity.get("sub"),
-        "email": identity.get("email"),
-        "first_name": identity.get("first_name", ""),
-        "last_name": identity.get("last_name", ""),
-        "organization_id": identity.get("organization_id", ""),
-        "organization_name": identity.get("organization_name", ""),
-        "scopes": identity.get("scope", []),
-        "context_id": context_id,
-        "enterprise_enabled": enterprise_enabled,
-    }
-
-    return(str(identity))
+    try:
+        return {
+            "user_id": identity["profile"],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/set")
@@ -85,14 +78,9 @@ async def set_user_profile(
     context_id = context.get("context_id")
     enterprise_enabled = context.get("enterprise_enabled", False)
 
-    return {
-        "user_id": identity.get("sub"),
-        "email": identity.get("email"),
-        "first_name": identity.get("first_name", ""),
-        "last_name": identity.get("last_name", ""),
-        "organization_id": identity.get("organization_id", ""),
-        "organization_name": identity.get("organization_name", ""),
-        "scopes": identity.get("scope", []),
-        "context_id": context_id,
-        "enterprise_enabled": enterprise_enabled,
-    }
+    try:
+        return {
+            "user_id": identity["profile"],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
