@@ -1,11 +1,11 @@
 services:
   incidents-incidentset:
-    image: quay.io/herringbone/incidents-incidentset:ef5d46b4@sha256:407744cdc0a2af712dda7d03b2cfabaa4b9888de92ea99da278cb596cd8c136d
+    image: quay.io/herringbone/incidents-incidentset:b4a8a79c@sha256:94632e19ab15ba6b2e249a6fa04272bea703c61a1add8830cb9e59faa7f06809
     restart: unless-stopped
     networks:
-    - herringbone
+      - herringbone
     expose:
-    - "7011"
+      - "7011"
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -19,13 +19,13 @@ services:
       HERRINGBONE_ELEMENT: incidentset
     read_only: true
     tmpfs:
-    - /tmp
+      - /tmp
     security_opt:
-    - no-new-privileges:true
+      - no-new-privileges:true
     secrets:
-    - service_token
-    - service_jwt_public_key
-    - jwt_secret
+      - service_token
+      - service_jwt_public_key
+      - jwt_secret
     deploy:
       replicas: ${INCIDENTS_INCIDENTSET_REPLICAS:-3}
 secrets:
