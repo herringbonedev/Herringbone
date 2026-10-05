@@ -1,11 +1,11 @@
 services:
   incidents-correlator:
-    image: quay.io/herringbone/incidents-correlator:573da897@sha256:5b43ab5e477f6cc60a0ca4231b99425a1e1eb6f0ffb4b677ea5f458ae1f84741
+    image: quay.io/herringbone/incidents-correlator:b4a8a79c@sha256:35dbeb29ec7ca02c6b9ff3392383b2bd7b0160fcb0a3285bf7125d32f88a0b74
     restart: unless-stopped
     networks:
-    - herringbone
+      - herringbone
     expose:
-    - "7012"
+      - "7012"
     environment:
       MONGO_HOST: ${MONGO_HOST}
       MONGO_PORT: ${MONGO_PORT}
@@ -20,13 +20,13 @@ services:
       HERRINGBONE_ELEMENT: correlator
     read_only: true
     tmpfs:
-    - /tmp
+      - /tmp
     security_opt:
-    - no-new-privileges:true
+      - no-new-privileges:true
     secrets:
-    - service_token
-    - service_jwt_public_key
-    - jwt_secret
+      - service_token
+      - service_jwt_public_key
+      - jwt_secret
     deploy:
       replicas: ${INCIDENTS_CORRELATOR_REPLICAS:-1}
 secrets:
