@@ -110,10 +110,15 @@ class MongoConnectionTests(unittest.TestCase):
                 host="mongodb", max_pool_size=7, retry_writes=False,
                 server_selection_timeout_ms=123,
             )
-            with self.assertRaisesRegex(ValueError, "body failed"):
+            body_error = ValueError("body failed")
+            caught_error = None
+            try:
                 with wrapper:
                     self.assertIs(wrapper.raw_db, client.__getitem__.return_value)
-                    raise ValueError("body failed")
+                    raise body_error
+            except ValueError as exc:
+                caught_error = exc
+            self.assertIs(caught_error, body_error)
             factory.assert_called_once_with(
                 wrapper.uri, serverSelectionTimeoutMS=123, retryWrites=False, maxPoolSize=7,
             )
