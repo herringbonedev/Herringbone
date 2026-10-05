@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
+      - 'modules/modules/database/**'
       - 'herringbone/search/**'
       - '.github/workflows/herringbone-search.yml'
 

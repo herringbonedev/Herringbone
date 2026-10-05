@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
+      - 'modules/modules/database/**'
       - 'herringbone/logs/**'
       - '.github/workflows/herringbone-logs.yml'
 

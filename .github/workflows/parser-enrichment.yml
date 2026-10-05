@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
+      - 'modules/modules/database/**'
       - 'parser/enrichment/**'
       - '.github/workflows/parser-enrichment.yml'
 

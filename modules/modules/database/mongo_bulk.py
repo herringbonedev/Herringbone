@@ -4,6 +4,8 @@ from datetime import datetime, UTC
 from uuid import uuid4
 from typing import Any, Iterable, Mapping, Sequence
 
+from threading import Lock
+
 from pymongo import MongoClient, errors
 from pymongo.database import Database
 
@@ -42,6 +44,7 @@ class HerringboneMongoBulkOperations:
         self.server_selection_timeout_ms = server_selection_timeout_ms
         self.retry_writes = retry_writes
         self.max_pool_size = max_pool_size
+        self._connection_lock = Lock()
         self.client: MongoClient | None = None
         self.db: Database | None = None
         self.last_claim_stats: dict[str, Any] = {}
@@ -53,21 +56,28 @@ class HerringboneMongoBulkOperations:
     # ===========================
 
     def open_mongo_connection(self) -> tuple[MongoClient, Database]:
+        # MongoClient owns a connection pool and monitoring threads. Reuse it
+        # across operations, and serialize first use by concurrent handlers.
         try:
-            if self.client is None:
-                self.client = MongoClient(
-                    self.uri,
-                    serverSelectionTimeoutMS=self.server_selection_timeout_ms,
-                    retryWrites=self.retry_writes,
-                    maxPoolSize=self.max_pool_size,
-                )
-                self.client.admin.command("ping")
-                self.db = self.client[self.database]
+            with self._connection_lock:
+                if self.client is None:
+                    client = MongoClient(
+                        self.uri,
+                        serverSelectionTimeoutMS=self.server_selection_timeout_ms,
+                        retryWrites=self.retry_writes,
+                        maxPoolSize=self.max_pool_size,
+                    )
+                    try:
+                        client.admin.command("ping")
+                        db = client[self.database]
+                    except Exception:
+                        client.close()
+                        raise
+                    # Publish only a successfully initialized client.
+                    self.client = client
+                    self.db = db
 
-            if self.db is None:
-                self.db = self.client[self.database]
-
-            return self.client, self.db
+                return self.client, self.db
 
         except errors.ServerSelectionTimeoutError as e:
             raise RuntimeError(f"MongoDB server unreachable: {e}") from e
@@ -75,12 +85,13 @@ class HerringboneMongoBulkOperations:
             raise RuntimeError(f"MongoDB authentication failed: {e}") from e
 
     def close_mongo_connection(self):
-        if self.client:
-            try:
-                self.client.close()
-            finally:
-                self.client = None
-                self.db = None
+        with self._connection_lock:
+            if self.client is not None:
+                try:
+                    self.client.close()
+                finally:
+                    self.client = None
+                    self.db = None
 
     def __enter__(self) -> "HerringboneMongoBulkOperations":
         self.open_mongo_connection()
