@@ -8,6 +8,8 @@ from typing import Any, Dict, Iterable, Tuple
 from datetime import datetime, UTC
 import codecs
 
+from threading import Lock
+
 from pymongo import MongoClient, errors
 
 
@@ -131,6 +133,7 @@ class HerringboneMongoDatabase:
 
         self.database = database
 
+        self._connection_lock = Lock()
         self.client: MongoClient | None = None
         self.db = None
 
@@ -139,15 +142,27 @@ class HerringboneMongoDatabase:
     # ===========================
 
     def open_mongo_connection(self):
+        # MongoClient owns a connection pool and monitoring threads. Reuse it
+        # across operations, and serialize first use by concurrent handlers.
         try:
-            self.client = MongoClient(
-                self.uri,
-                serverSelectionTimeoutMS=5000,
-                retryWrites=True,
-            )
-            self.client.admin.command("ping")
-            self.db = self.client[self.database]
-            return self.client, self.db
+            with self._connection_lock:
+                if self.client is None:
+                    client = MongoClient(
+                        self.uri,
+                        serverSelectionTimeoutMS=5000,
+                        retryWrites=True,
+                    )
+                    try:
+                        client.admin.command("ping")
+                        db = client[self.database]
+                    except Exception:
+                        client.close()
+                        raise
+                    # Publish only a successfully initialized client.
+                    self.client = client
+                    self.db = db
+
+                return self.client, self.db
 
         except errors.ServerSelectionTimeoutError as e:
             raise RuntimeError(f"MongoDB server unreachable: {e}") from e
@@ -155,12 +170,13 @@ class HerringboneMongoDatabase:
             raise RuntimeError(f"MongoDB authentication failed: {e}") from e
 
     def close_mongo_connection(self):
-        if self.client:
-            try:
-                self.client.close()
-            finally:
-                self.client = None
-                self.db = None
+        with self._connection_lock:
+            if self.client is not None:
+                try:
+                    self.client.close()
+                finally:
+                    self.client = None
+                    self.db = None
 
     # ===========================
     # Sanitization

@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
+      - 'modules/modules/database/**'
       - 'logingestion/receiver/**'
       - '.github/workflows/receiver.yml'
 

@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
+      - 'modules/modules/database/**'
       - 'parser/cardset/**'
       - '.github/workflows/parser-cardset.yml'
 

@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
+      - 'modules/modules/database/**'
       - 'parser/extractor/**'
       - '.github/workflows/parser-extractor.yml'
 
