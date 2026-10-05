@@ -5,6 +5,6 @@ resources:
   - deployment.yaml
   - service.yaml
 images:
-  - name:
-    newTag:
-    digest:
+  - name: quay.io/herringbone/herringbone-search
+    newTag: b4a8a79c
+    digest: sha256:30b1eeb364f0a715ed298bb73ca4969b7543361ffc7c1e4d8978e2fb8048207e
