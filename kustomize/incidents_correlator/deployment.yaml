@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: incidents-correlator
+  namespace: herringbone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: incidents-correlator
+  template:
+    metadata:
+      labels:
+        app: incidents-correlator
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+        - name: incidents-correlator
+          image: quay.io/herringbone/incidents-correlator
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7012
+              protocol: TCP
+          env:
+            - name: MONGO_HOST
+              value: "mongodb-headless.mongodb.svc.cluster.local"
+            - name: MONGO_PORT
+              value: "27017"
+            - name: MONGO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: username
+            - name: MONGO_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: password
+            - name: DB_NAME
+              value: "herringbone"
+            - name: AUTH_DB
+              value: "herringbone"
+            - name: COLLECTION_NAME
+              value: "incidents"
+            - name: EVENTS_API_BASE
+              value: "http://herringbone-logs-service:7010/herringbone/logs/events"
+            - name: HERRINGBONE_SERVICE
+              value: "incidents-correlator"
+            - name: HERRINGBONE_UNIT
+              value: "incidents"
+            - name: HERRINGBONE_ELEMENT
+              value: "correlator"
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: runtime-secrets
+              mountPath: /run/secrets
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: runtime-secrets
+          secret:
+            secretName: incidents-correlator-secrets
+            items:
+              - key: service_token
+                path: service_token
+              - key: service_jwt_public_key
+                path: service_jwt_public_key
+              - key: jwt_secret
+                path: jwt_secret
+        - name: tmp
+          emptyDir: {}
